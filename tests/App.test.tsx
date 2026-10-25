@@ -16,14 +16,27 @@ function setup(count = 1, approved = true) {
   }
   window.workspace = api; render(<Provider><App /></Provider>); return api
 }
-it('shows startup as a tab, leaves reserved sidebar empty, and creates in the active group', async () => {
+it('shows startup as a tab with workspace navigation and creates in the active group', async () => {
   const api = setup(); await screen.findByRole('tab', { name: 'Pi 1' })
-  expect(screen.getByRole('complementary', { name: 'Reserved sidebar' }).textContent).toBe('')
+  expect(screen.getByRole('complementary', { name: 'Main sidebar' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'AI Workspace' }).getAttribute('aria-current')).toBe('page')
   expect(api.create).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
   await screen.findByRole('tab', { name: 'Pi 2' })
   expect(screen.getByTestId('1').getAttribute('data-visible')).toBe('false')
   expect(screen.getByTestId('2').getAttribute('data-visible')).toBe('true')
+})
+it('opens settings and collapses navigation without stopping or recreating sessions', async () => {
+  const api = setup(); await screen.findByRole('tab', { name: 'Pi 1' })
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+  expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy()
+  expect(screen.queryByRole('tab', { name: 'Pi 1' })).toBeNull()
+  expect(screen.getByTestId('1')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
+  expect(screen.getByRole('button', { name: 'Expand sidebar' }).getAttribute('aria-expanded')).toBe('false')
+  fireEvent.click(screen.getByRole('button', { name: 'AI Workspace' }))
+  expect(screen.getByRole('tab', { name: 'Pi 1' })).toBeTruthy()
+  expect(api.create).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled()
 })
 it('honors close cancellation and leaves an empty state after closing the last tab', async () => {
   const api = setup(); await screen.findByRole('tab', { name: 'Pi 1' })

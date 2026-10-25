@@ -2,10 +2,13 @@ import { useEffect, useReducer, useRef, useState, type CSSProperties } from 'rea
 import { Button, Dialog, Portal } from '@chakra-ui/react'
 import type { Session } from '../../shared/types'
 import { TerminalPane } from './TerminalPane'
+import { Sidebar, type Page } from './Sidebar'
 import { initialLayout, layoutReducer, type Layout } from './layout'
 
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>([])
+  const [page, setPage] = useState<Page>('workspace')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [layout, dispatch] = useReducer(layoutReducer, initialLayout)
   const [folder, setFolder] = useState('')
   const [error, setError] = useState('')
@@ -72,10 +75,10 @@ export default function App() {
     : { gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: `42px minmax(0, ${ratio}fr) 6px 42px minmax(0, ${100 - ratio}fr)` }
   const needsPartner = !split && layout.groups[0].ids.length === 1
   return <div className="workspace flex h-dvh overflow-hidden">
-    <aside className="sidebar reserved-sidebar" aria-label="Reserved sidebar" />
-    <main className="flex min-w-0 flex-1 flex-col">
+    <Sidebar page={page} onPage={setPage} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
+    <main className="flex min-w-0 flex-1 flex-col" style={{ display: page === 'workspace' ? 'flex' : 'none' }}>
       <header className="toolbar">
-        <h1>Shumora</h1>
+        <h1>AI Workspace</h1>
         <button className="folder-button workspace-folder" title="Working directory for new sessions" aria-label="Choose folder for new sessions" onClick={() => { void window.workspace.chooseFolder().then(setFolder).catch(e => setError(String(e))) }}><span aria-hidden="true">▱</span><span title={folder}>{folder || 'Loading folder…'}</span></button>
         <div className="layout-switch" aria-label="Terminal layout">
           <Button size="xs" variant="ghost" disabled={busy || !sessions.length} aria-label={needsPartner ? 'New session in split right' : 'Split right'} onClick={() => doSplit('right')}>{needsPartner ? '+ Split right' : 'Split right'}</Button>
@@ -107,7 +110,7 @@ export default function App() {
           const index = layout.groups.findIndex(g => g.ids.includes(session.id))
           const visible = index >= 0 && layout.groups[index].active === session.id
           return <div key={session.id} id={`panel-${session.id}`} role="tabpanel" aria-labelledby={`tab-${session.id}`} className="session-panel" style={{ ...position(Math.max(0, index), 2), display: visible ? 'flex' : 'none' }}>
-            <TerminalPane session={session} visible={visible} focused={visible && layout.focused === index} onFocus={() => dispatch({ type: 'focus', group: index })} />
+            <TerminalPane session={session} visible={visible && page === 'workspace'} focused={visible && page === 'workspace' && layout.focused === index} onFocus={() => dispatch({ type: 'focus', group: index })} />
           </div>
         })}
         {split && <div className="group-separator" role="separator" tabIndex={0} aria-label="Resize terminal groups" aria-orientation={layout.orientation === 'right' ? 'vertical' : 'horizontal'} aria-valuemin={25} aria-valuemax={75} aria-valuenow={ratio} style={layout.orientation === 'right' ? { gridColumn: 2, gridRow: '1 / 3' } : { gridColumn: 1, gridRow: 3 }}
@@ -125,6 +128,7 @@ export default function App() {
       </div>
       <footer className="statusbar"><span>{sessions.filter(s => s.status === 'running').length} processes running</span><span>{split ? 'Two groups' : 'Single group'} · Hidden sessions keep running</span></footer>
     </main>
+    {page === 'settings' && <main className="settings-page flex min-w-0 flex-1 flex-col"><header className="toolbar"><h1>Settings</h1></header><section className="settings-content"><h2>Workspace settings</h2><p>Settings will be added here. Your terminal sessions keep running while you are on this page.</p><Button variant="outline" size="sm" onClick={() => setPage('workspace')}>Back to workspace</Button></section></main>}
     <Dialog.Root role="alertdialog" open={closeTarget !== null} placement="center" size="sm" initialFocusEl={() => cancelClose.current} closeOnInteractOutside={false} onOpenChange={({ open }) => { if (!open && !closing.length) setCloseTarget(null) }}>
       <Portal>
         <Dialog.Backdrop />
