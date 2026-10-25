@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Button } from '@chakra-ui/react'
 import type { Session } from '../../shared/types'
 import { TerminalPane } from './TerminalPane'
 
@@ -46,23 +47,23 @@ export default function App() {
     if (!split) setSecondaryId(sessions.find((s) => s.id !== active)?.id || '')
     setSplit(true)
   }
-  return <div className="workspace">
+  return <div className="workspace flex h-dvh overflow-hidden">
     <aside className="sidebar">
-      <div className="brand"><span className="brand-icon">π</span><div>Pi Workspace<small>YOUR AGENT WORKBENCH</small></div></div>
-      <div className="section-label">WORKSPACE</div>
+      <div className="brand"><span className="brand-mark" aria-hidden="true">S<span>_</span></span><div>Shumora<small>Pi terminal workspace</small></div></div>
+      <div className="section-label">Working directory</div>
       <button className="folder-button" aria-label="Choose folder for new sessions" onClick={() => { void window.workspace.chooseFolder().then(setFolder).catch((e) => setError(String(e))) }}><span>▱</span><span title={folder}>{folder || 'Loading folder…'}</span><span>↗</span></button>
       <p className="folder-help">Folder for new sessions</p>
-      <div className="session-heading"><span className="section-label">SESSIONS</span><span className="count">{sessions.length}</span></div>
-      <button className="new-session" onClick={() => void add()} disabled={busy}>＋ {busy ? 'Starting…' : 'New session'}</button>
+      <div className="session-heading"><span className="section-label">Sessions</span><span className="count">{sessions.length}</span></div>
+      <Button colorPalette="brand" size="sm" width="full" justifyContent="flex-start" borderRadius="4px" my="3" mb="4" loading={busy} loadingText="Starting…" disabled={busy} onClick={() => void add()}>＋ New session</Button>
       <nav aria-label="Pi sessions">{sessions.map((s) => <button key={s.id} className={`session-item ${active === s.id ? 'selected' : ''}`} onClick={() => select(s.id)} aria-pressed={active === s.id}>
         <span className={`status-dot ${s.status}`} /><span className="session-copy">{s.name}<small>{s.status === 'running' ? 'Process running' : s.status === 'error' ? 'Launch failed' : 'Process exited'}</small></span><span className="terminal-glyph">›_</span>
       </button>)}</nav>
-      <div className="sidebar-footer"><span className="status-dot running" /> Local workspace<small>Independent sessions · installed Pi runtime</small></div>
+      <div className="sidebar-footer"><span className="runtime-label">Pi Coding Agent</span><small>Local runtime · independent processes</small></div>
     </aside>
-    <main>
-      <header className="toolbar"><div><span className="eyebrow">TERMINAL WORKSPACE</span><h1>{selected?.name || 'Starting workspace'}</h1></div><div className="layout-switch" aria-label="Terminal layout"><button aria-label="Single view" aria-pressed={!split} onClick={() => setSplit(false)}>▣ <span>Single</span></button><button aria-label="Split view" aria-pressed={split} onClick={enableSplit}>◫ <span>Split</span></button></div></header>
-      {error && <div className="global-error" role="alert">{error}<button onClick={() => setError('')}>Dismiss</button></div>}
-      <div className={`terminal-grid ${secondary ? 'split' : ''}`}>
+    <main className="flex min-w-0 flex-1 flex-col">
+      <header className="toolbar"><div className="workspace-location"><span className="toolbar-label">Workspace</span><span className="breadcrumb-separator" aria-hidden="true">/</span><h1>{selected?.name || 'Starting workspace'}</h1></div><div className="layout-switch" aria-label="Terminal layout"><Button size="xs" variant={!split ? 'outline' : 'ghost'} colorPalette="brand" aria-label="Single view" aria-pressed={!split} onClick={() => setSplit(false)}>▣ <span>Single</span></Button><Button size="xs" variant={split ? 'outline' : 'ghost'} colorPalette="brand" aria-label="Split view" aria-pressed={split} onClick={enableSplit}>◫ <span>Split</span></Button></div></header>
+      {error && <div className="global-error" role="alert">{error}<Button size="xs" variant="ghost" colorPalette="red" onClick={() => setError('')}>Dismiss</Button></div>}
+      <div className={`terminal-grid grid min-h-0 flex-1 ${secondary ? 'grid-cols-2' : 'grid-cols-1'}`}>
         {sessions.map((session) => <TerminalPane key={session.id} session={session} visible={session.id === active || session.id === secondary?.id} focused={session.id === active} onFocus={() => select(session.id)} />)}
         {sessions.length === 0 && <div className="empty-state">Connecting to the local Pi runtime…</div>}
       </div>

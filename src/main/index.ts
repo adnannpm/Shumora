@@ -49,7 +49,7 @@ function createWindow() {
   closing = false
   window = new BrowserWindow({
     width: 1360, height: 860, minWidth: 800, minHeight: 540,
-    title: 'Pi Workspace', backgroundColor: '#0c1017', autoHideMenuBar: true,
+    title: 'Shumora', backgroundColor: '#ffffff', autoHideMenuBar: true,
     webPreferences: { preload: join(__dirname, '../preload/index.js'), nodeIntegration: false, contextIsolation: true, sandbox: true }
   })
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
@@ -60,7 +60,7 @@ function createWindow() {
     if (!sessions.list().some((s) => s.status === 'running')) { sessions.dispose(); return }
     event.preventDefault()
     const choice = dialog.showMessageBoxSync(window!, {
-      type: 'warning', title: 'Close Pi Workspace?', message: 'Stop all running Pi sessions and close?',
+      type: 'warning', title: 'Close Shumora?', message: 'Stop all running Pi sessions and close?',
       detail: 'Hidden sessions are still running. Closing this app stops their processes. Conversation resume is not managed by this MVP.',
       buttons: ['Keep working', 'Stop sessions and close'], defaultId: 0, cancelId: 0
     })
