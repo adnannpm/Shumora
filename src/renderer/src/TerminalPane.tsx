@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
+import { Button } from '@chakra-ui/react'
 import { FitAddon } from '@xterm/addon-fit'
+import { terminalTheme } from './theme'
 import type { Session, SessionEvent } from '../../shared/types'
 
 export function TerminalPane({ session, visible, focused, onFocus }: { session: Session; visible: boolean; focused: boolean; onFocus: () => void }) {
@@ -14,7 +16,7 @@ export function TerminalPane({ session, visible, focused, onFocus }: { session: 
     if (terminal.current) terminal.current.options.disableStdin = !running.current
   }, [session.status])
   useEffect(() => {
-    const term = new Terminal({ disableStdin: !running.current, cursorBlink: true, fontSize: 14, fontFamily: '"Cascadia Code", "DejaVu Sans Mono", Consolas, monospace', scrollback: 5000, allowProposedApi: false, theme: { background: '#10151e', foreground: '#d2d9e5', cursor: '#a7f3d0', selectionBackground: '#334b65', black: '#19212e', brightBlack: '#728099', green: '#8cdbad', cyan: '#7fcce5', blue: '#8caef9', magenta: '#c6a0f6', red: '#ef8b95', yellow: '#eac38b' } })
+    const term = new Terminal({ disableStdin: !running.current, cursorBlink: true, fontSize: 14, fontFamily: '"Cascadia Code", "DejaVu Sans Mono", Consolas, monospace', scrollback: 5000, allowProposedApi: false, theme: terminalTheme })
     const addon = new FitAddon(); term.loadAddon(addon); term.open(host.current!)
     terminal.current = term
     let disposed = false, ready = false, seq = 0
@@ -57,8 +59,8 @@ export function TerminalPane({ session, visible, focused, onFocus }: { session: 
     setError('')
     try { await window.workspace[kind](session.id) } catch (e) { setError(String(e)) }
   }
-  return <section className={`terminal-pane ${focused ? 'focused' : ''}`} style={{ display: visible ? 'flex' : 'none' }} onPointerDown={onFocus} aria-label={`${session.name} terminal`}>
-    <div className="pane-header"><div><span className={`status-dot ${session.status}`} /><strong>{session.name}</strong><span className="pane-cwd" title={session.cwd}>{session.cwd}</span></div><button onClick={() => void action(session.status === 'running' ? 'stop' : 'restart')} title={session.status === 'running' ? 'Stop this session' : 'Restart this session'}>{session.status === 'running' ? '■ Stop' : '↻ Restart'}</button></div>
+  return <section className={`terminal-pane dark ${focused ? 'focused' : ''}`} style={{ display: visible ? 'flex' : 'none' }} onPointerDown={onFocus} aria-label={`${session.name} terminal`}>
+    <div className="pane-header"><div><span className={`status-dot ${session.status}`} /><strong>{session.name}</strong><span className="pane-state">{session.status === 'running' ? 'Running' : session.status === 'error' ? 'Failed' : 'Exited'}</span><span className="pane-cwd" title={session.cwd}>{session.cwd}</span></div><Button size="xs" variant="ghost" colorPalette={session.status === 'running' ? 'red' : 'brand'} onClick={() => void action(session.status === 'running' ? 'stop' : 'restart')} title={session.status === 'running' ? 'Stop this session' : 'Restart this session'}>{session.status === 'running' ? '■ Stop' : '↻ Restart'}</Button></div>
     {(session.error || error) && <div className="terminal-error" role="alert"><strong>Session needs attention</strong><p>{session.error || error}</p></div>}
     {session.status === 'exited' && <div className="exit-note">Process exited{session.exitCode !== undefined ? ` (code ${session.exitCode})` : ''}. Restart to begin a new Pi process; this does not resume the previous conversation.</div>}
     <div className="terminal-host" ref={host} />

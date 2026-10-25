@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { Session, WorkspaceAPI } from '../src/shared/types'
 vi.mock('../src/renderer/src/TerminalPane', () => ({ TerminalPane: ({ session, visible }: { session: Session; visible: boolean }) => <div data-testid={session.id} data-visible={visible}>{session.error}</div> }))
 import App from '../src/renderer/src/App'
+import { Provider } from '../src/renderer/src/Provider'
 afterEach(cleanup)
 function setup(error = false) {
   const first: Session = { id: 'one', name: 'Pi 1', cwd: '/home/test', status: error ? 'error' : 'running', generation: 1, error: error ? 'Pi executable not found' : undefined }
@@ -15,7 +16,7 @@ function setup(error = false) {
     onEvent: () => () => {}, snapshot: vi.fn(), input: vi.fn(), resize: vi.fn(), stop: vi.fn(), restart: vi.fn()
   }
   window.workspace = api
-  render(<App />)
+  render(<Provider><App /></Provider>)
   return api
 }
 it('shows existing startup session without creating a duplicate', async () => {
