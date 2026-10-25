@@ -28,6 +28,11 @@ function registerIPC() {
     'sessions:snapshot': (id: string) => sessions.snapshot(id),
     'sessions:input': (id: string, data: string) => sessions.input(id, data),
     'sessions:resize': (id: string, cols: number, rows: number) => sessions.resize(id, cols, rows),
+    // The renderer confirms destructive closes using the Shumora dialog.
+    'sessions:close': (id: string) => {
+      sessions.close(id)
+      return true
+    },
     'sessions:stop': (id: string) => sessions.stop(id),
     'sessions:restart': (id: string) => sessions.restart(id),
     'workspace:folder': () => folder,
