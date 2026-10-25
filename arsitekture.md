@@ -1,6 +1,6 @@
 # Arsitektur Shumora
 
-Dokumen desain utama: [Desain Produk dan Arsitektur Awal](ai-artifacts/plans/2026-10-25-ai-workspace-design.md).
+Dokumen desain rinci dan catatan verifikasi disimpan secara lokal sebagai artefak internal dan tidak disertakan dalam repository.
 
 ## Konsep
 
@@ -30,4 +30,4 @@ Hybrid berarti terminal asli + UI pengelolaan workspace; UI chat native dan kont
 - Layout terpisah dari lifecycle sesi: panel tersembunyi tidak berarti proses berhenti.
 - Pemulihan UI, resume percakapan Pi, dan mempertahankan proses hidup adalah kebutuhan berbeda.
 
-Status: dokumentasi awal; belum implementasi. Detail, pertanyaan terbuka, dan strategi verifikasi tersedia dalam dokumen desain utama.
+Status: ringkasan desain awal. Lihat README untuk fitur MVP yang sudah diimplementasikan dan batas verifikasi saat ini.
