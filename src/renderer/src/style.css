@@ -71,7 +71,21 @@ button:disabled { opacity: .55; cursor: default; }
 .preview-dark i { background: #42516a; }
 .theme-choice-label { display: flex; justify-content: space-between; align-items: center; padding: 10px 7px 5px; font-size: 13px; }
 .theme-choice[aria-checked=true] .theme-choice-label { color: var(--accent); }
-.release-notes { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; font-size: 13px; line-height: 1.8; margin: 0; }
+.release-notes { overflow-wrap: anywhere; font-family: inherit; font-size: 13px; line-height: 1.8; }
+.release-notes h2 { font-size: 19px; font-weight: 650; margin: 0 0 20px; }
+.release-notes h3 { font-size: 15px; font-weight: 600; margin: 24px 0 10px; }
+.release-notes h4 { font-size: 14px; font-weight: 600; margin: 18px 0 8px; }
+.release-notes p { margin: 10px 0; }
+.release-notes ul, .release-notes ol { padding-left: 22px; margin: 8px 0 16px; }
+.release-notes ul { list-style: disc; }
+.release-notes ol { list-style: decimal; }
+.release-notes li { margin: 5px 0; }
+.release-notes strong { font-weight: 650; }
+.release-notes code { background: var(--sidebar); border: 1px solid var(--line); border-radius: 3px; padding: 1px 4px; font-size: 12px; }
+.release-notes pre { overflow-x: auto; background: var(--sidebar); padding: 12px; border-radius: 4px; margin: 12px 0; }
+.release-notes pre code { border: 0; padding: 0; }
+.release-notes blockquote { border-left: 3px solid var(--line); padding-left: 14px; color: var(--muted); }
+.release-notes .release-link { color: var(--accent); }
 .settings-note { margin-top: 24px; font-size: 12px !important; }
 .settings-details { margin-top: 24px; font-size: 13px; }
 .settings-details > div { display: flex; justify-content: space-between; gap: 20px; padding: 16px 0; border-bottom: 1px solid var(--line); }

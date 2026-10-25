@@ -2,7 +2,7 @@
 
 ## Source of truth
 
-`package.json` defines the application version. `changelogs/<version>.md` defines the notes for that version. The application bundles that exact file and GitHub Release uses it as its body. Notes render as plain Markdown text in the app, with no HTML execution or remote content. They are available offline.
+`package.json` defines the application version. `changelogs/<version>.md` defines the notes for that version. The application bundles that exact file and GitHub Release uses it as its body. Notes render as formatted Markdown in the app, with headings, lists, emphasis, and code. Raw HTML is skipped and remote images are not loaded. Link destinations are displayed as text, not opened automatically. They are available offline.
 
 The What's New dialog appears until dismissed for the installed version. Dismissal is recorded locally. Settings → About → Release notes reopens it. This is not an automatic installer/updater or a remote update notification.
 
