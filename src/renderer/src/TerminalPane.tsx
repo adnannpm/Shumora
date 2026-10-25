@@ -8,8 +8,13 @@ export function TerminalPane({ session, visible, focused, onFocus }: { session: 
   const terminal = useRef<Terminal | null>(null)
   const fit = useRef<(() => void) | null>(null)
   const [error, setError] = useState('')
+  const running = useRef(session.status === 'running')
   useEffect(() => {
-    const term = new Terminal({ cursorBlink: true, fontSize: 14, fontFamily: '"Cascadia Code", "DejaVu Sans Mono", Consolas, monospace', scrollback: 5000, allowProposedApi: false, theme: { background: '#10151e', foreground: '#d2d9e5', cursor: '#a7f3d0', selectionBackground: '#334b65', black: '#19212e', brightBlack: '#728099', green: '#8cdbad', cyan: '#7fcce5', blue: '#8caef9', magenta: '#c6a0f6', red: '#ef8b95', yellow: '#eac38b' } })
+    running.current = session.status === 'running'
+    if (terminal.current) terminal.current.options.disableStdin = !running.current
+  }, [session.status])
+  useEffect(() => {
+    const term = new Terminal({ disableStdin: !running.current, cursorBlink: true, fontSize: 14, fontFamily: '"Cascadia Code", "DejaVu Sans Mono", Consolas, monospace', scrollback: 5000, allowProposedApi: false, theme: { background: '#10151e', foreground: '#d2d9e5', cursor: '#a7f3d0', selectionBackground: '#334b65', black: '#19212e', brightBlack: '#728099', green: '#8cdbad', cyan: '#7fcce5', blue: '#8caef9', magenta: '#c6a0f6', red: '#ef8b95', yellow: '#eac38b' } })
     const addon = new FitAddon(); term.loadAddon(addon); term.open(host.current!)
     terminal.current = term
     let disposed = false, ready = false, seq = 0
@@ -29,7 +34,10 @@ export function TerminalPane({ session, visible, focused, onFocus }: { session: 
       pending.forEach(apply); pending.length = 0
     }).catch((e) => { if (!disposed) setError(String(e)) })
     const report = (e: unknown) => { if (!disposed) setError(String(e)) }
-    const input = term.onData((data) => { void window.workspace.input(session.id, data).catch(report) })
+    const input = term.onData((data) => {
+      if (!running.current || disposed) return
+      void window.workspace.input(session.id, data).catch(report)
+    })
     const resize = () => {
       if (!host.current || host.current.clientWidth < 20 || host.current.clientHeight < 20) return
       addon.fit()
