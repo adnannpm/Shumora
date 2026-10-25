@@ -1,0 +1,31 @@
+import { expect, it } from 'vitest'
+import { initialLayout, layoutReducer as reduce } from '../src/renderer/src/layout'
+it('splits by moving a tab, without duplicating session identities', () => {
+  let s = reduce(initialLayout, { type: 'init', ids: ['a', 'b', 'c'] })
+  s = reduce(s, { type: 'select', group: 0, id: 'b' })
+  s = reduce(s, { type: 'split', orientation: 'right' })
+  expect(s.groups.map(g => g.ids)).toEqual([['a', 'c'], ['b']])
+  expect(s.focused).toBe(1)
+  s = reduce(s, { type: 'select', group: 0, id: 'a' })
+  s = reduce(s, { type: 'move', group: 0 })
+  expect(s.groups.map(g => g.ids)).toEqual([['c'], ['b', 'a']])
+  s = reduce(s, { type: 'merge' })
+  expect(s.groups).toHaveLength(1); expect(new Set(s.groups[0].ids).size).toBe(3)
+})
+it('creates an explicit split partner for a single tab and collapses empty groups', () => {
+  let s = reduce(initialLayout, { type: 'init', ids: ['a'] })
+  s = reduce(s, { type: 'split', orientation: 'down', newId: 'b' })
+  expect(s.orientation).toBe('down'); expect(s.groups.map(g => g.ids)).toEqual([['a'], ['b']])
+  s = reduce(s, { type: 'remove', id: 'a' })
+  expect(s.groups.map(g => g.ids)).toEqual([['b']]); expect(s.focused).toBe(0)
+  s = reduce(s, { type: 'remove', id: 'b' })
+  expect(s.groups).toEqual([{ ids: [], active: '' }])
+})
+it('adds to the requested group and preserves active tabs on unrelated close', () => {
+  let s = reduce(initialLayout, { type: 'init', ids: ['a', 'b'] })
+  s = reduce(s, { type: 'split', orientation: 'right' })
+  s = reduce(s, { type: 'add', id: 'c', group: 0 })
+  s = reduce(s, { type: 'remove', id: 'b' })
+  expect(s.groups[0].active).toBe('c')
+  expect(s.groups.flatMap(g => g.ids).sort()).toEqual(['a', 'c'])
+})
