@@ -1,4 +1,5 @@
 import { Button } from '@chakra-ui/react'
+import shumoraLogo from './assets/shumora-logo.png'
 
 export type Page = 'workspace' | 'settings'
 function NavIcon({ type }: { type: 'terminal' | 'settings' | 'collapse' }) {
@@ -10,7 +11,7 @@ function NavIcon({ type }: { type: 'terminal' | 'settings' | 'collapse' }) {
 }
 export function Sidebar({ page, onPage, collapsed, onToggle }: { page: Page; onPage: (page: Page) => void; collapsed: boolean; onToggle: () => void }) {
   return <aside className={`app-sidebar ${collapsed ? 'collapsed' : ''}`} aria-label="Main sidebar">
-    <div className="sidebar-brand"><span className="logo-placeholder" title="Temporary logo" aria-hidden="true">S</span><span className="sidebar-label" aria-hidden={collapsed}>Shumora</span></div>
+    <div className="sidebar-brand"><img className="sidebar-logo" src={shumoraLogo} alt="" aria-hidden="true" /><span className="sidebar-label" aria-hidden={collapsed}>Shumora</span></div>
     <nav aria-label="Main navigation" className="sidebar-navigation">
       <Button variant="ghost" aria-label="AI Workspace" title={collapsed ? 'AI Workspace' : undefined} aria-current={page === 'workspace' ? 'page' : undefined} onClick={() => onPage('workspace')}><NavIcon type="terminal" /><span className="sidebar-label" aria-hidden={collapsed}>AI Workspace</span></Button>
       <Button variant="ghost" aria-label="Settings" title={collapsed ? 'Settings' : undefined} aria-current={page === 'settings' ? 'page' : undefined} onClick={() => onPage('settings')}><NavIcon type="settings" /><span className="sidebar-label" aria-hidden={collapsed}>Settings</span></Button>
