@@ -6,6 +6,7 @@ const api: WorkspaceAPI = {
   snapshot: (id) => ipcRenderer.invoke('sessions:snapshot', id),
   input: (id, data) => ipcRenderer.invoke('sessions:input', id, data),
   resize: (id, cols, rows) => ipcRenderer.invoke('sessions:resize', id, cols, rows),
+  close: (id) => ipcRenderer.invoke('sessions:close', id),
   stop: (id) => ipcRenderer.invoke('sessions:stop', id),
   restart: (id) => ipcRenderer.invoke('sessions:restart', id),
   folder: () => ipcRenderer.invoke('workspace:folder'),

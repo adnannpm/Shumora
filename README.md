@@ -2,7 +2,7 @@
 
 **A desktop workspace for managing multiple Pi Coding Agent sessions.**
 
-Shumora brings independent Pi terminals into a single application, combining a session sidebar with focused and split-screen layouts. It preserves Pi’s native terminal experience while providing a dedicated interface for organizing your work.
+Shumora brings independent Pi terminals into a single application, combining session tabs with focused and split-screen layouts. It preserves Pi’s native terminal experience while providing a dedicated interface for organizing your work.
 
 Built with Electron, React, TypeScript, xterm.js, and node-pty. Shumora uses an existing Pi installation; cloning or modifying Pi’s source code is not required.
 
@@ -11,8 +11,10 @@ Built with Electron, React, TypeScript, xterm.js, and node-pty. Shumora uses an 
 ## Features
 
 - **Instant startup:** Opens one Pi session in your home directory when the application starts.
-- **Independent sessions:** Create and switch between multiple Pi processes from the sidebar.
-- **Flexible views:** Work in a single terminal or display two sessions side by side.
+- **Session tabs:** Create sessions with the ＋ button, switch between tabs, and close them with ×. Running sessions require confirmation before they are stopped and removed.
+- **Tab groups:** Split the active tab into a second group, arrange groups side by side or top to bottom, and resize the divider by dragging or using arrow keys.
+- **Move and merge:** Move the active tab to the other group or merge both groups without restarting Pi. Closing the last tab in a group collapses that group.
+- **Reserved sidebar:** The sidebar is intentionally empty for future features.
 - **Background continuity:** Hidden sessions keep running when you switch views.
 - **Working directory selection:** Choose a directory for newly created sessions without changing existing ones.
 - **Session controls:** Stop or restart individual processes and inspect launch errors.
@@ -83,7 +85,8 @@ The desktop smoke test requires a working display, an available Electron binary,
 
 ### Verification Status
 
-- **Passed:** 15 backend/UI tests, TypeScript checks, and production build.
+- **Passed:** Backend/UI regression tests, TypeScript checks, and production build.
+- **Passed:** Browser-rendered workspace fixtures at 1360px and 800px, covering tab groups, both split orientations, pointer resizing, stable terminal mounts, and closing all tabs. These fixtures do not exercise the native Electron confirmation dialog or a live Pi session.
 - **Passed:** Native Electron PTY receiving output from the installed Pi runtime.
 - **Passed:** Linux unpacked packaging and native PTY loading from the packaged application.
 - **Outstanding:** Desktop smoke test, which currently times out during the DevTools connection in the development environment.
@@ -103,9 +106,9 @@ Build and validate releases on their target operating systems to ensure native d
 - Restarting creates a new Pi process; it does **not** resume the previous conversation.
 - Normal application shutdown stops managed PTYs. There is no background daemon or process persistence after exit.
 - Cleanup of Pi-created child processes after forced termination is not guaranteed. Shumora is not a production process supervisor.
-- The current limit is 32 retained sessions per application run. Stopped sessions still count toward this limit; a discard action is not yet available.
+- Up to 32 open sessions are supported. Stopped sessions retain their tab until closed; closing a tab releases its slot and output buffer. Closing the final tab leaves an empty workspace rather than automatically starting another process.
 - Terminal output replay is limited to 512,000 UTF-16 code units per session. It is not a conversation archive or a complete terminal screen snapshot.
-- Split panels have equal widths; drag-to-resize is not implemented.
+- A maximum of two tab groups is supported. The divider adjusts between 25% and 75%; arrow keys adjust it in 5% steps, Home/End select the limits, and double-click resets it. Freeform docking and drag-and-drop tab movement are not implemented.
 - The `running` indicator describes process liveness, not whether the AI is actively working.
 - Prompt libraries, model/provider management, native chat views, and inter-agent coordination are not included in this MVP.
 
