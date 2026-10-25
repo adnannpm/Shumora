@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { PluginsAPI } from '../shared/plugins'
 import type { UpdatesAPI, UpdateState } from '../shared/updates'
 import type { WorkspaceAPI, SessionEvent } from '../shared/types'
 const api: WorkspaceAPI = {
@@ -19,6 +20,11 @@ const api: WorkspaceAPI = {
   }
 }
 contextBridge.exposeInMainWorld('workspace', api)
+const plugins: PluginsAPI = {
+  status: (refresh) => ipcRenderer.invoke('plugins:status', refresh),
+  mutate: (action, version) => ipcRenderer.invoke('plugins:mutate', action, version)
+}
+contextBridge.exposeInMainWorld('plugins', plugins)
 const updates: UpdatesAPI = {
   status: () => ipcRenderer.invoke('updates:status'),
   check: () => ipcRenderer.invoke('updates:check'),

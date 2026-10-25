@@ -7,10 +7,15 @@ import { SessionManager } from './sessions'
 import { resolveLaunch } from './launch'
 import { autoUpdater } from 'electron-updater'
 import { UpdateManager } from './updates'
+import { openDatabase } from './database'
+import { PluginService } from './plugins'
+import { pluginHost } from './plugin-host'
+import type { PluginAction } from '../shared/plugins'
 
 let window: BrowserWindow | undefined
 let folder = homedir()
 let closing = false
+let database: ReturnType<typeof openDatabase> | undefined
 const sessions = new SessionManager((cwd) => {
   if (!statSync(cwd).isDirectory()) throw new Error('Working directory is not a folder')
   const launch = resolveLaunch(process.platform, process.env, process.env.PATH || process.env.Path || '')
@@ -21,8 +26,14 @@ const sessions = new SessionManager((cwd) => {
 })
 
 let updates: UpdateManager
+let plugins: PluginService
 function registerIPC() {
   const handlers: Record<string, (...args: any[]) => unknown> = {
+    'plugins:status': (refresh: boolean) => {
+      if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag')
+      return plugins.status(refresh)
+    },
+    'plugins:mutate': (action: PluginAction, version?: string) => plugins.mutate(action, version),
     'updates:status': () => updates.snapshot(),
     'updates:check': () => updates.check(),
     'updates:download': () => updates.download(),
@@ -84,6 +95,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  database = openDatabase(app.getPath('userData'))
+  plugins = new PluginService(database, pluginHost)
   const unsupported = !app.isPackaged ? 'Updates can only be installed in a packaged Shumora application.'
     : process.platform === 'darwin' ? 'macOS automatic updates require a signed and notarized release. Install a release manually for now.'
     : process.platform === 'linux' && !process.env.APPIMAGE ? 'Linux automatic updates are supported only for AppImage installations.'
@@ -100,4 +113,4 @@ app.whenReady().then(() => {
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
 app.on('window-all-closed', () => { sessions.dispose(); app.quit() })
-app.on('will-quit', () => sessions.dispose())
+app.on('will-quit', () => { sessions.dispose(); database?.close(); database = undefined })

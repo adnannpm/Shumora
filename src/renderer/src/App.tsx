@@ -4,12 +4,26 @@ import type { Session } from '../../shared/types'
 import { TerminalPane } from './TerminalPane'
 import { Sidebar, type Page } from './Sidebar'
 import { Settings } from './Settings'
+import { Library } from './Library'
+import type { RouterPlugin } from '../../shared/plugins'
 import { initialLayout, layoutReducer, type Layout } from './layout'
 
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [page, setPage] = useState<Page>('workspace')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [routerInstalled, setRouterInstalled] = useState(false)
+  function pluginStatus(plugin: RouterPlugin) {
+    if (plugin.error?.startsWith('Cannot verify local')) return
+    setRouterInstalled(plugin.installed)
+    if (!plugin.installed) setPage(current => current === '9router' ? 'workspace' : current)
+  }
+  useEffect(() => {
+    let alive = true
+    const check = () => { void window.plugins?.status().then(plugin => { if (alive) pluginStatus(plugin) }).catch(() => {}) }
+    check(); window.addEventListener('focus', check)
+    return () => { alive = false; window.removeEventListener('focus', check) }
+  }, [])
   const [layout, dispatch] = useReducer(layoutReducer, initialLayout)
   const [folder, setFolder] = useState('')
   const [error, setError] = useState('')
@@ -76,7 +90,7 @@ export default function App() {
     : { gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: `42px minmax(0, ${ratio}fr) 6px 42px minmax(0, ${100 - ratio}fr)` }
   const needsPartner = !split && layout.groups[0].ids.length === 1
   return <div className="workspace flex h-dvh overflow-hidden">
-    <Sidebar page={page} onPage={setPage} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
+    <Sidebar routerInstalled={routerInstalled} page={page} onPage={setPage} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
     <main className="flex min-w-0 flex-1 flex-col" style={{ display: page === 'workspace' ? 'flex' : 'none' }}>
       <header className="toolbar">
         <h1>AI Workspace</h1>
@@ -130,6 +144,8 @@ export default function App() {
       <footer className="statusbar"><span>{sessions.filter(s => s.status === 'running').length} processes running</span><span>{split ? 'Two groups' : 'Single group'} · Hidden sessions keep running</span></footer>
     </main>
     {page === 'settings' && <Settings />}
+    {page === 'library' && <Library onPluginStatus={pluginStatus} />}
+    {page === '9router' && routerInstalled && <main className="settings-page flex min-w-0 flex-1 flex-col"><header className="toolbar"><h1>9router</h1></header><section className="settings-content"><h2>9router integration</h2><p>9router is installed. Integration controls will be added here. Manage its installation separately in Library → Plugin.</p></section></main>}
     <Dialog.Root role="alertdialog" open={closeTarget !== null} placement="center" size="sm" initialFocusEl={() => cancelClose.current} closeOnInteractOutside={false} onOpenChange={({ open }) => { if (!open && !closing.length) setCloseTarget(null) }}>
       <Portal>
         <Dialog.Backdrop />
