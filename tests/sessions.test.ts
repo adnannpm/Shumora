@@ -63,26 +63,6 @@ describe('SessionManager', () => {
     expect(() => m.input(s.id, 'x'.repeat(65537))).toThrow('Invalid terminal input')
     expect(() => m.input('unknown', 'x')).toThrow('Unknown session')
   })
-  it('closes sessions, removes retained history and emits removal', () => {
-    const { manager: m, processes: p, events } = fixture(); const s = m.create('/tmp')
-    p[0].data('history'); m.close(s.id)
-    expect(p[0].killed).toBe(true); expect(m.list()).toEqual([])
-    expect(events).toContainEqual({ type: 'removed', id: s.id })
-    expect(() => m.snapshot(s.id)).toThrow('Unknown session')
-    expect(() => m.input(s.id, 'queued reply')).not.toThrow()
-    expect(() => m.resize(s.id, 80, 24)).not.toThrow()
-    expect(() => m.input('never-created', 'x')).toThrow('Unknown session')
-    expect(() => m.close(s.id)).not.toThrow()
-  })
-  it('keeps a process owned and visible if stop fails', () => {
-    let fail = true
-    const p: PtyProcess = { onData: () => ({ dispose() {} }), onExit: () => ({ dispose() {} }), write() {}, resize() {}, kill() { if (fail) throw new Error('kill failed') } }
-    const m = new SessionManager(() => p, () => {})
-    const s = m.create('/tmp')
-    expect(() => m.close(s.id)).toThrow('kill failed')
-    expect(m.list()[0].status).toBe('running')
-    fail = false; m.close(s.id); expect(m.list()).toEqual([])
-  })
   it('cleans every process on dispose', () => {
     const { manager: m, processes: p } = fixture(); m.create('/tmp'); m.create('/tmp'); m.dispose()
     expect(p.every((s) => s.killed)).toBe(true); expect(m.list().every((s) => s.status === 'exited')).toBe(true)

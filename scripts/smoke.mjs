@@ -12,18 +12,18 @@ try {
   page.on('console', (message) => console.log('renderer:', message.text()))
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.getByRole('tab', { name: 'Pi 1' }).waitFor()
+  await page.getByRole('button', { name: /Pi 1/ }).waitFor()
   await page.waitForFunction(() => window.workspace !== undefined)
   assert.equal(await page.evaluate(() => typeof window.require), 'undefined')
   const first = await page.evaluate(() => window.workspace.list())
   assert.equal(first.length, 1)
   assert.equal(first[0].status, 'running', first[0].error)
   await page.waitForFunction(async () => (await window.workspace.snapshot((await window.workspace.list())[0].id)).output.length > 0)
-  await page.getByRole('button', { name: 'New session in group 1' }).click()
-  await page.getByRole('tab', { name: 'Pi 2' }).waitFor()
-  await page.getByRole('button', { name: 'Split right' }).click()
+  await page.getByRole('button', { name: /New session/ }).click()
+  await page.getByRole('button', { name: /Pi 2/ }).waitFor()
+  await page.getByRole('button', { name: 'Split view' }).click()
   assert.equal(await page.locator('.terminal-pane:visible').count(), 2)
-  await page.getByRole('button', { name: 'Merge groups' }).click()
+  await page.getByRole('button', { name: 'Single view' }).click()
   assert.equal(await page.locator('.terminal-pane:visible').count(), 1)
   assert.equal((await page.evaluate(() => window.workspace.list())).filter((s) => s.status === 'running').length, 2)
   await mkdir('ai-artifacts/verification', { recursive: true })
@@ -35,7 +35,7 @@ try {
   })
   assert(stopped.every((s) => s.status === 'exited'))
   assert.deepEqual(errors, [])
-  console.log('PASS: actual Pi startup/output, isolated renderer, two native PTYs, session tabs, split/merge, hidden process survival, stop cleanup.')
+  console.log('PASS: actual Pi startup/output, isolated renderer, two native PTYs, sidebar, split/single, hidden process survival, stop cleanup.')
 } finally {
   await app.evaluate(async ({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0]
