@@ -51,7 +51,9 @@ export class SessionManager {
   input(id: string, data: string) {
     const e = this.get(id)
     if (typeof data !== 'string' || data.length > 65536) throw new Error('Invalid terminal input')
-    if (!e.process) throw new Error('Session is not running')
+    // Terminal replies and queued keystrokes can arrive after stop/exit,
+    // before the renderer has received the updated session state.
+    if (!e.process) return
     e.process.write(data)
   }
   resize(id: string, cols: number, rows: number) {

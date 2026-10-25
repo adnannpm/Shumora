@@ -10,8 +10,13 @@ export function TerminalPane({ session, visible, focused, onFocus }: { session: 
   const terminal = useRef<Terminal | null>(null)
   const fit = useRef<(() => void) | null>(null)
   const [error, setError] = useState('')
+  const running = useRef(session.status === 'running')
   useEffect(() => {
-    const term = new Terminal({ cursorBlink: true, fontSize: 14, fontFamily: '"Cascadia Code", "DejaVu Sans Mono", Consolas, monospace', scrollback: 5000, allowProposedApi: false, theme: terminalTheme })
+    running.current = session.status === 'running'
+    if (terminal.current) terminal.current.options.disableStdin = !running.current
+  }, [session.status])
+  useEffect(() => {
+    const term = new Terminal({ disableStdin: !running.current, cursorBlink: true, fontSize: 14, fontFamily: '"Cascadia Code", "DejaVu Sans Mono", Consolas, monospace', scrollback: 5000, allowProposedApi: false, theme: terminalTheme })
     const addon = new FitAddon(); term.loadAddon(addon); term.open(host.current!)
     terminal.current = term
     let disposed = false, ready = false, seq = 0
@@ -31,7 +36,10 @@ export function TerminalPane({ session, visible, focused, onFocus }: { session: 
       pending.forEach(apply); pending.length = 0
     }).catch((e) => { if (!disposed) setError(String(e)) })
     const report = (e: unknown) => { if (!disposed) setError(String(e)) }
-    const input = term.onData((data) => { void window.workspace.input(session.id, data).catch(report) })
+    const input = term.onData((data) => {
+      if (!running.current || disposed) return
+      void window.workspace.input(session.id, data).catch(report)
+    })
     const resize = () => {
       if (!host.current || host.current.clientWidth < 20 || host.current.clientHeight < 20) return
       addon.fit()

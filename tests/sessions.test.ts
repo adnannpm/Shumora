@@ -32,12 +32,13 @@ describe('SessionManager', () => {
     expect(s.status).toBe('error'); expect(s.error).toContain('Pi executable not found')
     expect(m.restart(s.id).status).toBe('error'); expect(m.list()).toHaveLength(1)
   })
-  it('marks exit without touching another session and rejects input to exited sessions', () => {
+  it('marks exit without touching another session and ignores late input to exited sessions', () => {
     const { manager: m, processes: p } = fixture(); const a = m.create('/tmp'), b = m.create('/tmp')
     p[0].exit(7)
     expect(m.snapshot(a.id).session).toMatchObject({ status: 'exited', exitCode: 7 })
     expect(m.snapshot(b.id).session.status).toBe('running')
-    expect(() => m.input(a.id, 'x')).toThrow()
+    expect(() => m.input(a.id, 'x')).not.toThrow()
+    expect(p[0].input).toEqual([])
   })
   it('stops idempotently and restarts under same id with fresh history', () => {
     const { manager: m, processes: p } = fixture(); const a = m.create('/tmp')
@@ -52,6 +53,15 @@ describe('SessionManager', () => {
     expect(() => m.input(s.id, 'x'.repeat(65537))).toThrow()
     expect(() => m.snapshot('unknown')).toThrow()
     m.resize(s.id, 100, 30); expect(p[0].sizes).toEqual([[100, 30]])
+  })
+  it('ignores queued input after shutdown while still validating input and session IDs', () => {
+    const { manager: m, processes: p } = fixture(); const s = m.create('/tmp')
+    m.dispose()
+    expect(() => m.input(s.id, '\u001b[1;1R')).not.toThrow()
+    expect(() => m.input(s.id, 'queued keystroke')).not.toThrow()
+    expect(p[0].input).toEqual([])
+    expect(() => m.input(s.id, 'x'.repeat(65537))).toThrow('Invalid terminal input')
+    expect(() => m.input('unknown', 'x')).toThrow('Unknown session')
   })
   it('cleans every process on dispose', () => {
     const { manager: m, processes: p } = fixture(); m.create('/tmp'); m.create('/tmp'); m.dispose()

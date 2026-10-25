@@ -89,7 +89,7 @@ The desktop smoke test requires a working display, an available Electron binary,
 - **Outstanding:** Desktop smoke test, which currently times out during the DevTools connection in the development environment.
 - **Outstanding:** Packaged GUI validation, Linux AppImage validation, and Windows runtime and installer testing.
 
-See the [verification report](ai-artifacts/verification/2026-10-25-mvp-verification.md) for supporting details and open review findings. Passing unit tests and packaging checks does not establish release readiness.
+Passing unit tests and packaging checks does not establish release readiness. Internal design notes and verification artifacts are maintained locally and are not included in this repository.
 
 ## Packaging
 
@@ -113,7 +113,7 @@ Build and validate releases on their target operating systems to ensure native d
 
 Pi runs with the current user’s credentials, extensions, tools, and filesystem permissions. Electron renderer isolation does not sandbox the agent’s work or prevent Pi from modifying files.
 
-The application uses an isolated renderer and a restricted preload API. Additional hardening remains necessary before production use, including tightening the production Content Security Policy. Review the [verification report](ai-artifacts/verification/2026-10-25-mvp-verification.md) before using this MVP for sensitive work.
+The application uses an isolated renderer and a restricted preload API. Additional hardening remains necessary before production use, including tightening the production Content Security Policy. Do not treat this MVP as production-hardened software or use it for sensitive work without an independent security review.
 
 ## License
 
