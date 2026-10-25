@@ -3,5 +3,6 @@ out/
 release/
 coverage/
 ai-artifacts/
+arsitekture.md
 *.log
 .env
