@@ -3,6 +3,7 @@ import { Button, Dialog, Portal } from '@chakra-ui/react'
 import type { Session } from '../../shared/types'
 import { TerminalPane } from './TerminalPane'
 import { Sidebar, type Page } from './Sidebar'
+import { Settings } from './Settings'
 import { initialLayout, layoutReducer, type Layout } from './layout'
 
 export default function App() {
@@ -128,7 +129,7 @@ export default function App() {
       </div>
       <footer className="statusbar"><span>{sessions.filter(s => s.status === 'running').length} processes running</span><span>{split ? 'Two groups' : 'Single group'} · Hidden sessions keep running</span></footer>
     </main>
-    {page === 'settings' && <main className="settings-page flex min-w-0 flex-1 flex-col"><header className="toolbar"><h1>Settings</h1></header><section className="settings-content"><h2>Workspace settings</h2><p>Settings will be added here. Your terminal sessions keep running while you are on this page.</p><Button variant="outline" size="sm" onClick={() => setPage('workspace')}>Back to workspace</Button></section></main>}
+    {page === 'settings' && <Settings />}
     <Dialog.Root role="alertdialog" open={closeTarget !== null} placement="center" size="sm" initialFocusEl={() => cancelClose.current} closeOnInteractOutside={false} onOpenChange={({ open }) => { if (!open && !closing.length) setCloseTarget(null) }}>
       <Portal>
         <Dialog.Backdrop />
