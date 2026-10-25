@@ -71,6 +71,10 @@ button:disabled { opacity: .55; cursor: default; }
 .preview-dark i { background: #42516a; }
 .theme-choice-label { display: flex; justify-content: space-between; align-items: center; padding: 10px 7px 5px; font-size: 13px; }
 .theme-choice[aria-checked=true] .theme-choice-label { color: var(--accent); }
+.update-status { margin: 24px 0 16px; font-size: 13px; line-height: 1.7; color: var(--muted); }
+.update-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+.update-release-notes { border-top: 1px solid var(--line); margin-top: 24px; }
+.settings-content progress { width: 100%; accent-color: var(--accent); }
 .release-notes { overflow-wrap: anywhere; font-family: inherit; font-size: 13px; line-height: 1.8; }
 .release-notes h2 { font-size: 19px; font-weight: 650; margin: 0 0 20px; }
 .release-notes h3 { font-size: 15px; font-weight: 600; margin: 24px 0 10px; }

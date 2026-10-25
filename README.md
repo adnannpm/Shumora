@@ -100,13 +100,13 @@ Shumora shows **What's New** once per installed version and lets you reopen it f
 
 Prepare a version explicitly with `npm run release:prepare -- 0.2.0`, finish the notes, and submit the version changes through a PR. After merging to `main`, the repository owner approves the exact version and commit through the **Approve and build release** GitHub Actions workflow. All Linux, Windows, and macOS build jobs must succeed before publication.
 
-This is not an automatic updater. Installers are initially unsigned, and hosted cross-platform packaging has not been validated by local tests. See [the release guide](docs/releases.md) for approval steps, artifact targets, and failure recovery.
+**Settings → Updates** supports manual checks, requested downloads, and a confirmed restart/install for packaged Windows NSIS and Linux AppImage installations. Automatic downloads and install-on-exit are disabled. macOS auto-install is unavailable until signing is configured. Installers are initially unsigned, and hosted cross-platform packaging and real version-to-version updating have not been validated by local tests. See [the release guide](docs/releases.md) for approval steps, artifact targets, and failure recovery.
 
 ## Packaging
 
 Build output is written to `out/`; packaged artifacts are written to `release/`. Distribution targets are **Linux AppImage**, **Windows NSIS**, and **macOS DMG/ZIP**.
 
-Build and validate releases on their target operating systems to ensure native dependencies are compatible. Code signing, automatic updates, and production installer polish are not configured yet. Release publication is handled separately by the owner-approved workflow.
+Build and validate releases on their target operating systems to ensure native dependencies are compatible. Code signing and production installer polish are not configured yet. Automatic installation is limited to the supported packaged formats described above. Release publication is handled separately by the owner-approved workflow.
 
 ## Current Limitations
 

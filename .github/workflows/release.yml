@@ -90,7 +90,9 @@ jobs:
       - name: Package approved source (unsigned)
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: npx --no-install electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+          RELEASE_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: npx --no-install electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never --config.releaseInfo.releaseNotesFile="changelogs/$RELEASE_VERSION.md"
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.platform }}-${{ matrix.arch }}
@@ -100,6 +102,9 @@ jobs:
             release/*.exe
             release/*.dmg
             release/*.zip
+            release/*.blockmap
+            release/latest.yml
+            release/latest-linux.yml
   publish:
     needs: [authorize, build]
     runs-on: ubuntu-latest
@@ -110,6 +115,11 @@ jobs:
         with:
           ref: ${{ needs.authorize.outputs.sha }}
           persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
       - uses: actions/download-artifact@v4
         with:
           pattern: release-*
@@ -127,6 +137,9 @@ jobs:
           for suffix in linux-x64.AppImage win-x64.exe mac-arm64.dmg mac-arm64.zip mac-x64.dmg mac-x64.zip; do
             test -s "artifacts/Shumora-$VERSION-$suffix"
           done
+          test -s artifacts/latest.yml
+          test -s artifacts/latest-linux.yml
+          node scripts/verify-update-assets.mjs artifacts "$VERSION"
           if gh release view "v$VERSION" --repo "$REPO" >/dev/null 2>&1; then echo 'Release already exists'; exit 1; fi
           if gh api "repos/$REPO/git/ref/tags/v$VERSION" >/dev/null 2>&1; then echo 'Tag already exists'; exit 1; fi
           gh release create "v$VERSION" artifacts/* --repo "$REPO" --target "$SHA" --draft --title "Shumora $VERSION" --notes-file "changelogs/$VERSION.md"

@@ -5,6 +5,8 @@ import { statSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { SessionManager } from './sessions'
 import { resolveLaunch } from './launch'
+import { autoUpdater } from 'electron-updater'
+import { UpdateManager } from './updates'
 
 let window: BrowserWindow | undefined
 let folder = homedir()
@@ -18,8 +20,13 @@ const sessions = new SessionManager((cwd) => {
   if (window && !window.isDestroyed()) window.webContents.send('sessions:event', event)
 })
 
+let updates: UpdateManager
 function registerIPC() {
   const handlers: Record<string, (...args: any[]) => unknown> = {
+    'updates:status': () => updates.snapshot(),
+    'updates:check': () => updates.check(),
+    'updates:download': () => updates.download(),
+    'updates:install': () => updates.install(),
     'sessions:list': () => sessions.list(),
     'sessions:create': () => {
       if (sessions.list().length >= 32) throw new Error('MVP supports up to 32 sessions per workspace')
@@ -77,6 +84,16 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  const unsupported = !app.isPackaged ? 'Updates can only be installed in a packaged Shumora application.'
+    : process.platform === 'darwin' ? 'macOS automatic updates require a signed and notarized release. Install a release manually for now.'
+    : process.platform === 'linux' && !process.env.APPIMAGE ? 'Linux automatic updates are supported only for AppImage installations.'
+    : !['linux', 'win32'].includes(process.platform) ? 'Automatic updates are not supported on this platform.' : undefined
+  updates = new UpdateManager(autoUpdater, app.getVersion(), state => {
+    if (window && !window.isDestroyed()) window.webContents.send('updates:state', state)
+  }, () => {
+    for (const session of sessions.list()) sessions.stop(session.id)
+    closing = true
+  }, unsupported)
   registerIPC()
   sessions.create(folder)
   createWindow()

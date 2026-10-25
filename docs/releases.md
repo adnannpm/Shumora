@@ -4,7 +4,7 @@
 
 `package.json` defines the application version. `changelogs/<version>.md` defines the notes for that version. The application bundles that exact file and GitHub Release uses it as its body. Notes render as formatted Markdown in the app, with headings, lists, emphasis, and code. Raw HTML is skipped and remote images are not loaded. Link destinations are displayed as text, not opened automatically. They are available offline.
 
-The What's New dialog appears until dismissed for the installed version. Dismissal is recorded locally. Settings → About → Release notes reopens it. This is not an automatic installer/updater or a remote update notification.
+The What's New dialog appears until dismissed for the installed version. Dismissal is recorded locally. Settings → About → Release notes reopens it. Settings → Updates separately checks published stable GitHub Releases using electron-updater. Downloads start only on request. After download, Restart & install opens a Shumora confirmation dialog, stops managed Pi sessions, and invokes the installer. No background download or automatic install-on-exit is enabled.
 
 ## Prepare a version
 
@@ -48,12 +48,12 @@ The workflow validates main head at approval, then checks out that immutable com
 | macOS | Apple Silicon arm64 | DMG and ZIP |
 | macOS | Intel x64 | DMG and ZIP |
 
-Builds run natively on hosted runners. All build jobs must succeed before publishing. The publisher verifies expected files, creates a draft with the exact changelog, uploads assets, then makes it public. If upload/publish fails, a draft or tag may remain; inspect and explicitly clean up that failed candidate before retrying. The workflow never overwrites an existing release/tag.
+Builds run natively on hosted runners. All build jobs must succeed before publishing. The pipeline includes `latest.yml`, `latest-linux.yml`, and blockmaps for Windows/Linux updates. macOS metadata is intentionally not published while auto-install is disabled, avoiding architecture collisions from separate macOS matrix jobs. The publisher verifies metadata version, release-note equality, asset sizes and SHA-512 hashes, creates a draft with the exact changelog, uploads assets, then makes it public. If upload/publish fails, a draft or tag may remain; inspect and explicitly clean up that failed candidate before retrying. The workflow never overwrites an existing release/tag.
 
 ## Signing and limits
 
 These initial artifacts are **unsigned**. Windows code signing and macOS Developer ID/notarization are not configured; users may see OS security warnings or launch restrictions. Do not present unsigned builds as production-ready. Signing credentials must be stored in GitHub secrets when a separately reviewed signing workflow is added.
 
-Hosted runners (including `macos-15-intel`), native dependencies, and installers must be validated in actual GitHub Actions runs. Local tests/build do not prove that cross-platform packaging works. This change does not run a release, bump the current version, provision signing credentials, or enable automatic updates.
+Hosted runners (including `macos-15-intel`), native dependencies, and installers must be validated in actual GitHub Actions runs. Local tests/build do not prove that cross-platform packaging works. This change does not run a release, bump the current version, or provision signing credentials. Windows NSIS and Linux AppImage updates are enabled only in packaged applications; macOS auto-install remains disabled until signed/notarized distribution is configured. Development and non-AppImage Linux installations show an unsupported explanation. Real end-to-end installation between two published versions has not been verified.
 
 For reproducible public releases, review dependency/action versions and consider pinning action references to audited commit SHAs before release use.
