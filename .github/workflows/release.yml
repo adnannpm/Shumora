@@ -134,11 +134,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for suffix in linux-x64.AppImage win-x64.exe mac-arm64.dmg mac-arm64.zip mac-x64.dmg mac-x64.zip; do
-            test -s "artifacts/Shumora-$VERSION-$suffix"
+          echo 'Downloaded release assets:'
+          ls -lh artifacts/
+          for suffix in linux-x86_64.AppImage win-x64.exe mac-arm64.dmg mac-arm64.zip mac-x64.dmg mac-x64.zip; do
+            asset="artifacts/Shumora-$VERSION-$suffix"
+            test -s "$asset" || { echo "::error::Missing or empty release asset: $asset"; exit 1; }
           done
-          test -s artifacts/latest.yml
-          test -s artifacts/latest-linux.yml
+          for metadata in latest.yml latest-linux.yml; do
+            test -s "artifacts/$metadata" || { echo "::error::Missing updater metadata: $metadata"; exit 1; }
+          done
           node scripts/verify-update-assets.mjs artifacts "$VERSION"
           if gh release view "v$VERSION" --repo "$REPO" >/dev/null 2>&1; then echo 'Release already exists'; exit 1; fi
           if gh api "repos/$REPO/git/ref/tags/v$VERSION" >/dev/null 2>&1; then echo 'Tag already exists'; exit 1; fi
