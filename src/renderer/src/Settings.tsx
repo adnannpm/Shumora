@@ -1,9 +1,13 @@
 import { useState } from 'react'
+import { Button } from '@chakra-ui/react'
+import { useReleaseNotes } from './ReleaseNotes'
+import { releaseVersion } from './release-data'
 import { useAppearance } from './Appearance'
 
 type Section = 'appearance' | 'terminal' | 'about'
 export function Settings() {
   const [section, setSection] = useState<Section>('appearance')
+  const { show } = useReleaseNotes()
   const { theme, setTheme } = useAppearance()
   return <main className="settings-page flex min-w-0 flex-1 flex-col">
     <header className="toolbar"><h1>Settings</h1></header>
@@ -28,7 +32,7 @@ export function Settings() {
           <p className="settings-note">The terminal stays dark in both themes. Changing appearance does not restart your sessions.</p>
         </>}
         {section === 'terminal' && <><h2>Terminal</h2><p>The Pi terminal has its own appearance, separate from the application shell.</p><dl className="settings-details"><div><dt>Terminal appearance</dt><dd>Always dark</dd></div><div><dt>Runtime</dt><dd>Installed Pi Coding Agent</dd></div><div><dt>Session behavior</dt><dd>Hidden sessions keep running</dd></div></dl><p className="settings-note">Font and terminal palette controls are not available yet.</p></>}
-        {section === 'about' && <><h2>About Shumora</h2><p>A desktop workspace for independent Pi Coding Agent sessions.</p><dl className="settings-details"><div><dt>Application</dt><dd>Shumora · early MVP</dd></div><div><dt>Agent runtime</dt><dd>External Pi installation</dd></div><div><dt>Workspace</dt><dd>Session tabs and two resizable groups</dd></div></dl><p className="settings-note">Shumora does not install Pi automatically. Model access and credentials are configured in Pi.</p></>}
+        {section === 'about' && <><h2>About Shumora</h2><p>A desktop workspace for independent Pi Coding Agent sessions.</p><Button size="sm" variant="outline" onClick={show}>Release notes</Button><dl className="settings-details"><div><dt>Application</dt><dd>Shumora {releaseVersion} · early MVP</dd></div><div><dt>Agent runtime</dt><dd>External Pi installation</dd></div><div><dt>Workspace</dt><dd>Session tabs and two resizable groups</dd></div></dl><p className="settings-note">Shumora does not install Pi automatically. Model access and credentials are configured in Pi.</p></>}
       </section>
     </div>
   </main>

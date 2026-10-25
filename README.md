@@ -94,11 +94,19 @@ The desktop smoke test requires a working display, an available Electron binary,
 
 Passing unit tests and packaging checks does not establish release readiness. Internal design notes and verification artifacts are maintained locally and are not included in this repository.
 
+## Release Notes and Publishing
+
+Shumora shows **What's New** once per installed version and lets you reopen it from **Settings → About → Release notes**. Notes are bundled for offline reading. The application and GitHub Release use the same `changelogs/<version>.md` file.
+
+Prepare a version explicitly with `npm run release:prepare -- 0.2.0`, finish the notes, and submit the version changes through a PR. After merging to `main`, the repository owner approves the exact version and commit through the **Approve and build release** GitHub Actions workflow. All Linux, Windows, and macOS build jobs must succeed before publication.
+
+This is not an automatic updater. Installers are initially unsigned, and hosted cross-platform packaging has not been validated by local tests. See [the release guide](docs/releases.md) for approval steps, artifact targets, and failure recovery.
+
 ## Packaging
 
-Build output is written to `out/`; packaged artifacts are written to `release/`. The initial distribution targets are **Linux AppImage** and **Windows NSIS**.
+Build output is written to `out/`; packaged artifacts are written to `release/`. Distribution targets are **Linux AppImage**, **Windows NSIS**, and **macOS DMG/ZIP**.
 
-Build and validate releases on their target operating systems to ensure native dependencies are compatible. Code signing, automatic updates, and production installer polish are not configured yet.
+Build and validate releases on their target operating systems to ensure native dependencies are compatible. Code signing, automatic updates, and production installer polish are not configured yet. Release publication is handled separately by the owner-approved workflow.
 
 ## Current Limitations
 

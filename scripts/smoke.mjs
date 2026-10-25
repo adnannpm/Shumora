@@ -12,6 +12,8 @@ try {
   page.on('console', (message) => console.log('renderer:', message.text()))
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
+  const notes = page.getByRole('button', { name: 'Got it', exact: true })
+  if (await notes.isVisible()) await notes.click()
   await page.getByRole('tab', { name: 'Pi 1' }).waitFor()
   await page.waitForFunction(() => window.workspace !== undefined)
   assert.equal(await page.evaluate(() => typeof window.require), 'undefined')

@@ -1,0 +1,133 @@
+name: Approve and build release
+run-name: Release ${{ inputs.version }} approved by @${{ github.actor }}
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Approved version already prepared in main (for example 0.2.0)'
+        required: true
+        type: string
+      commit:
+        description: 'Full 40-character SHA of the approved main commit'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: shumora-release
+  cancel-in-progress: false
+jobs:
+  authorize:
+    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.validate.outputs.sha }}
+    steps:
+      - name: Validate approval and immutable commit
+        id: validate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          SHA: ${{ inputs.commit }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(gh api "repos/$REPO/git/ref/heads/main" --jq '.object.sha')" = "$SHA"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.validate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify version and release source
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'if(require("./package.json").version !== process.env.VERSION) process.exit(1)'
+          node scripts/release-check.mjs
+          if gh api "repos/$REPO/git/ref/tags/v$VERSION" >/dev/null 2>&1; then echo 'Tag already exists'; exit 1; fi
+          if gh release view "v$VERSION" --repo "$REPO" >/dev/null 2>&1; then echo 'Release already exists'; exit 1; fi
+  build:
+    needs: authorize
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+            arch: x64
+          - os: windows-2022
+            platform: win
+            arch: x64
+          - os: macos-15
+            platform: mac
+            arch: arm64
+          - os: macos-15-intel
+            platform: mac
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.authorize.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Package approved source (unsigned)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx --no-install electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}-${{ matrix.arch }}
+          if-no-files-found: error
+          path: |
+            release/*.AppImage
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+  publish:
+    needs: [authorize, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.authorize.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: artifacts
+          merge-multiple: true
+      - name: Verify assets, create draft, then publish atomically
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          SHA: ${{ needs.authorize.outputs.sha }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for suffix in linux-x64.AppImage win-x64.exe mac-arm64.dmg mac-arm64.zip mac-x64.dmg mac-x64.zip; do
+            test -s "artifacts/Shumora-$VERSION-$suffix"
+          done
+          if gh release view "v$VERSION" --repo "$REPO" >/dev/null 2>&1; then echo 'Release already exists'; exit 1; fi
+          if gh api "repos/$REPO/git/ref/tags/v$VERSION" >/dev/null 2>&1; then echo 'Tag already exists'; exit 1; fi
+          gh release create "v$VERSION" artifacts/* --repo "$REPO" --target "$SHA" --draft --title "Shumora $VERSION" --notes-file "changelogs/$VERSION.md"
+          gh release edit "v$VERSION" --repo "$REPO" --draft=false --latest
