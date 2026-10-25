@@ -1,4 +1,4 @@
-# AI Workspace Berbasis Pi — Desain Produk dan Arsitektur Awal
+# Shumora — Desain Produk dan Arsitektur Awal
 
 Tanggal: 2026-10-25
 Status: arah produk disepakati dalam diskusi; detail teknis masih berupa rancangan, belum implementasi.

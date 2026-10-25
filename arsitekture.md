@@ -1,4 +1,4 @@
-# Arsitektur AI Workspace
+# Arsitektur Shumora
 
 Dokumen desain utama: [Desain Produk dan Arsitektur Awal](ai-artifacts/plans/2026-10-25-ai-workspace-design.md).
 

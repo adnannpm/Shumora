@@ -1,102 +1,120 @@
-# Pi Workspace — MVP
+# Shumora
 
-Desktop workspace untuk banyak terminal Pi Coding Agent. Terminal Pi asli ditampilkan dengan xterm.js; Electron mengelola satu PTY per sesi. Tidak perlu clone source Pi.
+**A desktop workspace for managing multiple Pi Coding Agent sessions.**
 
-## Fitur
+Shumora brings independent Pi terminals into a single application, combining a session sidebar with focused and split-screen layouts. It preserves Pi’s native terminal experience while providing a dedicated interface for organizing your work.
 
-- Startup membuat satu sesi Pi di folder home.
-- Sidebar menambah dan memilih sesi independen (maksimal 32 per aplikasi).
-- Single view dan split dua kolom; memilih sesi lain mengganti pasangan split, klik panel untuk fokus.
-- Sesi tersembunyi tetap hidup. Mengganti layout tidak membuat ulang proses.
-- Pemilih folder untuk **sesi berikutnya**; sesi yang sudah berjalan tidak berpindah direktori.
-- Stop/restart per sesi, status proses, pesan kegagalan launch.
-- Konfirmasi sebelum menutup aplikasi ketika masih ada proses hidup.
+Built with Electron, React, TypeScript, xterm.js, and node-pty. Shumora uses an existing Pi installation; cloning or modifying Pi’s source code is not required.
 
-## Prasyarat
+> **Project status:** Early MVP. Linux build and native PTY checks have passed. Full desktop end-to-end testing and Windows runtime validation remain outstanding.
 
-- Node.js 22.19+ (disarankan versi LTS yang didukung dependency), npm.
-- Pi sudah terinstal dan dapat dijalankan lewat `pi`; konfigurasi/login provider dilakukan di Pi.
-- Desktop Linux atau Windows. Linux memerlukan library sistem Electron dan dukungan sandbox yang sesuai distribusi.
-- Native module `node-pty` dibangun untuk Electron saat postinstall. Jika tidak ada prebuild: Linux membutuhkan compiler C/C++/make/Python; Windows membutuhkan toolchain native yang sesuai node-gyp, biasanya Visual Studio Build Tools dan Python.
+## Features
 
-## Development
+- **Instant startup:** Opens one Pi session in your home directory when the application starts.
+- **Independent sessions:** Create and switch between multiple Pi processes from the sidebar.
+- **Flexible views:** Work in a single terminal or display two sessions side by side.
+- **Background continuity:** Hidden sessions keep running when you switch views.
+- **Working directory selection:** Choose a directory for newly created sessions without changing existing ones.
+- **Session controls:** Stop or restart individual processes and inspect launch errors.
+- **Exit confirmation:** Receive a warning before closing the application with active sessions.
+
+## Requirements
+
+- Node.js **22.19 or later**, using a version supported by the project’s dependencies, and npm.
+- [Pi Coding Agent](https://pi.dev) installed and available through `pi`, with provider authentication configured in Pi.
+- A Linux or Windows desktop environment. Linux requires Electron’s system libraries and appropriate sandbox support.
+
+The native `node-pty` dependency is prepared for Electron during installation. If a compatible prebuilt binary is unavailable, you will need a native build toolchain: a C/C++ compiler, make, and Python on Linux; or the appropriate Visual Studio Build Tools and Python on Windows.
+
+## Getting Started
 
 ```bash
+git clone https://github.com/adnannpm/Shumora.git
+cd Shumora
 npm install
 npm run dev
 ```
 
-Buka folder proyek ini di terminal sebelum menjalankan perintah. Aplikasi awalnya menggunakan folder home, bukan folder source aplikasi, sebagai direktori sesi Pi.
+The first Pi session uses your home directory, not the application’s source directory. Use the folder selector to change the working directory for subsequent sessions.
 
-Jika Pi tidak ditemukan pada PATH aplikasi desktop:
+Pi is an external dependency. Shumora does not bundle or automatically install it.
+
+### Configuring the Pi Executable
+
+If Pi is not available on the application’s `PATH`, specify its executable before launching Shumora.
+
+**Linux**
 
 ```bash
 PI_EXECUTABLE=/absolute/path/to/pi npm run dev
 ```
 
-Windows PowerShell:
+**Windows PowerShell**
 
 ```powershell
 $env:PI_EXECUTABLE = 'C:\path\to\pi.exe'
 npm run dev
 ```
 
-Launcher Windows mendukung executable `.exe` atau instalasi npm standar dengan `pi.cmd` dan `node.exe` pada PATH. Untuk instalasi nonstandar yang menggunakan shim:
+On Windows, the launcher supports a native `.exe` or a standard npm installation with `pi.cmd` and `node.exe` available on `PATH`. For a nonstandard npm installation, provide explicit paths:
 
 ```powershell
+$env:PI_EXECUTABLE = 'C:\path\to\pi.cmd'
 $env:PI_NODE_EXECUTABLE = 'C:\Program Files\nodejs\node.exe'
 $env:PI_CLI_PATH = 'C:\path\to\node_modules\@earendil-works\pi-coding-agent\dist\cli.js'
-$env:PI_EXECUTABLE = 'C:\path\to\pi.cmd'
 npm run dev
 ```
 
-Shim tidak dieksekusi lewat interpolasi `cmd.exe`. Pi tidak dibundel dan aplikasi tidak menginstalnya otomatis. Environment konfigurasi harus tersedia saat aplikasi diluncurkan; launcher dari menu desktop mungkin memiliki PATH berbeda dari terminal.
+These environment variables must be available when the application launches. Applications opened from a desktop menu may inherit a different `PATH` from your terminal.
 
-## Verifikasi
+## Development and Validation
 
-```bash
-npm test
-npm run typecheck
-npm run build
-node scripts/smoke.mjs
-```
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the application in development mode |
+| `npm test` | Run backend and UI regression tests |
+| `npm run typecheck` | Check TypeScript types |
+| `npm run build` | Build the main process, preload, and renderer |
+| `node scripts/smoke.mjs` | Run the desktop smoke test against an installed Pi runtime |
+| `npm run pack` | Create an unpacked application directory |
+| `npm run dist` | Build distribution artifacts for the current target platform |
 
-Status verifikasi aktual dan keterbatasannya dicatat di [laporan verifikasi](ai-artifacts/verification/2026-10-25-mvp-verification.md). Unit/UI tests dan build lolos; smoke test desktop saat ini masih timeout pada koneksi DevTools di lingkungan pengembangan.
+The desktop smoke test requires a working display, an available Electron binary, and an installed Pi runtime. It checks startup, terminal output, renderer isolation, session creation, layout changes, hidden-session continuity, and process shutdown. It does not submit a model prompt. Playwright may disable the sandbox for its test process; the normal application window is configured with sandboxing enabled.
 
-Smoke test membutuhkan display desktop, binary Electron tersedia, dan Pi terinstal. Test ini membuka aplikasi, memeriksa output Pi, renderer isolation, penambahan sesi, split/single, keberlangsungan proses tersembunyi, dan stop. Tidak mengirim prompt berbayar ke model. Playwright dapat menonaktifkan sandbox dalam proses test; konfigurasi aplikasi normal tetap sandboxed.
+### Verification Status
 
-## Build dan packaging
+- **Passed:** 15 backend/UI tests, TypeScript checks, and production build.
+- **Passed:** Native Electron PTY receiving output from the installed Pi runtime.
+- **Passed:** Linux unpacked packaging and native PTY loading from the packaged application.
+- **Outstanding:** Desktop smoke test, which currently times out during the DevTools connection in the development environment.
+- **Outstanding:** Packaged GUI validation, Linux AppImage validation, and Windows runtime and installer testing.
 
-```bash
-npm run build
-npm run pack
-npm run dist
-```
+See the [verification report](ai-artifacts/verification/2026-10-25-mvp-verification.md) for supporting details and open review findings. Passing unit tests and packaging checks does not establish release readiness.
 
-Output build berada di `out/`, packaging di `release/`. Konfigurasi target awal: Linux AppImage dan Windows NSIS. Build rilis perlu dijalankan/diuji pada OS target agar native module sesuai. Code signing, installer polish, dan update otomatis belum disiapkan. Jangan menganggap konfigurasi packaging berarti kedua platform sudah terverifikasi.
+## Packaging
 
-## Lifecycle dan batas MVP
+Build output is written to `out/`; packaged artifacts are written to `release/`. The initial distribution targets are **Linux AppImage** and **Windows NSIS**.
 
-- Status `running` hanya berarti proses hidup, bukan model sedang berpikir.
-- Stop/restart menghentikan proses; restart memulai proses Pi baru, **bukan resume percakapan**.
-- Penutupan normal aplikasi menghentikan managed PTY. Tidak ada daemon/background session.
-- Penghentian paksa aplikasi dan child process yang dibuat tool Pi belum dijamin seluruhnya bersih; jangan mengandalkan aplikasi sebagai process supervisor produksi.
-- Tidak ada penyimpanan workspace/layout, prompt library, database, chat React, pengelolaan model/provider, atau komunikasi antar-agent.
-- Pi memakai kredensial, extensions, tools, dan akses file milik pengguna. Renderer isolation bukan sandbox untuk pekerjaan agent.
-- Output replay dibatasi 512.000 karakter per sesi; bukan arsip percakapan atau snapshot layar terminal yang sempurna.
-- Split berukuran sama; drag-resize panel belum masuk versi ini.
-- Windows runtime dan installer serta build terpaket Linux masih perlu uji native sebelum rilis.
+Build and validate releases on their target operating systems to ensure native dependencies are compatible. Code signing, automatic updates, and production installer polish are not configured yet.
 
-## Struktur
+## Current Limitations
 
-```text
-src/main/         Electron, lifecycle sesi, launcher Pi
-src/preload/      API IPC terbatas
-src/shared/       Kontrak tipe
-src/renderer/     React workspace dan terminal
-tests/            Unit dan UI regression tests
-scripts/          Desktop smoke test
-ai-artifacts/     Desain, rencana, dan bukti verifikasi
-```
+- Workspace settings, layouts, and session selection are not persisted between application launches.
+- Restarting creates a new Pi process; it does **not** resume the previous conversation.
+- Normal application shutdown stops managed PTYs. There is no background daemon or process persistence after exit.
+- Cleanup of Pi-created child processes after forced termination is not guaranteed. Shumora is not a production process supervisor.
+- The current limit is 32 retained sessions per application run. Stopped sessions still count toward this limit; a discard action is not yet available.
+- Terminal output replay is limited to 512,000 UTF-16 code units per session. It is not a conversation archive or a complete terminal screen snapshot.
+- Split panels have equal widths; drag-to-resize is not implemented.
+- The `running` indicator describes process liveness, not whether the AI is actively working.
+- Prompt libraries, model/provider management, native chat views, and inter-agent coordination are not included in this MVP.
 
-Desain: [ai-artifacts/plans/2026-10-25-ai-workspace-design.md](ai-artifacts/plans/2026-10-25-ai-workspace-design.md).
+## Security Considerations
+
+Pi runs with the current user’s credentials, extensions, tools, and filesystem permissions. Electron renderer isolation does not sandbox the agent’s work or prevent Pi from modifying files.
+
+The application uses an isolated renderer and a restricted preload API. Additional hardening remains necessary before production use, including tightening the production Content Security Policy. Review the [verification report](ai-artifacts/verification/2026-10-25-mvp-verification.md) before using this MVP for sensitive work.
+
+## License
+
+Licensed under the [MIT License](LICENSE).

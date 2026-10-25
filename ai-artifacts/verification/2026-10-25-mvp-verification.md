@@ -1,4 +1,4 @@
-# MVP verification — 2026-10-25
+# Shumora MVP Verification — 2026-10-25
 
 ## Passed
 

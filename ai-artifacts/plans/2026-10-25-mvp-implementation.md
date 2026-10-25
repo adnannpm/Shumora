@@ -1,4 +1,4 @@
-# AI Workspace MVP Implementation Plan
+# Shumora MVP Implementation Plan
 
 **Goal:** Build the approved terminal-first hybrid desktop MVP without cloning or changing Pi.
 **Architecture:** React renders persistent xterm views; a sandboxed preload exposes narrow IPC; Electron owns independent node-pty processes and bounded output replay. Layout never owns process lifetime.
