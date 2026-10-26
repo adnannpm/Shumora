@@ -1,16 +1,24 @@
 import { accessSync, constants, existsSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
-import { execFile } from 'node:child_process'
+import { spawn, type ChildProcess, execFile } from 'node:child_process'
 import type { PluginHost } from './plugins'
+import type { RouterHost } from './router-service'
+import { routerHealth } from './router-health'
 function executable(name: string): string | undefined {
   const dirs = (process.env.PATH || process.env.Path || '').split(path.delimiter).filter(Boolean)
   const names = process.platform === 'win32' ? [`${name}.exe`, `${name}.cmd`, name] : [name]
   return dirs.flatMap(dir => names.map(n => path.join(dir, n))).find(file => { try { accessSync(file, process.platform === 'win32' ? constants.F_OK : constants.X_OK); return true } catch { return false } })
 }
-function run(file: string, args: string[], timeout = 120_000): Promise<string> {
-  return new Promise((resolve, reject) => execFile(file, args, { timeout, maxBuffer: 1024 * 1024, windowsHide: true, env: { ...process.env, npm_config_update_notifier: 'false' } }, (error, stdout, stderr) => {
-    if (error) reject(new Error(`${error.message}\n${stderr.slice(-4000)}`)); else resolve(stdout)
-  }))
+function run(file: string, args: string[], timeout = 120_000, output?: (text: string) => void): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = execFile(file, args, { timeout, maxBuffer: 1024 * 1024, windowsHide: true, env: { ...process.env, npm_config_update_notifier: 'false', NO_COLOR: '1' } }, (error, stdout, stderr) => {
+      if (error) reject(new Error(`${error.message}\n${stderr.slice(-4000)}`)); else resolve(stdout)
+    })
+    if (output) {
+      child.stdout?.on('data', (text: string) => output(text))
+      child.stderr?.on('data', (text: string) => output(text))
+    }
+  })
 }
 function npmCommand(): { file: string; args: string[] } {
   const npm = executable('npm')
@@ -20,6 +28,36 @@ function npmCommand(): { file: string; args: string[] } {
   const node = executable('node')
   if (!node || !existsSync(cli)) throw new Error('Cannot resolve npm CLI and node.exe. Run the npm command manually in your terminal.')
   return { file: node, args: [cli] }
+}
+export const routerHost: RouterHost = {
+  health: routerHealth,
+  async start(output, exit) {
+    const installation = await pluginHost.detect()
+    if (!installation.executable) throw new Error('9router is not installed')
+    const node = executable('node')
+    if (!node) throw new Error('Node.js is not available on PATH')
+    // Launch the packaged server directly: the CLI creates detached children/tray processes.
+    const dir = process.platform === 'win32'
+      ? path.join(path.dirname(installation.executable), 'node_modules', '9router')
+      : path.dirname(realpathSync(installation.executable))
+    const server = path.join(dir, 'app', 'custom-server.js')
+    if (!existsSync(server)) throw new Error('Unsupported 9router package layout. Start this installation manually.')
+    const child = spawn(node, [server], { cwd: path.dirname(server), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PORT: '20128', HOSTNAME: '127.0.0.1', NO_COLOR: '1', ELECTRON_RUN_AS_NODE: undefined } })
+    child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8')
+    child.stdout.on('data', output); child.stderr.on('data', output)
+    child.once('exit', exit)
+    await new Promise<void>((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })
+    return child
+  },
+  async stop(process) {
+    const child = process as ChildProcess
+    if (child.exitCode !== null || child.signalCode !== null) return
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => child.kill('SIGKILL'), 5000)
+      child.once('exit', () => { clearTimeout(timer); resolve() })
+      if (!child.kill('SIGTERM')) { clearTimeout(timer); reject(new Error('Could not stop managed 9router process')) }
+    })
+  }
 }
 export const pluginHost: PluginHost = {
   async detect() {
@@ -47,7 +85,7 @@ export const pluginHost: PluginHost = {
     if (release.ok) { const data = await release.json() as { body?: string }; changelog = data.body?.slice(0, 100_000) || changelog }
     return { latestVersion: pkg.version, changelog }
   },
-  async run(args) {
+  async run(args, output) {
     const npm = npmCommand()
     if (args[0] === 'uninstall' || args[0] === 'install') {
       const current = executable('9router')
@@ -61,6 +99,6 @@ export const pluginHost: PluginHost = {
       }
     }
     // Fixed argv only, no shell, sudo, password prompting or arbitrary package names.
-    await run(npm.file, [...npm.args, ...args])
+    await run(npm.file, [...npm.args, ...args], 120_000, output)
   }
 }

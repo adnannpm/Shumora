@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { PluginsAPI } from '../shared/plugins'
+import type { PluginsAPI, PluginOperation } from '../shared/plugins'
 import type { UpdatesAPI, UpdateState } from '../shared/updates'
 import type { WorkspaceAPI, SessionEvent } from '../shared/types'
 const api: WorkspaceAPI = {
@@ -21,6 +21,31 @@ const api: WorkspaceAPI = {
 }
 contextBridge.exposeInMainWorld('workspace', api)
 const plugins: PluginsAPI = {
+  routerLogin: password => ipcRenderer.invoke('plugins:router-login', password),
+  routerLogout: () => ipcRenderer.invoke('plugins:router-logout'),
+  routerAuthStatus: () => ipcRenderer.invoke('plugins:router-auth-status'),
+  routerOpenOAuth: () => ipcRenderer.invoke('plugins:router-open-oauth'),
+  routerEditProvider: (id, input) => ipcRenderer.invoke('plugins:router-edit-provider', id, input),
+  routerCustomProvider: input => ipcRenderer.invoke('plugins:router-custom-provider', input),
+  routerModelEnabled: (provider, model, enabled) => ipcRenderer.invoke('plugins:router-model-enabled', provider, model, enabled),
+  routerProviders: () => ipcRenderer.invoke('plugins:router-providers'),
+  routerModels: () => ipcRenderer.invoke('plugins:router-models'),
+  routerAddProvider: input => ipcRenderer.invoke('plugins:router-add-provider', input),
+  routerToggleProvider: (id, active) => ipcRenderer.invoke('plugins:router-toggle-provider', id, active),
+  routerRemoveProvider: id => ipcRenderer.invoke('plugins:router-remove-provider', id),
+  routerTestProvider: id => ipcRenderer.invoke('plugins:router-test-provider', id),
+  routerModelAlias: (model, alias) => ipcRenderer.invoke('plugins:router-model-alias', model, alias),
+  routerState: () => ipcRenderer.invoke('plugins:router-state'),
+  routerControl: action => ipcRenderer.invoke('plugins:router-control', action),
+  routerKeys: () => ipcRenderer.invoke('plugins:router-keys'),
+  routerCreateKey: name => ipcRenderer.invoke('plugins:router-create-key', name),
+  health: () => ipcRenderer.invoke('plugins:health'),
+  operation: () => ipcRenderer.invoke('plugins:operation'),
+  onOperation: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, operation: PluginOperation) => callback(operation)
+    ipcRenderer.on('plugins:operation', listener)
+    return () => ipcRenderer.removeListener('plugins:operation', listener)
+  },
   status: (refresh) => ipcRenderer.invoke('plugins:status', refresh),
   mutate: (action, version) => ipcRenderer.invoke('plugins:mutate', action, version)
 }

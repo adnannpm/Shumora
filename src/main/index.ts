@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { statSync } from 'node:fs'
@@ -9,7 +9,12 @@ import { autoUpdater } from 'electron-updater'
 import { UpdateManager } from './updates'
 import { openDatabase } from './database'
 import { PluginService } from './plugins'
-import { pluginHost } from './plugin-host'
+import { pluginHost, routerHost } from './plugin-host'
+import { routerLogin, routerLogout, routerAuthStatus } from './router-auth'
+import { RouterCatalog } from './router-catalog'
+import { RouterService } from './router-service'
+import { routerKeys, routerCreateKey } from './router-keys'
+import { routerHealth } from './router-health'
 import type { PluginAction } from '../shared/plugins'
 
 let window: BrowserWindow | undefined
@@ -27,12 +32,34 @@ const sessions = new SessionManager((cwd) => {
 
 let updates: UpdateManager
 let plugins: PluginService
+const router = new RouterService(routerHost)
+const catalog = new RouterCatalog()
 function registerIPC() {
   const handlers: Record<string, (...args: any[]) => unknown> = {
     'plugins:status': (refresh: boolean) => {
       if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag')
       return plugins.status(refresh)
     },
+    'plugins:router-login': password => routerLogin(password),
+    'plugins:router-logout': () => routerLogout(),
+    'plugins:router-auth-status': () => routerAuthStatus(),
+    'plugins:router-open-oauth': async () => { await shell.openExternal('http://127.0.0.1:20128/dashboard/providers') },
+    'plugins:router-edit-provider': (id, input) => catalog.edit(id, input),
+    'plugins:router-custom-provider': input => catalog.custom(input),
+    'plugins:router-model-enabled': (provider, model, enabled) => catalog.modelEnabled(provider, model, enabled),
+    'plugins:router-providers': () => catalog.providers(),
+    'plugins:router-models': () => catalog.models(),
+    'plugins:router-add-provider': input => catalog.add(input),
+    'plugins:router-toggle-provider': (id, active) => catalog.toggle(id, active),
+    'plugins:router-remove-provider': id => catalog.remove(id),
+    'plugins:router-test-provider': id => catalog.test(id),
+    'plugins:router-model-alias': (model, alias) => catalog.alias(model, alias),
+    'plugins:router-state': () => router.state(),
+    'plugins:router-control': (action) => router.control(action),
+    'plugins:router-keys': () => routerKeys(),
+    'plugins:router-create-key': (name) => routerCreateKey(name),
+    'plugins:health': () => routerHealth(),
+    'plugins:operation': () => plugins.operation(),
     'plugins:mutate': (action: PluginAction, version?: string) => plugins.mutate(action, version),
     'updates:status': () => updates.snapshot(),
     'updates:check': () => updates.check(),
@@ -96,7 +123,9 @@ function createWindow() {
 
 app.whenReady().then(() => {
   database = openDatabase(app.getPath('userData'))
-  plugins = new PluginService(database, pluginHost)
+  plugins = new PluginService(database, pluginHost, operation => {
+    if (window && !window.isDestroyed()) window.webContents.send('plugins:operation', operation)
+  })
   const unsupported = !app.isPackaged ? 'Updates can only be installed in a packaged Shumora application.'
     : process.platform === 'darwin' ? 'macOS automatic updates require a signed and notarized release. Install a release manually for now.'
     : process.platform === 'linux' && !process.env.APPIMAGE ? 'Linux automatic updates are supported only for AppImage installations.'
@@ -113,4 +142,10 @@ app.whenReady().then(() => {
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
 app.on('window-all-closed', () => { sessions.dispose(); app.quit() })
+app.on('before-quit', (event) => {
+  if (routerClosing) return
+  event.preventDefault()
+  void router.dispose().catch(() => {}).finally(() => { routerClosing = true; app.quit() })
+})
+let routerClosing = false
 app.on('will-quit', () => { sessions.dispose(); database?.close(); database = undefined })
