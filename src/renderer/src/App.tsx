@@ -5,6 +5,7 @@ import { TerminalPane } from './TerminalPane'
 import { Sidebar, type Page } from './Sidebar'
 import { Settings } from './Settings'
 import { Library } from './Library'
+import { RouterDashboard } from './RouterDashboard'
 import type { RouterPlugin } from '../../shared/plugins'
 import { initialLayout, layoutReducer, type Layout } from './layout'
 
@@ -145,7 +146,7 @@ export default function App() {
     </main>
     {page === 'settings' && <Settings />}
     {page === 'library' && <Library onPluginStatus={pluginStatus} />}
-    {page === '9router' && routerInstalled && <main className="settings-page flex min-w-0 flex-1 flex-col"><header className="toolbar"><h1>9router</h1></header><section className="settings-content"><h2>9router integration</h2><p>9router is installed. Integration controls will be added here. Manage its installation separately in Library → Plugin.</p></section></main>}
+    {page === '9router' && routerInstalled && <RouterDashboard />}
     <Dialog.Root role="alertdialog" open={closeTarget !== null} placement="center" size="sm" initialFocusEl={() => cancelClose.current} closeOnInteractOutside={false} onOpenChange={({ open }) => { if (!open && !closing.length) setCloseTarget(null) }}>
       <Portal>
         <Dialog.Backdrop />

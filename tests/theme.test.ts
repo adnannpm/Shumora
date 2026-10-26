@@ -14,6 +14,23 @@ it('hides only xterm scrollbar chrome without disabling terminal scrolling', () 
   expect(css).toContain('visibility: hidden')
   expect(css).toContain('scrollbar-width: none')
 })
+it('uses application theme colors for 9router button and tab hover states', () => {
+  const css = readFileSync('src/renderer/src/style.css', 'utf8')
+  expect(css).toContain('.router-dashboard button:hover:not(:disabled)')
+  expect(css).toContain('.router-dashboard button[data-selected]')
+  const hover = css.match(/\.router-dashboard button:hover:not\(:disabled\)\s*\{([^}]+)\}/)?.[1]
+  expect(hover).toContain('background: var(--selected)')
+  expect(hover).toContain('color: var(--selected-text)')
+})
+it('fills the service logs panel and wraps long output without horizontal scrolling', () => {
+  const css = readFileSync('src/renderer/src/style.css', 'utf8')
+  expect(css).toContain('.router-dashboard .router-logs-panel[data-state=open]')
+  const log = css.match(/\.router-logs-panel \.plugin-output-log\s*\{([^}]+)\}/)?.[1]
+  expect(log).toContain('flex: 1')
+  expect(log).toContain('height: auto')
+  expect(log).toContain('overflow-x: hidden')
+  expect(log).toContain('white-space: pre-wrap')
+})
 it('defaults the desktop and renderer to light mode with Shumora branding', () => {
   expect(readFileSync('src/renderer/src/style.css', 'utf8')).toContain('color-scheme: light')
   expect(readFileSync('src/main/index.ts', 'utf8')).toContain("backgroundColor: '#ffffff'")
