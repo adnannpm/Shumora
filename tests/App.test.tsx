@@ -14,11 +14,15 @@ function setup(count = 1, approved = true) {
     list: vi.fn(async () => sessions), create: vi.fn(async () => { const n = ++counter; const s: Session = { id: String(n), name: `Pi ${n}`, cwd: '/tmp', status: 'running', generation: 1 }; sessions = [...sessions, s]; return s }),
     close: vi.fn(async () => approved), folder: async () => '/tmp', chooseFolder: async () => '/project', onEvent: () => () => {}, snapshot: vi.fn(), input: vi.fn(), resize: vi.fn(), stop: vi.fn(), restart: vi.fn()
   }
+  window.plugins = { status: async () => ({ id: '9router', installed: true }) } as any
   window.workspace = api; render(<Provider><App /></Provider>); return api
 }
 it('shows startup as a tab with workspace navigation and creates in the active group', async () => {
   const api = setup(); await screen.findByRole('tab', { name: 'Pi 1' })
   expect(screen.getByRole('complementary', { name: 'Main sidebar' })).toBeTruthy()
+  const manage = screen.getByRole('group', { name: 'Manage' })
+  expect(manage.querySelector('[aria-label="Library"]')).toBeTruthy()
+  expect(manage.querySelector('[aria-label="Settings"]')).toBeTruthy()
   expect(screen.getByRole('button', { name: 'AI Workspace' }).getAttribute('aria-current')).toBe('page')
   expect(api.create).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
@@ -34,6 +38,20 @@ it('opens settings and collapses navigation without stopping or recreating sessi
   expect(screen.getByTestId('1')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
   expect(screen.getByRole('button', { name: 'Expand sidebar' }).getAttribute('aria-expanded')).toBe('false')
+  fireEvent.click(screen.getByRole('button', { name: 'AI Workspace' }))
+  expect(screen.getByRole('tab', { name: 'Pi 1' })).toBeTruthy()
+  expect(api.create).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled()
+})
+it('opens 9router and Library without recreating or stopping terminal sessions', async () => {
+  const api = setup(); await screen.findByRole('tab', { name: 'Pi 1' })
+  await screen.findByRole('button', { name: '9router' })
+  for (const name of ['9router', 'Library']) {
+    fireEvent.click(screen.getByRole('button', { name }))
+    expect(screen.getByRole('heading', { name, level: 1 })).toBeTruthy()
+    expect(screen.getByRole('button', { name }).getAttribute('aria-current')).toBe('page')
+    expect(screen.queryByRole('tab', { name: 'Pi 1' })).toBeNull()
+    expect(screen.getByTestId('1')).toBeTruthy()
+  }
   fireEvent.click(screen.getByRole('button', { name: 'AI Workspace' }))
   expect(screen.getByRole('tab', { name: 'Pi 1' })).toBeTruthy()
   expect(api.create).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled()
