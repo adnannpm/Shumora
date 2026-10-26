@@ -5,7 +5,11 @@ import { parse } from 'yaml'
 const [dir, version] = process.argv.slice(2)
 for (const name of ['latest.yml', 'latest-linux.yml']) {
   const data = parse(readFileSync(join(dir, name), 'utf8'))
-  if (data.releaseNotes !== readFileSync(`changelogs/${version}.md`, 'utf8')) throw new Error(`Release notes mismatch: ${name}`)
+  // Windows checkout can produce CRLF; YAML parses block scalars with LF.
+  // Compare the same text across platforms without ignoring content changes.
+  const normalizeNewlines = text => text.replace(/\r\n/g, '\n')
+  const approvedNotes = readFileSync(`changelogs/${version}.md`, 'utf8')
+  if (typeof data.releaseNotes !== 'string' || normalizeNewlines(data.releaseNotes) !== normalizeNewlines(approvedNotes)) throw new Error(`Release notes mismatch: ${name}`)
   if (data.version !== version || !Array.isArray(data.files) || !data.files.length) throw new Error(`Invalid updater metadata: ${name}`)
   for (const file of data.files) {
     const url = decodeURIComponent(file.url)
