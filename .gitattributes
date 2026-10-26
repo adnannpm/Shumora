@@ -1,0 +1,2 @@
+# Release notes must remain byte-consistent across Linux/macOS/Windows builds.
+changelogs/*.md text eol=lf
