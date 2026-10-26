@@ -92,7 +92,24 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           RELEASE_VERSION: ${{ inputs.version }}
         shell: bash
-        run: npx --no-install electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never --config.releaseInfo.releaseNotesFile="changelogs/$RELEASE_VERSION.md"
+        run: |
+          set -euo pipefail
+          log_file="$(mktemp)"
+          trap 'rm -f "$log_file"' EXIT
+          for attempt in 1 2 3; do
+            if npx --no-install electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never --config.releaseInfo.releaseNotesFile="changelogs/$RELEASE_VERSION.md" 2>&1 | tee "$log_file"; then
+              exit 0
+            else
+              status=$?
+            fi
+            # Retry only the known transient macOS DMG detach failure.
+            # Never detach arbitrary volumes or hide unrelated packaging errors.
+            if [[ "$RUNNER_OS" != 'macOS' ]] || ! grep -Eq 'Unable to detach device cleanly:.*Resource busy' "$log_file" || [[ "$attempt" == '3' ]]; then
+              exit "$status"
+            fi
+            echo "::warning::DMG volume busy; retrying packaging ($attempt/3)."
+            sleep 15
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.platform }}-${{ matrix.arch }}
