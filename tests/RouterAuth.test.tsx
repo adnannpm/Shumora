@@ -19,5 +19,8 @@ it('signs in explicitly, clears the password and notifies data views', async () 
   await waitFor(() => expect(changed).toHaveBeenCalledOnce())
   expect(login).toHaveBeenCalledWith('private-password')
   await screen.findByRole('button', { name: 'Sign out of 9router' })
-  expect(screen.queryByLabelText('Dashboard password')).toBeNull()
+  expect((input as HTMLInputElement).value).toBe('')
+  // Chakra retains the dialog during its exit animation. Wait for unmount,
+  // rather than racing the animation after the header has already updated.
+  await waitFor(() => expect(screen.queryByLabelText('Dashboard password')).toBeNull())
 })
