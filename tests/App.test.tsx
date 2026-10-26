@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import React from 'react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Session, WorkspaceAPI } from '../src/shared/types'
 vi.mock('../src/renderer/src/TerminalPane', () => ({ TerminalPane: ({ session, visible, onFocus }: { session: Session; visible: boolean; onFocus: () => void }) => <div data-testid={session.id} data-visible={visible} onClick={onFocus}>{session.error}</div> }))
 import App from '../src/renderer/src/App'
 import { Provider } from '../src/renderer/src/Provider'
-afterEach(cleanup)
+beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }))
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 function setup(count = 1, approved = true) {
   let sessions: Session[] = Array.from({ length: count }, (_, i) => ({ id: String(i + 1), name: `Pi ${i + 1}`, cwd: '/tmp', status: 'running', generation: 1 }))
   let counter = count
@@ -17,13 +18,43 @@ function setup(count = 1, approved = true) {
   window.plugins = { status: async () => ({ id: '9router', installed: true }) } as any
   window.workspace = api; render(<Provider><App /></Provider>); return api
 }
+it('slides tabs horizontally without browser dragging or restarting Pi', async () => {
+  vi.stubGlobal('PointerEvent', MouseEvent)
+  const api = setup(3); await screen.findByRole('tab', { name: 'Pi 3' })
+  const tabs = screen.getAllByRole('tab').map(tab => tab.parentElement!)
+  tabs.forEach((tab, i) => { tab.getBoundingClientRect = () => ({ left: i * 100, right: (i + 1) * 100, width: 100 } as DOMRect); tab.setPointerCapture = vi.fn() })
+  screen.getByRole('tablist', { name: 'Session group 1' }).getBoundingClientRect = () => ({ left: 0, right: 300, width: 300 } as DOMRect)
+  expect(tabs[2].getAttribute('draggable')).toBeNull()
+  fireEvent.pointerDown(tabs[2], { clientX: 250, button: 0 })
+  fireEvent.pointerMove(tabs[2], { clientX: 20, clientY: 500 })
+  fireEvent.pointerUp(tabs[2], { clientX: 20 })
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Pi 3', 'Pi 1', 'Pi 2'])
+  expect(api.create).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled(); expect(api.restart).not.toHaveBeenCalled()
+})
+it('does not capture normal clicks and releases capture after sliding before selecting another tab', async () => {
+  vi.stubGlobal('PointerEvent', MouseEvent)
+  setup(2); await screen.findByRole('tab', { name: 'Pi 2' })
+  const first = screen.getByRole('tab', { name: 'Pi 1' }).parentElement!
+  const capture = vi.fn(), release = vi.fn()
+  first.setPointerCapture = capture; first.releasePointerCapture = release; first.hasPointerCapture = () => true
+  fireEvent.pointerDown(first, { clientX: 50, button: 0 })
+  expect(capture).not.toHaveBeenCalled()
+  fireEvent.pointerUp(first, { clientX: 50 })
+  expect(screen.getByRole('tab', { name: 'Pi 1' }).getAttribute('aria-selected')).toBe('true')
+  fireEvent.pointerDown(first, { clientX: 50, button: 0 })
+  fireEvent.pointerMove(first, { clientX: 70, buttons: 1 })
+  fireEvent.pointerUp(first, { clientX: 70 })
+  expect(release).toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('tab', { name: 'Pi 2' }))
+  expect(screen.getByRole('tab', { name: 'Pi 2' }).getAttribute('aria-selected')).toBe('true')
+})
 it('shows startup as a tab with workspace navigation and creates in the active group', async () => {
   const api = setup(); await screen.findByRole('tab', { name: 'Pi 1' })
   expect(screen.getByRole('complementary', { name: 'Main sidebar' })).toBeTruthy()
   const manage = screen.getByRole('group', { name: 'Manage' })
   expect(manage.querySelector('[aria-label="Library"]')).toBeTruthy()
   expect(manage.querySelector('[aria-label="Settings"]')).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'AI Workspace' }).getAttribute('aria-current')).toBe('page')
+  expect(screen.getByRole('button', { name: 'Terminals' }).getAttribute('aria-current')).toBe('page')
   expect(api.create).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
   await screen.findByRole('tab', { name: 'Pi 2' })
@@ -38,7 +69,7 @@ it('opens settings and collapses navigation without stopping or recreating sessi
   expect(screen.getByTestId('1')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
   expect(screen.getByRole('button', { name: 'Expand sidebar' }).getAttribute('aria-expanded')).toBe('false')
-  fireEvent.click(screen.getByRole('button', { name: 'AI Workspace' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Terminals' }))
   expect(screen.getByRole('tab', { name: 'Pi 1' })).toBeTruthy()
   expect(api.create).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled()
 })
@@ -52,7 +83,7 @@ it('opens 9router and Library without recreating or stopping terminal sessions',
     expect(screen.queryByRole('tab', { name: 'Pi 1' })).toBeNull()
     expect(screen.getByTestId('1')).toBeTruthy()
   }
-  fireEvent.click(screen.getByRole('button', { name: 'AI Workspace' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Terminals' }))
   expect(screen.getByRole('tab', { name: 'Pi 1' })).toBeTruthy()
   expect(api.create).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled()
 })

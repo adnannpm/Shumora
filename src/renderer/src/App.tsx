@@ -36,6 +36,50 @@ export default function App() {
   const [closeTarget, setCloseTarget] = useState<Session | null>(null)
   const cancelClose = useRef<HTMLButtonElement>(null)
   const area = useRef<HTMLDivElement>(null)
+  const slide = useRef<{ id: string; group: number; startX: number; pointer: number; moved: boolean; element: HTMLDivElement } | null>(null)
+  const [sliding, setSliding] = useState<{ id: string; offset: number } | null>(null)
+  function slideTab(event: React.PointerEvent<HTMLDivElement>) {
+    const current = slide.current
+    if (!current || current.pointer !== event.pointerId) return
+    const delta = event.clientX - current.startX
+    if (!current.moved && Math.abs(delta) < 6) return
+    if (!current.moved) {
+      current.moved = true
+      event.currentTarget.setPointerCapture(event.pointerId)
+    }
+    const list = event.currentTarget.parentElement!
+    const rect = event.currentTarget.getBoundingClientRect()
+    const bounds = list.getBoundingClientRect()
+    setSliding({ id: current.id, offset: Math.max(bounds.left - (rect.left - (sliding?.offset || 0)), Math.min(delta, bounds.right - (rect.right - (sliding?.offset || 0)))) })
+    const ids = layout.groups[current.group].ids
+    const tabs = Array.from(list.querySelectorAll<HTMLElement>('.session-tab'))
+    const target = tabs.find(tab => {
+      if (tab.dataset.sessionId === current.id) return false
+      const box = tab.getBoundingClientRect()
+      return event.clientX >= box.left && event.clientX <= box.right
+    })
+    if (!target) return
+    const box = target.getBoundingClientRect()
+    const targetId = target.dataset.sessionId!
+    const sourceIndex = ids.indexOf(current.id), targetIndex = ids.indexOf(targetId)
+    if (targetIndex > sourceIndex && event.clientX > box.left + box.width / 2) {
+      dispatch({ type: 'drop', id: current.id, group: current.group, before: ids[targetIndex + 1] })
+    } else if (targetIndex < sourceIndex && event.clientX < box.left + box.width / 2) {
+      dispatch({ type: 'drop', id: current.id, group: current.group, before: targetId })
+    } else return
+    current.startX = event.clientX
+    setSliding({ id: current.id, offset: 0 })
+  }
+  function endSlide() {
+    const current = slide.current
+    slide.current = null; setSliding(null)
+    if (current?.moved && current.element.hasPointerCapture?.(current.pointer)) current.element.releasePointerCapture(current.pointer)
+  }
+  useEffect(() => {
+    window.addEventListener('blur', endSlide)
+    return () => { window.removeEventListener('blur', endSlide) }
+  }, [])
+  useEffect(() => { endSlide() }, [page])
   const split = layout.groups.length === 2
   useEffect(() => {
     let disposed = false
@@ -96,7 +140,7 @@ export default function App() {
     <Sidebar routerInstalled={routerInstalled} page={page} onPage={value => { setSetupPlugin(null); setPage(value) }} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
     <main className="flex min-w-0 flex-1 flex-col" style={{ display: page === 'workspace' ? 'flex' : 'none' }}>
       <header className="toolbar">
-        <h1>AI Workspace</h1>
+        <h1>Terminals</h1>
         <button className="folder-button workspace-folder" title="Working directory for new sessions" aria-label="Choose folder for new sessions" onClick={() => { void window.workspace.chooseFolder().then(setFolder).catch(e => setError(String(e))) }}><span aria-hidden="true">▱</span><span title={folder}>{folder || 'Loading folder…'}</span></button>
         <div className="layout-switch" aria-label="Terminal layout">
           <Button size="xs" variant="ghost" disabled={busy || !sessions.length} aria-label={needsPartner ? 'New session in split right' : 'Split right'} onClick={() => doSplit('right')}>{needsPartner ? '+ Split right' : 'Split right'}</Button>
@@ -115,7 +159,10 @@ export default function App() {
             document.getElementById(`tab-${group.ids[next]}`)?.focus()
           }}>
             {group.ids.map(id => { const s = sessions.find(s => s.id === id); if (!s) return null
-              return <div className={`session-tab ${group.active === id ? 'selected' : ''}`} key={id}>
+              return <div className={`session-tab ${group.active === id ? 'selected' : ''} ${sliding?.id === id ? 'sliding' : ''}`} key={id} data-session-id={id} style={sliding?.id === id ? { transform: `translateX(${sliding.offset}px)` } : undefined} onDragStart={event => event.preventDefault()} onPointerDown={event => {
+                if (event.button !== 0 || (event.target as HTMLElement).closest('.close-tab')) return
+                slide.current = { id, group: index, startX: event.clientX, pointer: event.pointerId, moved: false, element: event.currentTarget }
+              }} onPointerMove={slideTab} onPointerUp={event => { if (slide.current?.pointer === event.pointerId) { dispatch({ type: 'select', group: index, id }); endSlide() } }} onPointerCancel={endSlide} onLostPointerCapture={endSlide}>
                 <button role="tab" id={`tab-${id}`} aria-selected={group.active === id} aria-controls={`panel-${id}`} tabIndex={group.active === id ? 0 : -1} onClick={() => dispatch({ type: 'select', group: index, id })}><span className={`status-dot ${s.status}`} aria-hidden="true" />{s.name}</button>
                 <button className="close-tab" aria-label={`Close ${s.name}`} title={`Close ${s.name}`} disabled={closing.includes(id)} onClick={() => { if (s.status === 'running') setCloseTarget(s); else void close(id) }}>×</button>
               </div>

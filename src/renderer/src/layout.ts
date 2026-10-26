@@ -9,6 +9,7 @@ export type LayoutAction =
   | { type: 'remove'; id: string }
   | { type: 'split'; orientation: Layout['orientation']; newId?: string }
   | { type: 'move'; group: number }
+  | { type: 'drop'; id: string; group: number; before?: string }
   | { type: 'merge' }
 function without(group: TabGroup, id: string): TabGroup {
   const ids = group.ids.filter(i => i !== id)
@@ -36,6 +37,16 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
       if (!group.active || (group.ids.length < 2 && !action.newId)) return state
       const id = action.newId || group.active
       return { groups: [action.newId ? group : without(group, id), { ids: [id], active: id }], focused: 1, orientation: action.orientation }
+    }
+    case 'drop': {
+      if (!state.groups[action.group] || !state.groups.some(g => g.ids.includes(action.id)) || action.before === action.id) return state
+      const groups = state.groups.map(g => without(g, action.id))
+      const target = groups[action.group]
+      const index = action.before ? target.ids.indexOf(action.before) : target.ids.length
+      if (index < 0) return state
+      target.ids.splice(index, 0, action.id)
+      target.active = action.id
+      return collapse({ ...state, focused: action.group, groups })
     }
     case 'move': {
       if (state.groups.length !== 2) return state

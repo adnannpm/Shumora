@@ -224,6 +224,10 @@ h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.3px; }
 .tab-group-bar.active-group { border-bottom-color: #6385cc; }
 .session-tablist { display: flex; align-items: stretch; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
 .session-tab { position: relative; display: flex; align-items: stretch; flex-shrink: 0; border-right: 1px solid var(--line); color: var(--muted); }
+.session-tab { touch-action: pan-y; user-select: none; transition: transform 140ms ease; }
+.session-tab > [role=tab] { cursor: grab; }
+.session-tab.sliding { z-index: 2; transition: none; background: var(--selected); }
+.session-tab.sliding > [role=tab] { cursor: grabbing; }
 .session-tab.selected { color: var(--selected-text); background: var(--surface); }
 .session-tab:hover { background: var(--selected); }
 /* Paint selection above both buttons so their hover backgrounds cannot cover it. */

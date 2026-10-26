@@ -1,5 +1,16 @@
 import { expect, it } from 'vitest'
 import { initialLayout, layoutReducer as reduce } from '../src/renderer/src/layout'
+it('reorders tabs and moves them between groups without duplicating sessions', () => {
+  let s = reduce(initialLayout, { type: 'init', ids: ['a', 'b', 'c'] })
+  s = reduce(s, { type: 'drop', id: 'c', group: 0, before: 'a' })
+  expect(s.groups[0].ids).toEqual(['c', 'a', 'b'])
+  s = reduce(s, { type: 'split', orientation: 'right' })
+  s = reduce(s, { type: 'drop', id: 'a', group: 1, before: 'c' })
+  expect(s.groups.map(g => g.ids)).toEqual([['b'], ['a', 'c']])
+  s = reduce(s, { type: 'drop', id: 'b', group: 1 })
+  expect(s.groups).toEqual([{ ids: ['a', 'c', 'b'], active: 'b' }])
+  expect(reduce(s, { type: 'drop', id: 'unknown', group: 0 })).toEqual(s)
+})
 it('splits by moving a tab, without duplicating session identities', () => {
   let s = reduce(initialLayout, { type: 'init', ids: ['a', 'b', 'c'] })
   s = reduce(s, { type: 'select', group: 0, id: 'b' })

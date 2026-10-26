@@ -16,7 +16,7 @@ export function Sidebar({ page, onPage, collapsed, onToggle, routerInstalled }: 
     <div className="sidebar-brand"><img className="sidebar-logo" src={shumoraLogo} alt="" aria-hidden="true" /><span className="sidebar-label" aria-hidden={collapsed}>Shumora</span></div>
     <nav aria-label="Main navigation" className="sidebar-navigation">
       <div className="sidebar-group" role="group" aria-label="Workspace"><div className="sidebar-group-label" aria-hidden="true">{!collapsed && 'Workspace'}</div>
-      <Button variant="ghost" aria-label="AI Workspace" title={collapsed ? 'AI Workspace' : undefined} aria-current={page === 'workspace' ? 'page' : undefined} onClick={() => onPage('workspace')}><NavIcon type="terminal" /><span className="sidebar-label" aria-hidden={collapsed}>AI Workspace</span></Button>
+      <Button variant="ghost" aria-label="Terminals" title={collapsed ? 'Terminals' : undefined} aria-current={page === 'workspace' ? 'page' : undefined} onClick={() => onPage('workspace')}><NavIcon type="terminal" /><span className="sidebar-label" aria-hidden={collapsed}>Terminals</span></Button>
       </div>
       {routerInstalled && <div className="sidebar-group" role="group" aria-label="Integrations"><div className="sidebar-group-label" aria-hidden="true">{!collapsed && 'Integrations'}</div>
       <Button variant="ghost" aria-label="9router" title={collapsed ? '9router' : undefined} aria-current={page === '9router' ? 'page' : undefined} onClick={() => onPage('9router')}><NavIcon type="router" /><span className="sidebar-label" aria-hidden={collapsed}>9router</span></Button>
