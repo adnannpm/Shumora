@@ -1,5 +1,5 @@
-export interface RouterPlugin {
-  id: '9router'
+export interface PluginMetadata<Id extends '9router' | 'pi' = '9router'> {
+  id: Id
   name: string
   description: string
   repository: string
@@ -13,6 +13,15 @@ export interface RouterPlugin {
   busy: boolean
   operationError?: string
 }
+export type RouterPlugin = PluginMetadata<'9router'>
+export type PiPlugin = PluginMetadata<'pi'>
+export interface PiPluginAPI {
+  status(refresh?: boolean): Promise<PiPlugin>
+  mutate(action: PluginAction, version?: string): Promise<PiPlugin>
+  operation(): Promise<PluginOperation>
+  onOperation(callback: (operation: PluginOperation) => void): () => void
+}
+declare global { interface Window { piPlugin: PiPluginAPI } }
 export type PluginAction = 'install' | 'update' | 'uninstall'
 export interface PluginOperation {
   status: 'idle' | 'running' | 'success' | 'failed'

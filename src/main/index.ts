@@ -8,8 +8,12 @@ import { resolveLaunch } from './launch'
 import { autoUpdater } from 'electron-updater'
 import { UpdateManager } from './updates'
 import { openDatabase } from './database'
-import { PluginService } from './plugins'
-import { pluginHost, routerHost } from './plugin-host'
+import { PackageService } from './packages'
+import { packageStatus, configuredPackageNames } from './package-status'
+import { checkLibraryUpdates } from './library-updates'
+import { fetchPackagePage } from './package-fetch'
+import { PluginService, piDefinition } from './plugins'
+import { pluginHost, piPluginHost, routerHost, runPiPackage } from './plugin-host'
 import { routerLogin, routerLogout, routerAuthStatus } from './router-auth'
 import { RouterCatalog } from './router-catalog'
 import { RouterService } from './router-service'
@@ -31,11 +35,25 @@ const sessions = new SessionManager((cwd) => {
 })
 
 let updates: UpdateManager
+const packages = new PackageService(fetchPackagePage, runPiPackage, () => { if (sessions.list().some(s => s.status === 'running')) throw new Error('Stop running Workspace sessions before installing a package.') }, operation => {
+  if (window && !window.isDestroyed()) window.webContents.send('packages:operation', operation)
+}, packageStatus)
 let plugins: PluginService
+let piPlugin: PluginService<'pi'>
 const router = new RouterService(routerHost)
 const catalog = new RouterCatalog()
 function registerIPC() {
   const handlers: Record<string, (...args: any[]) => unknown> = {
+    'packages:updates': scope => checkLibraryUpdates({ names: configuredPackageNames, status: packageStatus, latest: async name => (await packages.detail(name)).version, plugins: [{ id: 'pi', check: () => piPlugin.status(true) }, { id: '9router', check: () => plugins.status(true) }] }, scope),
+    'packages:detail': name => packages.detail(name),
+    'packages:status': name => packages.status(name),
+    'packages:mutate': (action, name, version) => packages.mutate(action, name, version),
+    'packages:catalog': query => packages.catalog(query),
+    'packages:install': (name, version) => packages.install(name, version),
+    'packages:operation': () => packages.operation(),
+    'pi-plugin:status': (refresh) => { if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag'); return piPlugin.status(refresh) },
+    'pi-plugin:operation': () => piPlugin.operation(),
+    'pi-plugin:mutate': (action, version) => piPlugin.mutate(action, version),
     'plugins:status': (refresh: boolean) => {
       if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag')
       return plugins.status(refresh)
@@ -126,6 +144,9 @@ app.whenReady().then(() => {
   plugins = new PluginService(database, pluginHost, operation => {
     if (window && !window.isDestroyed()) window.webContents.send('plugins:operation', operation)
   })
+  piPlugin = new PluginService(database, piPluginHost, operation => {
+    if (window && !window.isDestroyed()) window.webContents.send('pi-plugin:operation', operation)
+  }, piDefinition, () => { if (sessions.list().some(s => s.status === 'running')) throw new Error('Stop all running Workspace sessions before changing Pi.') })
   const unsupported = !app.isPackaged ? 'Updates can only be installed in a packaged Shumora application.'
     : process.platform === 'darwin' ? 'macOS automatic updates require a signed and notarized release. Install a release manually for now.'
     : process.platform === 'linux' && !process.env.APPIMAGE ? 'Linux automatic updates are supported only for AppImage installations.'

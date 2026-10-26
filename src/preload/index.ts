@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { PluginsAPI, PluginOperation } from '../shared/plugins'
+import type { PackageAPI } from '../shared/packages'
+import type { PluginsAPI, PluginOperation, PiPluginAPI } from '../shared/plugins'
 import type { UpdatesAPI, UpdateState } from '../shared/updates'
 import type { WorkspaceAPI, SessionEvent } from '../shared/types'
 const api: WorkspaceAPI = {
@@ -20,6 +21,21 @@ const api: WorkspaceAPI = {
   }
 }
 contextBridge.exposeInMainWorld('workspace', api)
+const packages: PackageAPI = {
+  updates: scope => ipcRenderer.invoke('packages:updates', scope),
+  detail: name => ipcRenderer.invoke('packages:detail', name),
+  status: name => ipcRenderer.invoke('packages:status', name),
+  mutate: (action, name, version) => ipcRenderer.invoke('packages:mutate', action, name, version),
+  catalog: query => ipcRenderer.invoke('packages:catalog', query),
+  install: (name, version) => ipcRenderer.invoke('packages:install', name, version),
+  operation: () => ipcRenderer.invoke('packages:operation'),
+  onOperation: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, operation: PluginOperation) => callback(operation)
+    ipcRenderer.on('packages:operation', listener)
+    return () => ipcRenderer.removeListener('packages:operation', listener)
+  }
+}
+contextBridge.exposeInMainWorld('packages', packages)
 const plugins: PluginsAPI = {
   routerLogin: password => ipcRenderer.invoke('plugins:router-login', password),
   routerLogout: () => ipcRenderer.invoke('plugins:router-logout'),
@@ -50,6 +66,17 @@ const plugins: PluginsAPI = {
   mutate: (action, version) => ipcRenderer.invoke('plugins:mutate', action, version)
 }
 contextBridge.exposeInMainWorld('plugins', plugins)
+const piPlugin: PiPluginAPI = {
+  status: refresh => ipcRenderer.invoke('pi-plugin:status', refresh),
+  mutate: (action, version) => ipcRenderer.invoke('pi-plugin:mutate', action, version),
+  operation: () => ipcRenderer.invoke('pi-plugin:operation'),
+  onOperation: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, operation: PluginOperation) => callback(operation)
+    ipcRenderer.on('pi-plugin:operation', listener)
+    return () => ipcRenderer.removeListener('pi-plugin:operation', listener)
+  }
+}
+contextBridge.exposeInMainWorld('piPlugin', piPlugin)
 const updates: UpdatesAPI = {
   status: () => ipcRenderer.invoke('updates:status'),
   check: () => ipcRenderer.invoke('updates:check'),
