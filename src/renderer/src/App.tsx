@@ -5,6 +5,7 @@ import { TerminalPane } from './TerminalPane'
 import { Sidebar, type Page } from './Sidebar'
 import { Settings } from './Settings'
 import { Library } from './Library'
+import { WorkspaceSetup } from './WorkspaceSetup'
 import { RouterDashboard } from './RouterDashboard'
 import type { RouterPlugin } from '../../shared/plugins'
 import { initialLayout, layoutReducer, type Layout } from './layout'
@@ -12,6 +13,7 @@ import { initialLayout, layoutReducer, type Layout } from './layout'
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [page, setPage] = useState<Page>('workspace')
+  const [setupPlugin, setSetupPlugin] = useState<'pi' | '9router' | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [routerInstalled, setRouterInstalled] = useState(false)
   function pluginStatus(plugin: RouterPlugin) {
@@ -91,7 +93,7 @@ export default function App() {
     : { gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: `42px minmax(0, ${ratio}fr) 6px 42px minmax(0, ${100 - ratio}fr)` }
   const needsPartner = !split && layout.groups[0].ids.length === 1
   return <div className="workspace flex h-dvh overflow-hidden">
-    <Sidebar routerInstalled={routerInstalled} page={page} onPage={setPage} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
+    <Sidebar routerInstalled={routerInstalled} page={page} onPage={value => { setSetupPlugin(null); setPage(value) }} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
     <main className="flex min-w-0 flex-1 flex-col" style={{ display: page === 'workspace' ? 'flex' : 'none' }}>
       <header className="toolbar">
         <h1>AI Workspace</h1>
@@ -145,8 +147,9 @@ export default function App() {
       <footer className="statusbar"><span>{sessions.filter(s => s.status === 'running').length} processes running</span><span>{split ? 'Two groups' : 'Single group'} · Hidden sessions keep running</span></footer>
     </main>
     {page === 'settings' && <Settings />}
-    {page === 'library' && <Library onPluginStatus={pluginStatus} />}
+    {page === 'library' && <Library initialPlugin={setupPlugin} onPluginStatus={pluginStatus} />}
     {page === '9router' && routerInstalled && <RouterDashboard />}
+    <WorkspaceSetup active={page === 'workspace'} onSetup={id => { setSetupPlugin(id); setPage('library') }} />
     <Dialog.Root role="alertdialog" open={closeTarget !== null} placement="center" size="sm" initialFocusEl={() => cancelClose.current} closeOnInteractOutside={false} onOpenChange={({ open }) => { if (!open && !closing.length) setCloseTarget(null) }}>
       <Portal>
         <Dialog.Backdrop />
