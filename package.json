@@ -60,26 +60,30 @@
       "out/**/*",
       "package.json",
       "third-party/**/*",
-      "resources/meeting-extension.mjs"
+      "resources/meeting-extension.mjs",
+      "resources/icons/**/*"
     ],
     "asarUnpack": [
       "node_modules/node-pty/**/*",
       "node_modules/better-sqlite3/**/*"
     ],
     "linux": {
+      "icon": "resources/icons/icon.png",
       "target": [
         "AppImage"
       ],
       "category": "Development"
     },
     "win": {
+      "icon": "resources/icons/icon.ico",
       "target": [
         "nsis"
       ],
-      "signAndEditExecutable": false
+      "signAndEditExecutable": true
     },
     "artifactName": "Shumora-${version}-${os}-${arch}.${ext}",
     "mac": {
+      "icon": "resources/icons/icon.png",
       "target": [
         "dmg",
         "zip"

@@ -184,6 +184,7 @@ function createWindow() {
   window = new BrowserWindow({
     width: 1360, height: 860, minWidth: 800, minHeight: 540,
     title: 'Shumora', backgroundColor: '#ffffff', autoHideMenuBar: true,
+    icon: join(__dirname, '../../resources/icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     webPreferences: { preload: join(__dirname, '../preload/index.js'), nodeIntegration: false, contextIsolation: true, sandbox: true }
   })
   window.webContents.setWindowOpenHandler(({ url }) => {
