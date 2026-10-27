@@ -5,7 +5,7 @@ import { JSDOM } from 'jsdom'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Provider } from '../src/renderer/src/Provider'
 import { ReleaseNotesProvider, useReleaseNotes } from '../src/renderer/src/ReleaseNotes'
-import { releaseVersion } from '../src/renderer/src/release-data'
+import { releaseNotes, releaseVersion } from '../src/renderer/src/release-data'
 beforeEach(() => Object.defineProperty(window, 'localStorage', { configurable: true, value: new JSDOM('', { url: 'https://shumora.test' }).window.localStorage }))
 afterEach(cleanup)
 function OpenNotes() { const { show } = useReleaseNotes(); return <button onClick={show}>Release notes</button> }
@@ -14,9 +14,11 @@ it('shows bundled notes once per version and permits reopening them', async () =
   const view = render(<Fixture />)
   await screen.findByRole('dialog', { name: `What’s new in Shumora ${releaseVersion}` })
   expect(screen.getByRole('heading', { name: `Shumora ${releaseVersion}` })).toBeTruthy()
-  expect(screen.getByRole('heading', { name: 'Workspace' }).tagName).toBe('H3')
+  const section = releaseNotes.match(/^## (.+)$/m)?.[1]
+  expect(section).toBeTruthy()
+  expect(screen.getByRole('heading', { name: section!, level: 3 })).toBeTruthy()
   expect(screen.getByTestId('release-notes').querySelectorAll('li').length).toBeGreaterThan(0)
-  expect(screen.getByTestId('release-notes').textContent).not.toContain('## Workspace')
+  expect(screen.getByTestId('release-notes').textContent).not.toContain(`## ${section}`)
   fireEvent.click(screen.getByRole('button', { name: 'Got it' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(window.localStorage.getItem('shumora.seenRelease')).toBe(releaseVersion)

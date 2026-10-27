@@ -1,6 +1,8 @@
+import { useLanguage } from './Language'
 import { Skeleton } from '@chakra-ui/react'
 type Shape = 'lines' | 'providers' | 'models' | 'details' | 'keys' | 'service' | 'logs' | 'button'
 export function DataSkeleton({ label, rows = 3, shape = 'lines' }: { label: string; rows?: number; shape?: Shape }) {
+  const { t } = useLanguage()
   const bar = (width: string, height = '14px') => <Skeleton as="span" height={height} width={width} borderRadius="4px" css={{ '--start-color': 'var(--line)', '--end-color': 'var(--sidebar)' }} />
   const button = () => bar('90px', '32px')
   const cards = shape === 'providers' || shape === 'models'
@@ -10,6 +12,6 @@ export function DataSkeleton({ label, rows = 3, shape = 'lines' }: { label: stri
     : shape === 'keys' ? <>{Array.from({ length: 2 }, (_, i) => <span className="router-key-row" key={i}>{bar('100px')}{bar('35%')}{button()}{button()}</span>)}</>
     : shape === 'service' ? bar('60%', '24px')
     : shape === 'button' ? bar('150px', '32px')
-    : <span className={shape === 'logs' ? 'plugin-output-log skeleton-log' : 'skeleton-lines'}>{Array.from({ length: rows }, (_, index) => <span className="skeleton-line" key={index}>{bar(`${[85, 60, 95, 45, 75][index % 5]}%`, '14px')}</span>)}</span>}
+    : <span className={shape === 'logs' ? "plugin-output-log skeleton-log" : "skeleton-lines"}>{Array.from({ length: rows }, (_, index) => <span className="skeleton-line" key={index}>{bar(`${[85, 60, 95, 45, 75][index % 5]}%`, '14px')}</span>)}</span>}
   </span>
 }

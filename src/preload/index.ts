@@ -1,18 +1,48 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { PluginsAPI, PluginOperation } from '../shared/plugins'
+import type { MeetingsAPI, MeetingSnapshot } from '../shared/meetings'
+const meetings: MeetingsAPI = {
+  snapshot: () => ipcRenderer.invoke('meetings:snapshot'),
+  start: input => ipcRenderer.invoke('meetings:start', input),
+  pause: () => ipcRenderer.invoke('meetings:pause'),
+  resume: () => ipcRenderer.invoke('meetings:resume'),
+  stop: () => ipcRenderer.invoke('meetings:stop'),
+  takeOver: () => ipcRenderer.invoke('meetings:take-over'),
+  direction: text => ipcRenderer.invoke('meetings:direction', text),
+  onChange: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, snapshot: MeetingSnapshot) => callback(snapshot)
+    ipcRenderer.on('meetings:change', listener)
+    return () => ipcRenderer.removeListener('meetings:change', listener)
+  }
+}
+contextBridge.exposeInMainWorld('meetings', meetings)
+import type { PackageAPI } from '../shared/packages'
+import type { PluginsAPI, PluginOperation, PiPluginAPI } from '../shared/plugins'
 import type { UpdatesAPI, UpdateState } from '../shared/updates'
 import type { WorkspaceAPI, SessionEvent } from '../shared/types'
 const api: WorkspaceAPI = {
   list: () => ipcRenderer.invoke('sessions:list'),
-  create: () => ipcRenderer.invoke('sessions:create'),
+  create: (cwd) => ipcRenderer.invoke('sessions:create', cwd),
   snapshot: (id) => ipcRenderer.invoke('sessions:snapshot', id),
   input: (id, data) => ipcRenderer.invoke('sessions:input', id, data),
   resize: (id, cols, rows) => ipcRenderer.invoke('sessions:resize', id, cols, rows),
   close: (id) => ipcRenderer.invoke('sessions:close', id),
   stop: (id) => ipcRenderer.invoke('sessions:stop', id),
   restart: (id) => ipcRenderer.invoke('sessions:restart', id),
-  folder: () => ipcRenderer.invoke('workspace:folder'),
-  chooseFolder: () => ipcRenderer.invoke('workspace:choose-folder'),
+  rename: (id, name) => ipcRenderer.invoke('sessions:rename', id, name),
+  folder: () => ipcRenderer.invoke('workspace:folder'), 
+  chooseFolder: (defaultPath) => ipcRenderer.invoke('workspace:choose-folder', defaultPath),
+  gitStatus: (id) => ipcRenderer.invoke('git:status', id),
+  gitDiff: (id, path, area) => ipcRenderer.invoke('git:diff', id, path, area),
+  gitStage: (id, path) => ipcRenderer.invoke('git:stage', id, path),
+  gitUnstage: (id, path) => ipcRenderer.invoke('git:unstage', id, path),
+  gitStageAll: (id) => ipcRenderer.invoke('git:stage-all', id),
+  gitUnstageAll: (id) => ipcRenderer.invoke('git:unstage-all', id),
+  gitDiscard: (id, path) => ipcRenderer.invoke('git:discard', id, path),
+  gitCommit: (id, message) => ipcRenderer.invoke('git:commit', id, message),
+  gitCommitModels: () => ipcRenderer.invoke('git:commit-models'),
+  gitGenerateMessage: (id, model) => ipcRenderer.invoke('git:generate-message', id, model),
+  gitBranches: (id) => ipcRenderer.invoke('git:branches', id),
+  gitSwitch: (id, branch, options) => ipcRenderer.invoke('git:switch', id, branch, options),
   onEvent: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, data: SessionEvent) => callback(data)
     ipcRenderer.on('sessions:event', listener)
@@ -20,6 +50,21 @@ const api: WorkspaceAPI = {
   }
 }
 contextBridge.exposeInMainWorld('workspace', api)
+const packages: PackageAPI = {
+  updates: scope => ipcRenderer.invoke('packages:updates', scope),
+  detail: name => ipcRenderer.invoke('packages:detail', name),
+  status: name => ipcRenderer.invoke('packages:status', name),
+  mutate: (action, name, version) => ipcRenderer.invoke('packages:mutate', action, name, version),
+  catalog: query => ipcRenderer.invoke('packages:catalog', query),
+  install: (name, version) => ipcRenderer.invoke('packages:install', name, version),
+  operation: () => ipcRenderer.invoke('packages:operation'),
+  onOperation: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, operation: PluginOperation) => callback(operation)
+    ipcRenderer.on('packages:operation', listener)
+    return () => ipcRenderer.removeListener('packages:operation', listener)
+  }
+}
+contextBridge.exposeInMainWorld('packages', packages)
 const plugins: PluginsAPI = {
   routerLogin: password => ipcRenderer.invoke('plugins:router-login', password),
   routerLogout: () => ipcRenderer.invoke('plugins:router-logout'),
@@ -50,6 +95,17 @@ const plugins: PluginsAPI = {
   mutate: (action, version) => ipcRenderer.invoke('plugins:mutate', action, version)
 }
 contextBridge.exposeInMainWorld('plugins', plugins)
+const piPlugin: PiPluginAPI = {
+  status: refresh => ipcRenderer.invoke('pi-plugin:status', refresh),
+  mutate: (action, version) => ipcRenderer.invoke('pi-plugin:mutate', action, version),
+  operation: () => ipcRenderer.invoke('pi-plugin:operation'),
+  onOperation: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, operation: PluginOperation) => callback(operation)
+    ipcRenderer.on('pi-plugin:operation', listener)
+    return () => ipcRenderer.removeListener('pi-plugin:operation', listener)
+  }
+}
+contextBridge.exposeInMainWorld('piPlugin', piPlugin)
 const updates: UpdatesAPI = {
   status: () => ipcRenderer.invoke('updates:status'),
   check: () => ipcRenderer.invoke('updates:check'),

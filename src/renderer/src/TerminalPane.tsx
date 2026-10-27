@@ -1,3 +1,4 @@
+import { useLanguage } from './Language'
 import { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { Button } from '@chakra-ui/react'
@@ -6,6 +7,7 @@ import { terminalTheme } from './theme'
 import type { Session, SessionEvent } from '../../shared/types'
 
 export function TerminalPane({ session, visible, focused, onFocus }: { session: Session; visible: boolean; focused: boolean; onFocus: () => void }) {
+  const { t } = useLanguage()
   const host = useRef<HTMLDivElement>(null)
   const terminal = useRef<Terminal | null>(null)
   const fit = useRef<(() => void) | null>(null)
@@ -60,9 +62,9 @@ export function TerminalPane({ session, visible, focused, onFocus }: { session: 
     try { await window.workspace[kind](session.id) } catch (e) { setError(String(e)) }
   }
   return <section className={`terminal-pane dark ${focused ? 'focused' : ''}`} style={{ display: visible ? 'flex' : 'none' }} onPointerDown={onFocus} aria-label={`${session.name} terminal`}>
-    <div className="pane-header"><div><span className={`status-dot ${session.status}`} /><strong>{session.name}</strong><span className="pane-state">{session.status === 'running' ? 'Running' : session.status === 'error' ? 'Failed' : 'Exited'}</span><span className="pane-cwd" title={session.cwd}>{session.cwd}</span></div><Button size="xs" variant="ghost" colorPalette={session.status === 'running' ? 'red' : 'brand'} onClick={() => void action(session.status === 'running' ? 'stop' : 'restart')} title={session.status === 'running' ? 'Stop this session' : 'Restart this session'}>{session.status === 'running' ? '■ Stop' : '↻ Restart'}</Button></div>
-    {(session.error || error) && <div className="terminal-error" role="alert"><strong>Session needs attention</strong><p>{session.error || error}</p></div>}
-    {session.status === 'exited' && <div className="exit-note">Process exited{session.exitCode !== undefined ? ` (code ${session.exitCode})` : ''}. Restart to begin a new Pi process; this does not resume the previous conversation.</div>}
+    <div className="pane-header"><div><span className={`status-dot ${session.status}`} /><strong>{session.name}</strong><span className="pane-state">{session.status === 'running' ? t("Running") : session.status === 'error' ? t("Failed") : t("Exited")}</span><span className="pane-cwd" title={session.cwd}>{session.cwd}</span></div><Button size="xs" variant="ghost" colorPalette={session.status === 'running' ? "red" : "brand"} onClick={() => void action(session.status === 'running' ? 'stop' : 'restart')} title={session.status === 'running' ? t("Stop this session") : t("Restart this session")}>{session.status === 'running' ? t("■ Stop") : t("↻ Restart")}</Button></div>
+    {(session.error || error) && <div className="terminal-error" role="alert"><strong>{t("Session needs attention")}</strong><p>{session.error || error}</p></div>}
+    {session.status === 'exited' && <div className="exit-note">{t("Process exited")}{session.exitCode !== undefined ? ` (code ${session.exitCode})` : ''}{t(". Restart to begin a new Pi process; this does not resume the previous conversation.")}</div>}
     <div className="terminal-host" ref={host} />
   </section>
 }

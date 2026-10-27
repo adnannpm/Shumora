@@ -4,6 +4,11 @@ import { spawn, type ChildProcess, execFile } from 'node:child_process'
 import type { PluginHost } from './plugins'
 import type { RouterHost } from './router-service'
 import { routerHealth } from './router-health'
+import { resolveLaunch } from './launch'
+export async function runPiPackage(args: string[], output: (text: string) => void): Promise<void> {
+  const launch = resolveLaunch(process.platform, process.env, process.env.PATH || process.env.Path || '')
+  await run(launch.file, [...launch.args, ...args], 300_000, output)
+}
 function executable(name: string): string | undefined {
   const dirs = (process.env.PATH || process.env.Path || '').split(path.delimiter).filter(Boolean)
   const names = process.platform === 'win32' ? [`${name}.exe`, `${name}.cmd`, name] : [name]
@@ -59,46 +64,48 @@ export const routerHost: RouterHost = {
     })
   }
 }
-export const pluginHost: PluginHost = {
+export const pluginHost = createPluginHost('9router', '9router', 'decolua/9router')
+export const piPluginHost = createPluginHost('pi', '@earendil-works/pi-coding-agent', 'earendil-works/pi')
+function createPluginHost(command: string, packageName: string, repository: string): PluginHost { return {
   async detect() {
-    const file = executable('9router')
+    const file = command === 'pi' && process.env.PI_EXECUTABLE ? process.env.PI_EXECUTABLE : executable(command)
     if (!file) return { installed: false }
     const real = realpathSync(file)
     let dir = path.dirname(real)
     // npm symlinks on Unix and .cmd shims on Windows have different layouts.
-    const candidates = [path.join(path.dirname(file), 'node_modules', '9router', 'package.json')]
+    const candidates = [path.join(path.dirname(file), 'node_modules', packageName, 'package.json')]
     for (let i = 0; i < 5; i++) { candidates.push(path.join(dir, 'package.json')); dir = path.dirname(dir) }
     for (const candidate of candidates) {
       if (!existsSync(candidate)) continue
       const pkg = JSON.parse(readFileSync(candidate, 'utf8'))
-      if (pkg.name === '9router' && typeof pkg.version === 'string') return { installed: true, installedVersion: pkg.version, executable: file }
+      if (pkg.name === packageName && typeof pkg.version === 'string') return { installed: true, installedVersion: pkg.version, executable: file }
     }
-    throw new Error(`9router exists at ${file}, but its npm package version could not be verified. Source/Docker installations are not managed by this plugin.`)
+    throw new Error(`${command} exists at ${file}, but its package version could not be verified. Manage this installation manually.`)
   },
   async catalog() {
-    const response = await fetch('https://registry.npmjs.org/9router/latest', { signal: AbortSignal.timeout(15_000) })
+    const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(packageName)}/latest`, { signal: AbortSignal.timeout(15_000) })
     if (!response.ok) throw new Error(`npm registry HTTP ${response.status}`)
     const pkg = await response.json() as { version?: string }
     if (!pkg.version || !/^\d+\.\d+\.\d+$/.test(pkg.version)) throw new Error('Registry did not return a stable version')
     let changelog = 'No matching release notes were found for this npm version.'
-    const release = await fetch(`https://api.github.com/repos/decolua/9router/releases/tags/v${pkg.version}`, { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(15_000) })
+    const release = await fetch(`https://api.github.com/repos/${repository}/releases/tags/v${pkg.version}`, { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(15_000) })
     if (release.ok) { const data = await release.json() as { body?: string }; changelog = data.body?.slice(0, 100_000) || changelog }
     return { latestVersion: pkg.version, changelog }
   },
   async run(args, output) {
     const npm = npmCommand()
     if (args[0] === 'uninstall' || args[0] === 'install') {
-      const current = executable('9router')
+      const current = command === 'pi' && process.env.PI_EXECUTABLE ? process.env.PI_EXECUTABLE : executable(command)
       if (current) {
         const root = (await run(npm.file, [...npm.args, 'root', '--global'], 15_000)).trim()
-        const packageDir = path.join(root, '9router')
+        const packageDir = path.join(root, packageName)
         const owned = existsSync(packageDir) && (process.platform === 'win32'
           ? path.dirname(current).toLowerCase() === path.dirname(root).toLowerCase()
           : realpathSync(current).startsWith(realpathSync(packageDir) + path.sep))
-        if (!owned) throw new Error('The 9router on PATH is not owned by the active npm global prefix. Manage it manually to avoid changing another installation.')
+        if (!owned) throw new Error(`The ${command} installation is not owned by the active npm global prefix. Manage it manually to avoid changing another installation.`)
       }
     }
     // Fixed argv only, no shell, sudo, password prompting or arbitrary package names.
     await run(npm.file, [...npm.args, ...args], 120_000, output)
   }
-}
+} }

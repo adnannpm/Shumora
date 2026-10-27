@@ -1,9 +1,11 @@
+import { useLanguage } from './Language'
 import { useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import { Button, Dialog, Portal } from '@chakra-ui/react'
 import type { UpdateState } from '../../shared/updates'
 import { releaseVersion } from './release-data'
 export function Updates() {
+  const { t } = useLanguage()
   const [state, setState] = useState<UpdateState>({ status: 'idle', currentVersion: releaseVersion })
   const [confirm, setConfirm] = useState(false)
   const [running, setRunning] = useState(0)
@@ -27,33 +29,33 @@ export function Updates() {
   }
   const busy = ['checking', 'downloading', 'installing'].includes(state.status)
   return <>
-    <h2>Updates</h2><p>Check stable GitHub Releases and install a new Shumora version when you are ready.</p>
-    <dl className="settings-details"><div><dt>Installed version</dt><dd>{state.currentVersion}</dd></div>{state.version && <div><dt>Available version</dt><dd>{state.version}</dd></div>}</dl>
+    <h2>{t("Updates")}</h2><p>{t("Check stable GitHub Releases and install a new Shumora version when you are ready.")}</p>
+    <dl className="settings-details"><div><dt>{t("Installed version")}</dt><dd>{state.currentVersion}</dd></div>{state.version && <div><dt>{t("Available version")}</dt><dd>{state.version}</dd></div>}</dl>
     <div className="update-status" role="status">
-      {state.status === 'idle' && 'Updates are checked only when you request them.'}
+      {state.status === 'idle' && t("Updates are checked only when you request them.")}
       {state.status === 'unsupported' && state.reason}
-      {state.status === 'checking' && 'Checking for updates…'}
-      {state.status === 'current' && 'You are using the latest available version.'}
-      {state.status === 'available' && `Shumora ${state.version} is available.`}
-      {state.status === 'downloading' && `Downloading update… ${state.percent ?? 0}%`}
-      {state.status === 'downloaded' && 'Update downloaded. Restart to install it.'}
-      {state.status === 'installing' && 'Stopping sessions and restarting to install…'}
-      {state.status === 'error' && `Update failed: ${state.error}`}
+      {state.status === 'checking' && t("Checking for updates…")}
+      {state.status === 'current' && t("You are using the latest available version.")}
+      {state.status === 'available' && t("Shumora {version} is available.", { version: state.version || "" })}
+      {state.status === 'downloading' && t("Downloading update… {percent}%", { percent: state.percent ?? 0 })}
+      {state.status === 'downloaded' && t("Update downloaded. Restart to install it.")}
+      {state.status === 'installing' && t("Stopping sessions and restarting to install…")}
+      {state.status === 'error' && t("Update failed: {error}", { error: state.error || "" })}
     </div>
-    {error && <p role="alert">{error}</p>}
-    {state.status === 'downloading' && <progress aria-label="Update download progress" max={100} value={state.percent ?? 0} />}
+    {error && <p role="alert">{t(error)}</p>}
+    {state.status === 'downloading' && <progress aria-label={t("Update download progress")} max={100} value={state.percent ?? 0} />}
     <div className="update-actions">
-      <Button size="sm" variant="outline" disabled={busy || state.status === 'unsupported' || state.status === 'downloaded'} onClick={() => void run('check')}>Check for updates</Button>
-      {state.status === 'available' && <Button size="sm" colorPalette="brand" onClick={() => void run('download')}>Download update</Button>}
-      {state.status === 'downloaded' && <Button size="sm" colorPalette="brand" onClick={() => void requestInstall()}>Restart &amp; install</Button>}
+      <Button size="sm" variant="outline" disabled={busy || state.status === 'unsupported' || state.status === 'downloaded'} onClick={() => void run('check')}>{t("Check for updates")}</Button>
+      {state.status === 'available' && <Button size="sm" colorPalette="brand" onClick={() => void run('download')}>{t("Download update")}</Button>}
+      {state.status === 'downloaded' && <Button size="sm" colorPalette="brand" onClick={() => void requestInstall()}>{t("Restart & install")}</Button>}
     </div>
-    {state.notes && <section className="update-release-notes"><h3>Release notes</h3><div className="release-notes"><Markdown skipHtml components={{ a: ({ children, href }) => <span>{children}{href ? ` (${href})` : ''}</span>, img: ({ alt }) => <span>{alt}</span> }}>{state.notes}</Markdown></div></section>}
-    <p className="settings-note">Nothing is downloaded or installed automatically on exit. Restarting stops all Pi sessions. Save your work before installing. macOS auto-install is unavailable until release signing is configured.</p>
+    {state.notes && <section className="update-release-notes"><h3>{t("Release notes")}</h3><div className="release-notes"><Markdown skipHtml components={{ a: ({ children, href }) => <span>{children}{href ? ` (${href})` : ''}</span>, img: ({ alt }) => <span>{alt}</span> }}>{state.notes}</Markdown></div></section>}
+    <p className="settings-note">{t("Nothing is downloaded or installed automatically on exit. Restarting stops all Pi sessions. Save your work before installing. macOS auto-install is unavailable until release signing is configured.")}</p>
     <Dialog.Root role="alertdialog" open={confirm} onOpenChange={({ open }) => { if (!installing) setConfirm(open) }} placement="center" size="sm" initialFocusEl={() => cancel.current} closeOnInteractOutside={false}>
       <Portal><Dialog.Backdrop /><Dialog.Positioner><Dialog.Content>
-        <Dialog.Header><Dialog.Title>Restart and install update?</Dialog.Title></Dialog.Header>
-        <Dialog.Body><Dialog.Description>{running ? `${running} Pi session(s) are running and will be stopped. ` : ''}Save your work before continuing. Workspace processes are not restored automatically.</Dialog.Description></Dialog.Body>
-        <Dialog.Footer><Button ref={cancel} disabled={installing} variant="outline" onClick={() => setConfirm(false)}>Cancel</Button><Button colorPalette="red" disabled={installing} loading={installing} onClick={() => void run('install')}>Stop sessions and install</Button></Dialog.Footer>
+        <Dialog.Header><Dialog.Title>{t("Restart and install update?")}</Dialog.Title></Dialog.Header>
+        <Dialog.Body><Dialog.Description>{running ? t("{count} Pi session(s) are running and will be stopped. ", { count: running }) : ''}{t("Save your work before continuing. Workspace processes are not restored automatically.")}</Dialog.Description></Dialog.Body>
+        <Dialog.Footer><Button ref={cancel} disabled={installing} variant="outline" onClick={() => setConfirm(false)}>{t("Cancel")}</Button><Button colorPalette="red" disabled={installing} loading={installing} onClick={() => void run('install')}>{t("Stop sessions and install")}</Button></Dialog.Footer>
       </Dialog.Content></Dialog.Positioner></Portal>
     </Dialog.Root>
   </>

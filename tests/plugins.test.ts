@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
-import { PluginService, type PluginHost } from '../src/main/plugins'
+import { PluginService, piDefinition, type PluginHost } from '../src/main/plugins'
 function fixture(installed = false) {
   const db = new Database(':memory:'); const calls: string[][] = []; const events = vi.fn()
   let present = installed
@@ -43,6 +43,21 @@ it('retains bounded output and failed verification or permission details', async
   expect(service.operation().status).toBe('failed')
   expect(service.operation().output).toContain('does not match')
   expect(service.operation().output).not.toContain('EACCES')
+  db.close()
+})
+it('seeds Pi separately, uses its scoped package and blocks changes while sessions run', async () => {
+  const { db, host } = fixture()
+  let running = true
+  const calls: string[][] = []
+  host.run = async args => { calls.push(args); host.detect = async () => ({ installed: true, installedVersion: '0.5.109' }) }
+  const pi = new PluginService(db, host, () => {}, piDefinition, () => { if (running) throw new Error('Stop Workspace sessions') })
+  await pi.status(true)
+  await expect(pi.mutate('install', '0.5.109')).rejects.toThrow('Stop Workspace')
+  expect(calls).toEqual([])
+  running = false
+  expect((await pi.mutate('install', '0.5.109')).id).toBe('pi')
+  expect(calls[0].at(-1)).toBe('@earendil-works/pi-coding-agent@0.5.109')
+  expect(db.prepare('SELECT id FROM plugins ORDER BY id').all()).toEqual([{ id: '9router' }, { id: 'pi' }])
   db.close()
 })
 it('seeds only 9router and persists metadata while rechecking the real installation', async () => {

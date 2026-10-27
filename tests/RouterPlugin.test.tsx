@@ -39,7 +39,7 @@ it('shows live read-only output, closes confirmation, copies errors and cleans u
   view.unmount()
   expect(unsubscribe).toHaveBeenCalledOnce()
 })
-it('puts a saved operation error in the output panel, not the page alert', async () => {
+it('starts with empty output instead of restoring previous operation errors', async () => {
   window.plugins = {
     ...routerAPI,
     health: async () => false,
@@ -48,8 +48,11 @@ it('puts a saved operation error in the output panel, not the page alert', async
     onOperation: () => () => {}, mutate: vi.fn()
   }
   render(<Provider><RouterDetails /></Provider>)
-  await waitFor(() => expect(screen.getByRole('log').textContent).toContain('npm EACCES stack trace'))
-  expect(screen.getByRole('alert').textContent).not.toContain('stack trace')
+  await screen.findByRole('button', { name: 'Install' })
+  expect(screen.queryByRole('log')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Show output' }))
+  expect(screen.getByRole('log').textContent).not.toContain('npm EACCES stack trace')
+  expect(screen.queryByRole('alert')).toBeNull()
 })
 it('opens detail from the plugin card', () => {
   const open = vi.fn(); window.plugins = { status: async () => plugin } as any
