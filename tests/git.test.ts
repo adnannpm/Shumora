@@ -79,8 +79,13 @@ it('stages all, unstages all, trashes untracked files and restores deletions', a
 
   await service.discard(dir, 'gone.ts')
   expect(existsSync(path.join(dir, 'gone.ts'))).toBe(true)
+  // Git expands Windows 8.3 aliases (RUNNER~1 -> runneradmin); use its
+  // repository root rather than assuming tmpdir() has the same spelling.
+  const root = (await service.status(dir)).root!
+  expect(readFileSync(path.join(root, 'sub', 'new file.ts'), 'utf8')).toBe('hello\n')
   await service.discard(dir, 'sub/new file.ts')
-  expect(trash).toHaveBeenCalledWith(path.join(dir, 'sub', 'new file.ts'))
+  expect(trash).toHaveBeenCalledWith(path.join(root, 'sub', 'new file.ts'))
+  expect(existsSync(path.join(dir, 'sub', 'new file.ts'))).toBe(false)
   expect((await service.status(dir)).changes).toEqual([])
 })
 
