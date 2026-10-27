@@ -1,3 +1,4 @@
+import { useLanguage } from './Language'
 import { useEffect, useState } from 'react'
 import { Button, Tabs } from '@chakra-ui/react'
 import { RouterProviders, RouterModels } from './RouterCatalog'
@@ -6,6 +7,7 @@ import { DataSkeleton } from './DataSkeleton'
 import type { RouterPlugin, RouterState, RouterControl, RouterKey } from '../../shared/plugins'
 
 export function RouterDashboard() {
+  const { t } = useLanguage()
   const [tab, setTab] = useState('overview')
   const [authRevision, setAuthRevision] = useState(0)
   const [plugin, setPlugin] = useState<RouterPlugin>()
@@ -40,7 +42,7 @@ export function RouterDashboard() {
     finally { setBusy(false) }
   }
   const [online, setOnline] = useState<boolean | null>(null)
-  const serviceLabel = online === null ? 'Checking…' : online ? 'Online' : 'Offline'
+  const serviceLabel = online === null ? t('Checking…') : online ? t('Online') : t('Offline')
   useEffect(() => {
     let active = true
     let timer: ReturnType<typeof setTimeout>
@@ -77,41 +79,41 @@ export function RouterDashboard() {
     return () => { active = false }
   }, [])
   return <main className="library-page router-dashboard flex min-w-0 flex-1 flex-col">
-    <header className="toolbar router-toolbar"><h1>9router</h1><div className="router-header-actions"><RouterAuth onChange={() => { setKeys([]); setRevealed([]); setAuthRevision(value => value + 1) }} /><span className="router-service-status" role="status" aria-label={`9router ${online === null ? 'checking' : online ? 'online' : 'offline'}`} title="Local health check · 127.0.0.1:20128"><span aria-hidden="true" className={`router-service-dot ${online === null ? 'checking' : online ? 'online' : 'offline'}`} />{serviceLabel}</span></div></header>
+    <header className="toolbar router-toolbar"><h1>{t("9router")}</h1><div className="router-header-actions"><RouterAuth onChange={() => { setKeys([]); setRevealed([]); setAuthRevision(value => value + 1) }} /><span className="router-service-status" role="status" aria-label={`9router ${online === null ? 'checking' : online ? 'online' : 'offline'}`} title={t("Local health check · 127.0.0.1:20128")}><span aria-hidden="true" className={`router-service-dot ${online === null ? 'checking' : online ? 'online' : 'offline'}`} />{serviceLabel}</span></div></header>
     <Tabs.Root value={tab} onValueChange={({ value }) => setTab(value)} variant="line" fitted lazyMount unmountOnExit colorPalette="brand" className="library-tabs">
-      <Tabs.List aria-label="9router sections" className="library-tablist">
-        <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
-        <Tabs.Trigger value="providers">Providers</Tabs.Trigger>
-        <Tabs.Trigger value="models">Models</Tabs.Trigger>
-        <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
+      <Tabs.List aria-label={t("9router sections")} className="library-tablist">
+        <Tabs.Trigger value="overview">{t("Overview")}</Tabs.Trigger>
+        <Tabs.Trigger value="providers">{t("Providers")}</Tabs.Trigger>
+        <Tabs.Trigger value="models">{t("Models")}</Tabs.Trigger>
+        <Tabs.Trigger value="logs">{t("Logs")}</Tabs.Trigger>
         <Tabs.Indicator />
       </Tabs.List>
       <Tabs.Content value="overview" className="library-content">
-        <h2>9router overview</h2>
-        <p>Your local AI gateway, connection endpoint and API keys.</p>
-        <section className="router-overview-card"><h2>Service</h2>{online === null ? <DataSkeleton label="Loading service status" shape="service" /> : <p>{service.managed ? online ? 'Running · managed by Shumora' : 'Starting or unavailable · managed by Shumora' : online ? 'External instance · manage its process outside Shumora' : 'Service is offline'} · Local port 20128</p>}
-          <div className="router-control-actions"><Button variant="outline" disabled={busy || service.busy || online !== false || service.managed || !plugin?.installed} onClick={() => void control('start')}>Start</Button><Button variant="outline" disabled={busy || service.busy || !service.managed} onClick={() => void control('restart')}>Restart</Button><Button variant="outline" disabled={busy || service.busy || !service.managed} onClick={() => void control('stop')}>Stop</Button></div>
-          {(busy || service.busy) && <p role="status">Applying service changes…</p>}
-          {online && !service.managed && <p className="settings-note">Stop 9router from its tray or terminal first, then press Start here to enable Shumora's Stop and Restart controls.</p>}
-          <p className="settings-note">Stop and Restart affect active requests. Only Shumora-started processes are controlled, and they stop when Shumora quits.</p>
+        <h2>{t("9router overview")}</h2>
+        <p>{t("Your local AI gateway, connection endpoint and API keys.")}</p>
+        <section className="router-overview-card"><h2>{t("Service")}</h2>{online === null ? <DataSkeleton label={t("Loading service status")} shape="service" /> : <p>{service.managed ? online ? t("Running · managed by Shumora") : t("Starting or unavailable · managed by Shumora") : online ? t("External instance · manage its process outside Shumora") : t("Service is offline")} {t("· Local port 20128")}</p>}
+          <div className="router-control-actions"><Button variant="outline" disabled={busy || service.busy || online !== false || service.managed || !plugin?.installed} onClick={() => void control('start')}>{t("Start")}</Button><Button variant="outline" disabled={busy || service.busy || !service.managed} onClick={() => void control('restart')}>{t("Restart")}</Button><Button variant="outline" disabled={busy || service.busy || !service.managed} onClick={() => void control('stop')}>{t("Stop")}</Button></div>
+          {(busy || service.busy) && <p role="status">{t("Applying service changes…")}</p>}
+          {online && !service.managed && <p className="settings-note">{t("Stop 9router from its tray or terminal first, then press Start here to enable Shumora's Stop and Restart controls.")}</p>}
+          <p className="settings-note">{t("Stop and Restart affect active requests. Only Shumora-started processes are controlled, and they stop when Shumora quits.")}</p>
         </section>
-        <section className="router-overview-card"><h2>API Endpoint</h2><div className="router-endpoint"><code>http://127.0.0.1:20128/v1</code><Button size="sm" variant="outline" onClick={() => void copy('http://127.0.0.1:20128/v1')}>Copy endpoint</Button></div><p>OpenAI-compatible base URL for your coding tools.</p></section>
-        <section className="router-overview-card"><h2>API Keys</h2><p>Keys are managed by 9router, not stored in the Shumora database.</p>
-          {keyError && <p className="plugin-error" role="alert">{keyError}</p>}
-          {(online === null || keyBusy) && !keys.length && <DataSkeleton label="Loading API keys" shape="keys" />}
-          {online === false && <p>Start or connect to 9router to load API keys.</p>}
-          {online && !keyBusy && !keys.length && !keyError && <p>No API keys yet.</p>}
-          {keys.map(key => <div className="router-key-row" key={key.id}><strong>{key.name}</strong><code>{revealed.includes(key.id) ? key.key : '••••••••••••••••'}</code><Button size="sm" variant="ghost" aria-label={`${revealed.includes(key.id) ? 'Hide' : 'Show'} ${key.name} key`} onClick={() => setRevealed(previous => previous.includes(key.id) ? previous.filter(id => id !== key.id) : [...previous, key.id])}>{revealed.includes(key.id) ? 'Hide' : 'Show'}</Button><Button size="sm" variant="ghost" aria-label={`Copy ${key.name} key`} onClick={() => void copy(key.key)}>Copy</Button></div>)}
-          <form className="router-control-actions" onSubmit={event => { event.preventDefault(); void createKey() }}><input aria-label="API key name" placeholder="Key name, e.g. Coding tools" value={name} maxLength={100} disabled={!online || keyBusy} onChange={event => setName(event.target.value)} /><Button type="submit" variant="outline" disabled={!online || keyBusy || !name.trim()}>Create API Key</Button><Button variant="ghost" disabled={!online || keyBusy} onClick={() => void loadKeys()}>Refresh keys</Button></form>
+        <section className="router-overview-card"><h2>{t("API Endpoint")}</h2><div className="router-endpoint"><code>{t("http://127.0.0.1:20128/v1")}</code><Button size="sm" variant="outline" onClick={() => void copy('http://127.0.0.1:20128/v1')}>{t("Copy endpoint")}</Button></div><p>{t("OpenAI-compatible base URL for your coding tools.")}</p></section>
+        <section className="router-overview-card"><h2>{t("API Keys")}</h2><p>{t("Keys are managed by 9router, not stored in the Shumora database.")}</p>
+          {keyError && <p className="plugin-error" role="alert">{t(keyError)}</p>}
+          {(online === null || keyBusy) && !keys.length && <DataSkeleton label={t("Loading API keys")} shape="keys" />}
+          {online === false && <p>{t("Start or connect to 9router to load API keys.")}</p>}
+          {online && !keyBusy && !keys.length && !keyError && <p>{t("No API keys yet.")}</p>}
+          {keys.map(key => <div className="router-key-row" key={key.id}><strong>{key.name}</strong><code>{revealed.includes(key.id) ? key.key : '••••••••••••••••'}</code><Button size="sm" variant="ghost" aria-label={`${revealed.includes(key.id) ? 'Hide' : 'Show'} ${key.name} key`} onClick={() => setRevealed(previous => previous.includes(key.id) ? previous.filter(id => id !== key.id) : [...previous, key.id])}>{revealed.includes(key.id) ? t("Hide") : t("Show")}</Button><Button size="sm" variant="ghost" aria-label={`Copy ${key.name} key`} onClick={() => void copy(key.key)}>{t("Copy")}</Button></div>)}
+          <form className="router-control-actions" onSubmit={event => { event.preventDefault(); void createKey() }}><input aria-label={t("API key name")} placeholder={t("Key name, e.g. Coding tools")} value={name} maxLength={100} disabled={!online || keyBusy} onChange={event => setName(event.target.value)} /><Button type="submit" variant="outline" disabled={!online || keyBusy || !name.trim()}>{t("Create API Key")}</Button><Button variant="ghost" disabled={!online || keyBusy} onClick={() => void loadKeys()}>{t("Refresh keys")}</Button></form>
         </section>
-        {notice && <p role="status">{notice}</p>}
-        {error && <p className="plugin-error" role="alert">{error}</p>}
+        {notice && <p role="status">{t(notice)}</p>}
+        {error && <p className="plugin-error" role="alert">{t(error)}</p>}
 
 
       </Tabs.Content>
       <Tabs.Content value="providers" className="library-content"><RouterProviders key={authRevision} /></Tabs.Content>
       <Tabs.Content value="models" className="library-content"><RouterModels key={authRevision} /></Tabs.Content>
-      <Tabs.Content value="logs" className="library-content router-logs-panel"><h2>Service logs</h2><p>Output from Shumora-managed processes. External service logs are unavailable here.</p>{online === null ? <DataSkeleton label="Loading service logs" shape="logs" rows={10} /> : <pre className="plugin-output-log" role="log" tabIndex={0}>{service.logs || 'No service output yet.'}</pre>}</Tabs.Content>
+      <Tabs.Content value="logs" className="library-content router-logs-panel"><h2>{t("Service logs")}</h2><p>{t("Output from Shumora-managed processes. External service logs are unavailable here.")}</p>{online === null ? <DataSkeleton label={t("Loading service logs")} shape="logs" rows={10} /> : <pre className="plugin-output-log" role="log" tabIndex={0}>{service.logs || t("No service output yet.")}</pre>}</Tabs.Content>
     </Tabs.Root>
   </main>
 }

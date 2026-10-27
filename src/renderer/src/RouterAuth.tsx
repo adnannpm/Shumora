@@ -1,7 +1,9 @@
+import { useLanguage } from './Language'
 import { useEffect, useState } from 'react'
 import { Button, Dialog, Portal } from '@chakra-ui/react'
 import { DataSkeleton } from './DataSkeleton'
 export function RouterAuth({ onChange }: { onChange: () => void }) {
+  const { t } = useLanguage()
   const [checking, setChecking] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
   const [open, setOpen] = useState(false)
@@ -30,8 +32,8 @@ export function RouterAuth({ onChange }: { onChange: () => void }) {
     setBusy(true)
     try { await window.plugins.routerLogout(); setAuthenticated(false); onChange() } finally { setBusy(false) }
   }
-  if (checking) return <DataSkeleton label="Loading dashboard session" shape="button" />
-  return <><Button size="sm" variant="outline" disabled={busy} onClick={() => { if (authenticated) void logout(); else { setError(''); setOpen(true) } }}>{authenticated ? 'Sign out of 9router' : 'Sign in to 9router'}</Button>
-    <Dialog.Root open={open} placement="center" onOpenChange={({ open }) => { if (!busy) { setOpen(open); setPassword('') } }}><Portal><Dialog.Backdrop /><Dialog.Positioner><Dialog.Content><Dialog.Header><Dialog.Title>Sign in to 9router</Dialog.Title></Dialog.Header><Dialog.Body><p>Enter your local 9router dashboard password, not a provider API key. The password is not saved. The session is kept only until Shumora closes or you sign out.</p><form id="router-login" className="router-provider-form" onSubmit={e => { e.preventDefault(); void submit() }}><label>Dashboard password<input required type="password" autoComplete="off" value={password} disabled={busy} onChange={e => setPassword(e.target.value)} /></label>{error && <p className="plugin-error" role="alert">{error}</p>}</form></Dialog.Body><Dialog.Footer><Button variant="outline" disabled={busy} onClick={() => { setOpen(false); setPassword('') }}>Cancel</Button><Button type="submit" form="router-login" variant="outline" disabled={busy || !password}>Sign in</Button></Dialog.Footer></Dialog.Content></Dialog.Positioner></Portal></Dialog.Root>
+  if (checking) return <DataSkeleton label={t("Loading dashboard session")} shape="button" />
+  return <><Button size="sm" variant="outline" disabled={busy} onClick={() => { if (authenticated) void logout(); else { setError(''); setOpen(true) } }}>{authenticated ? t("Sign out of 9router") : t("Sign in to 9router")}</Button>
+    <Dialog.Root open={open} placement="center" onOpenChange={({ open }) => { if (!busy) { setOpen(open); setPassword('') } }}><Portal><Dialog.Backdrop /><Dialog.Positioner><Dialog.Content><Dialog.Header><Dialog.Title>{t("Sign in to 9router")}</Dialog.Title></Dialog.Header><Dialog.Body><p>{t("Enter your local 9router dashboard password, not a provider API key. The password is not saved. The session is kept only until Shumora closes or you sign out.")}</p><form id="router-login" className="router-provider-form" onSubmit={e => { e.preventDefault(); void submit() }}><label>{t("Dashboard password")}<input required type="password" autoComplete="off" value={password} disabled={busy} onChange={e => setPassword(e.target.value)} /></label>{error && <p className="plugin-error" role="alert">{t(error)}</p>}</form></Dialog.Body><Dialog.Footer><Button variant="outline" disabled={busy} onClick={() => { setOpen(false); setPassword('') }}>{t("Cancel")}</Button><Button type="submit" form="router-login" variant="outline" disabled={busy || !password}>{t("Sign in")}</Button></Dialog.Footer></Dialog.Content></Dialog.Positioner></Portal></Dialog.Root>
   </>
 }
