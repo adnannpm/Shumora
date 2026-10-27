@@ -26,6 +26,14 @@ npm run build
 
 Commit the version and notes together and submit a PR. Merge only after review. Merge to main runs CI but does not automatically raise the version, build installers or publish. The owner chooses when the candidate is ready.
 
+## Cross-platform pre-merge checks
+
+Every PR and push to main runs `npm ci`, the complete test suite, the production build, and unsigned unpacked packaging on the same four OS/architecture targets as the release workflow. These jobs never publish. The final `verify` check succeeds only if every platform passes; failed or cancelled platform jobs fail that gate. Superseded CI runs are cancelled to avoid testing stale revisions unnecessarily.
+
+Require **CI / verify** (check context `verify`) in the main branch ruleset and wait for it on the exact approved main SHA before dispatching a release. A workflow file alone cannot prevent an administrator from merging without a required-check rule. Keep the platform matrix synchronized with release; `tests/ci-workflow.test.ts` enforces matching targets and the aggregate gate.
+
+Unpacked CI packaging validates native dependencies and resource layout, not final NSIS/DMG/AppImage creation, signing, installation or live-agent behavior. The release pipeline still tests and builds its immutable source and is the authority for final installer success. Never skip a failing platform or blanket-retry test failures to make a release green. Diagnose the failure, add regression coverage, merge the fix and dispatch a new run for the new SHA; rerunning an old release still uses its old source.
+
 ## Approve and build
 
 After the workflow has been merged into main:
