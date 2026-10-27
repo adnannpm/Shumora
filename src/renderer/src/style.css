@@ -336,3 +336,53 @@ h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.3px; }
   .statusbar { flex-wrap: wrap; padding-inline: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* Automatic Meeting Room */
+.meeting-page-host { flex: 1; min-width: 0; overflow: hidden; }
+.meeting-page { overflow: hidden; }
+.meeting-badge { margin-left: auto; color: var(--accent); font-size: 12px; }
+.meeting-auto-body { flex: 1; min-height: 0; overflow-y: auto; padding: 28px; }
+.meeting-setup { max-width: 740px; margin: 0 auto; padding: 16px; }
+.meeting-page h2 { font-size: 22px; font-weight: 650; margin-bottom: 10px; }
+.meeting-page h3 { font-size: 14px; font-weight: 600; margin: 24px 0 10px; }
+.meeting-page p { color: var(--muted); font-size: 13px; line-height: 1.7; margin-bottom: 14px; }
+.meeting-page label { display: block; font-size: 13px; margin: 18px 0; }
+.meeting-page textarea, .meeting-page select, .meeting-invite > input { display: block; width: 100%; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+.meeting-page textarea { min-height: 90px; resize: vertical; }
+.meeting-page button { padding: 9px 15px; border: 1px solid var(--line); border-radius: 7px; font-size: 13px; background: var(--surface); color: var(--text); }
+.meeting-page button.meeting-primary { background: var(--accent); color: white; border-color: var(--accent); padding: 12px 24px; }
+.meeting-page button:disabled { opacity: .45; cursor: not-allowed; }
+.meeting-page input[type=checkbox] { accent-color: var(--accent); margin-right: 9px; }
+.meeting-invites { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.meeting-invite { padding: 12px 16px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+.meeting-invite.selected { border-color: var(--accent); }
+.meeting-invite label { margin: 0; }
+.meeting-invite small { display: block; margin: 8px 0 0 24px; color: var(--muted); }
+.meeting-notice { border-left: 2px solid var(--accent); padding-left: 12px; margin-top: 22px; }
+.meeting-room-live { max-width: 960px; margin: 0 auto; }
+.meeting-live-header { border-bottom: 1px solid var(--line); padding-bottom: 16px; }
+.meeting-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 12px; }
+.meeting-actions > span { margin-right: auto; color: var(--muted); }
+.meeting-conversation { padding: 16px 0; }
+.meeting-message { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+.meeting-message strong { color: var(--accent); font-size: 13px; }
+.meeting-message p { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); margin: 9px 0 0; }
+.meeting-summary { border-color: var(--accent); }
+.meeting-markdown { margin-top: 10px; font-size: 13px; line-height: 1.75; overflow-wrap: anywhere; }
+.meeting-markdown p { white-space: normal; margin: 10px 0; }
+.meeting-markdown h1, .meeting-markdown h2, .meeting-markdown h3 { font-weight: 650; font-size: 16px; margin: 16px 0 8px; }
+.meeting-markdown ul, .meeting-markdown ol { padding-left: 24px; margin: 10px 0; }
+.meeting-markdown ul { list-style: disc; }
+.meeting-markdown ol { list-style: decimal; }
+.meeting-markdown blockquote { border-left: 3px solid var(--accent); padding-left: 12px; margin: 12px 0; color: var(--muted); }
+.meeting-markdown pre { overflow-x: auto; padding: 12px; border: 1px solid var(--line); border-radius: 6px; margin: 12px 0; white-space: pre; }
+.meeting-markdown code { font-family: monospace; background: var(--sidebar); padding: 2px 4px; border-radius: 3px; }
+.meeting-markdown pre code { padding: 0; background: none; }
+.meeting-markdown a { color: var(--accent); text-decoration: underline; }
+.meeting-markdown hr { border-color: var(--line); margin: 16px 0; }
+.meeting-user-turn { border: 1px solid var(--accent); border-radius: 10px; padding: 18px; background: var(--surface); }
+.meeting-user-turn button + button { margin-left: 10px; }
+.meeting-direction { border-top: 1px solid var(--line); padding-top: 4px; }
+.meeting-footnote, .meeting-progress { color: var(--muted); font-size: 12px; padding: 12px 0; }
+.meeting-alert { border: 1px solid #c54e4e; padding: 12px; border-radius: 7px; }
+@media (max-width: 900px) { .meeting-auto-body { padding: 14px; } .meeting-invites { grid-template-columns: 1fr; } }

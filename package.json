@@ -59,7 +59,8 @@
     "files": [
       "out/**/*",
       "package.json",
-      "third-party/**/*"
+      "third-party/**/*",
+      "resources/meeting-extension.mjs"
     ],
     "asarUnpack": [
       "node_modules/node-pty/**/*",

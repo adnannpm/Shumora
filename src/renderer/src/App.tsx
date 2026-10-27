@@ -5,6 +5,7 @@ import type { Session } from '../../shared/types'
 import { TerminalPane } from './TerminalPane'
 import { Sidebar, type Page } from './Sidebar'
 import { Settings } from './Settings'
+import { MeetingRoom } from './MeetingRoom'
 import { Library } from './Library'
 import { WorkspaceSetup } from './WorkspaceSetup'
 import { RouterDashboard } from './RouterDashboard'
@@ -238,6 +239,9 @@ export default function App() {
       </div>
       <footer className="statusbar"><span>{sessions.filter(s => s.status === 'running').length} {t("processes running")}</span><span>{split ? t("{count} groups", { count: layout.groups.length }) : t("Single group")} {t("· Hidden sessions keep running")}</span></footer>
     </main>
+    <div className="meeting-page-host" style={{ display: page === 'meeting' ? 'flex' : 'none' }}>
+      <MeetingRoom sessions={sessions} active={page === 'meeting'} />
+    </div>
     {page === 'settings' && <Settings />}
     {page === 'library' && <Library initialPlugin={setupPlugin} onPluginStatus={pluginStatus} />}
     {page === '9router' && routerInstalled && <RouterDashboard />}

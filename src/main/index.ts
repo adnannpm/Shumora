@@ -4,6 +4,9 @@ import { join } from 'node:path'
 import { statSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { SessionManager } from './sessions'
+import { MeetingBridge } from './meeting-bridge'
+import { MeetingManager } from './meetings'
+import type { MeetingInput } from '../shared/meetings'
 import { resolveLaunch, enrichedPath } from './launch'
 import { autoUpdater } from 'electron-updater'
 import { UpdateManager } from './updates'
@@ -27,13 +30,27 @@ let window: BrowserWindow | undefined
 let folder = homedir()
 let closing = false
 let database: ReturnType<typeof openDatabase> | undefined
-const sessions = new SessionManager((cwd) => {
+const bridge = new MeetingBridge(() => publishMeeting())
+const meetings = new MeetingManager(bridge, () => publishMeeting())
+function meetingSnapshot() {
+  return { state: meetings.snapshot(), agents: Object.fromEntries(sessions.list().map(s => [s.id, s.status === 'running' ? bridge.status(s.id) : 'disconnected'])) }
+}
+function publishMeeting() {
+  if (window && !window.isDestroyed()) window.webContents.send('meetings:change', meetingSnapshot())
+}
+const sessions = new SessionManager((cwd, id, generation) => {
   if (!statSync(cwd).isDirectory()) throw new Error('Working directory is not a folder')
   const launch = resolveLaunch(process.platform, process.env, process.env.PATH || process.env.Path || '')
   const env = Object.fromEntries(Object.entries(process.env).filter(([key, value]) => value !== undefined && key !== 'ELECTRON_RUN_AS_NODE')) as Record<string, string>
-  return pty.spawn(launch.file, launch.args, { name: 'xterm-256color', cols: 100, rows: 30, cwd, env: { ...env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } })
+  const token = bridge.register(id, generation)
+  const extension = join(__dirname, '../../resources/meeting-extension.mjs')
+  try {
+    return pty.spawn(launch.file, [...launch.args, '--extension', extension], { name: 'xterm-256color', cols: 100, rows: 30, cwd, env: { ...env, TERM: 'xterm-256color', COLORTERM: 'truecolor', SHUMORA_MEETING_PORT: String(bridge.port), SHUMORA_MEETING_TOKEN: token } })
+  } catch (error) { bridge.remove(id); throw error }
 }, (event) => {
+  if (event.type === 'removed' || (event.type === 'state' && event.session.status !== 'running')) bridge.remove(event.type === 'removed' ? event.id : event.session.id)
   if (window && !window.isDestroyed()) window.webContents.send('sessions:event', event)
+  if (event.type !== 'data') publishMeeting()
 })
 
 let updates: UpdateManager
@@ -46,6 +63,22 @@ const router = new RouterService(routerHost)
 const catalog = new RouterCatalog()
 function registerIPC() {
   const handlers: Record<string, (...args: any[]) => unknown> = {
+    'meetings:snapshot': () => meetingSnapshot(),
+    'meetings:start': (input: MeetingInput) => {
+      if (!input || !Array.isArray(input.participants)) throw new Error('Invalid meeting setup')
+      const list = sessions.list()
+      const participants = input.participants.map(p => {
+        const session = list.find(s => s.id === p?.id && s.status === 'running')
+        if (!session) throw new Error('Meeting agent is not ready')
+        return { id: session.id, name: session.name, role: p.role }
+      })
+      meetings.start({ ...input, participants })
+    },
+    'meetings:pause': () => meetings.pause(),
+    'meetings:resume': () => meetings.resume(),
+    'meetings:stop': () => meetings.stop(),
+    'meetings:take-over': () => meetings.takeOver(),
+    'meetings:direction': text => meetings.direction(text),
     'packages:updates': scope => checkLibraryUpdates({ names: configuredPackageNames, status: packageStatus, latest: async name => (await packages.detail(name)).version, plugins: [{ id: 'pi', check: () => piPlugin.status(true) }, { id: '9router', check: () => plugins.status(true) }] }, scope),
     'packages:detail': name => packages.detail(name),
     'packages:status': name => packages.status(name),
@@ -150,7 +183,8 @@ function createWindow() {
   else void window.loadFile(join(__dirname, '../renderer/index.html'))
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await bridge.listen()
   database = openDatabase(app.getPath('userData'))
   plugins = new PluginService(database, pluginHost, operation => {
     if (window && !window.isDestroyed()) window.webContents.send('plugins:operation', operation)
@@ -180,4 +214,4 @@ app.on('before-quit', (event) => {
   void router.dispose().catch(() => {}).finally(() => { routerClosing = true; app.quit() })
 })
 let routerClosing = false
-app.on('will-quit', () => { sessions.dispose(); database?.close(); database = undefined })
+app.on('will-quit', () => { meetings.stop(); bridge.dispose(); sessions.dispose(); database?.close(); database = undefined })

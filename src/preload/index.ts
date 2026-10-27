@@ -1,4 +1,20 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { MeetingsAPI, MeetingSnapshot } from '../shared/meetings'
+const meetings: MeetingsAPI = {
+  snapshot: () => ipcRenderer.invoke('meetings:snapshot'),
+  start: input => ipcRenderer.invoke('meetings:start', input),
+  pause: () => ipcRenderer.invoke('meetings:pause'),
+  resume: () => ipcRenderer.invoke('meetings:resume'),
+  stop: () => ipcRenderer.invoke('meetings:stop'),
+  takeOver: () => ipcRenderer.invoke('meetings:take-over'),
+  direction: text => ipcRenderer.invoke('meetings:direction', text),
+  onChange: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, snapshot: MeetingSnapshot) => callback(snapshot)
+    ipcRenderer.on('meetings:change', listener)
+    return () => ipcRenderer.removeListener('meetings:change', listener)
+  }
+}
+contextBridge.exposeInMainWorld('meetings', meetings)
 import type { PackageAPI } from '../shared/packages'
 import type { PluginsAPI, PluginOperation, PiPluginAPI } from '../shared/plugins'
 import type { UpdatesAPI, UpdateState } from '../shared/updates'

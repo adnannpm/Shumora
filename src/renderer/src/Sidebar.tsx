@@ -2,7 +2,7 @@ import { useLanguage } from './Language'
 import { Button } from '@chakra-ui/react'
 import shumoraLogo from './assets/shumora-logo.png'
 
-export type Page = 'workspace' | '9router' | 'library' | 'settings'
+export type Page = 'workspace' | 'meeting' | '9router' | 'library' | 'settings'
 function NavIcon({ type }: { type: 'terminal' | 'router' | 'library' | 'settings' | 'collapse' }) {
   const { t } = useLanguage()
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -20,6 +20,7 @@ export function Sidebar({ page, onPage, collapsed, onToggle, routerInstalled }: 
     <nav aria-label={t("Main navigation")} className="sidebar-navigation">
       <div className="sidebar-group" role="group" aria-label={t("Workspace")}><div className="sidebar-group-label" aria-hidden="true">{!collapsed && t("Workspace")}</div>
       <Button variant="ghost" aria-label={t("Terminals")} title={collapsed ? t("Terminals") : undefined} aria-current={page === 'workspace' ? "page" : undefined} onClick={() => onPage('workspace')}><NavIcon type="terminal" /><span className="sidebar-label" aria-hidden={collapsed}>{t("Terminals")}</span></Button>
+      <Button variant="ghost" aria-label={t("Meeting Room")} title={collapsed ? t("Meeting Room") : undefined} aria-current={page === 'meeting' ? "page" : undefined} onClick={() => onPage('meeting')}><NavIcon type="router" /><span className="sidebar-label" aria-hidden={collapsed}>{t("Meeting Room")}</span></Button>
       </div>
       {routerInstalled && <div className="sidebar-group" role="group" aria-label={t("Integrations")}><div className="sidebar-group-label" aria-hidden="true">{!collapsed && t("Integrations")}</div>
       <Button variant="ghost" aria-label={t("9router")} title={collapsed ? t("9router") : undefined} aria-current={page === '9router' ? "page" : undefined} onClick={() => onPage('9router')}><NavIcon type="router" /><span className="sidebar-label" aria-hidden={collapsed}>{t("9router")}</span></Button>
