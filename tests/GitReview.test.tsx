@@ -68,6 +68,26 @@ it('reviews staged and unstaged sections, stages, unstages and confirms discard'
   await waitFor(() => expect(mock.gitStageAll).toHaveBeenCalledWith('one'))
 })
 
+it.each(['modified', 'untracked'] as const)('reloads the selected %s diff on refresh even when line counts are unchanged', async status => {
+  const mock = api([{ path: 'a.ts', status, worktreeStatus: status, staged: false, unstaged: true,
+    ...(status === 'modified' ? { unstagedStats: { binary: false, insertions: 1, deletions: 1 } } : {}) }])
+  let content = 'initial-content'
+  mock.gitStatus.mockImplementation(async () => ({ isRepo: true, branch: 'main', changes: [{ path: 'a.ts', status, worktreeStatus: status, staged: false, unstaged: true,
+    ...(status === 'modified' ? { unstagedStats: { binary: false, insertions: 1, deletions: 1 } } : {}) }] }))
+  mock.gitDiff.mockImplementation(async (_id, path, area) => ({ path, area, untracked: status === 'untracked', binary: false, tooLarge: false, patch: `@@ -1 +1 @@\n-old\n+${content}\n` }))
+  window.workspace = mock as any
+  render(<Provider><GitReviewButton sessionId="one" visible /></Provider>)
+  fireEvent.click(await screen.findByTitle('Review 1 changed file'))
+  expect(await screen.findByText('initial-content')).toBeTruthy()
+  content = 'refreshed-content'
+  fireEvent.click(screen.getByTitle('Refresh changes'))
+  expect(await screen.findByText('refreshed-content')).toBeTruthy()
+  expect(screen.queryByText('initial-content')).toBeNull()
+  content = 'focus-refreshed-content'
+  fireEvent.focus(window)
+  expect(await screen.findByText('focus-refreshed-content')).toBeTruthy()
+  expect(screen.queryByText('refreshed-content')).toBeNull()
+})
 it('generates a message with the chosen model and commits', async () => {
   const mock = api([{ path: 'a.ts', status: 'modified', indexStatus: 'modified', staged: true, unstaged: false }])
   window.workspace = mock as any

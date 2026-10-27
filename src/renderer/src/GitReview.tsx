@@ -103,15 +103,16 @@ function GitReviewDialog({ sessionId, status, error, refresh, onClose }: { sessi
     : selected && valid({ path: selected.path, area: selected.area === 'staged' ? 'unstaged' : 'staged' }) ? { path: selected.path, area: selected.area === 'staged' ? 'unstaged' : 'staged' }
     : unstaged[0] ? { path: unstaged[0].path, area: 'unstaged' } : staged[0] ? { path: staged[0].path, area: 'staged' } : undefined
   const change = current && status.changes.find((c) => c.path === current.path)
-  const stats = change && current && (current.area === 'staged' ? change.stagedStats : change.unstagedStats)
-  const key = current && change ? `${current.area}:${current.path}:${change.status}:${stats?.insertions}:${stats?.deletions}` : ''
+  const key = current ? `${current.area}:${current.path}` : ''
 
   const load = useCallback(async (sel: Selection) => {
     const id = ++request.current
     try { const result = await window.workspace.gitDiff(sessionId, sel.path, sel.area); if (id === request.current) setDiff(result) }
     catch (e) { if (id === request.current) { setDiff(undefined); setActionError(String(e)) } }
   }, [sessionId])
-  useEffect(() => { if (current) void load(current); else setDiff(undefined) }, [key, load])
+  // Each successful status refresh can represent new content, even when line
+  // counts are unchanged (or absent for untracked files).
+  useEffect(() => { if (current) void load(current); else setDiff(undefined) }, [key, status, load])
 
   async function act(run: () => Promise<unknown>) {
     setBusy(true); setActionError('')

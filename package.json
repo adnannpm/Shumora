@@ -60,8 +60,10 @@
       "out/**/*",
       "package.json",
       "third-party/**/*",
-      "resources/meeting-extension.mjs",
       "resources/icons/**/*"
+    ],
+    "extraResources": [
+      { "from": "resources/meeting-extension.mjs", "to": "meeting-extension.mjs" }
     ],
     "asarUnpack": [
       "node_modules/node-pty/**/*",

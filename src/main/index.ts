@@ -5,6 +5,7 @@ import { statSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { SessionManager } from './sessions'
 import { MeetingBridge } from './meeting-bridge'
+import { meetingExtensionPath } from './meeting-extension-path'
 import { MeetingManager } from './meetings'
 import type { MeetingInput } from '../shared/meetings'
 import { resolveLaunch, enrichedPath } from './launch'
@@ -45,7 +46,7 @@ const sessions = new SessionManager((cwd, id, generation) => {
   const launch = resolveLaunch(process.platform, process.env, process.env.PATH || process.env.Path || '')
   const env = Object.fromEntries(Object.entries(process.env).filter(([key, value]) => value !== undefined && key !== 'ELECTRON_RUN_AS_NODE')) as Record<string, string>
   const token = bridge.register(id, generation)
-  const extension = join(__dirname, '../../resources/meeting-extension.mjs')
+  const extension = meetingExtensionPath(app.isPackaged, process.resourcesPath, __dirname)
   try {
     return pty.spawn(launch.file, [...launch.args, '--extension', extension], { name: 'xterm-256color', cols: 100, rows: 30, cwd, env: { ...env, TERM: 'xterm-256color', COLORTERM: 'truecolor', SHUMORA_MEETING_PORT: String(bridge.port), SHUMORA_MEETING_TOKEN: token } })
   } catch (error) { bridge.remove(id); throw error }
