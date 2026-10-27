@@ -5,15 +5,16 @@ import type { UpdatesAPI, UpdateState } from '../shared/updates'
 import type { WorkspaceAPI, SessionEvent } from '../shared/types'
 const api: WorkspaceAPI = {
   list: () => ipcRenderer.invoke('sessions:list'),
-  create: () => ipcRenderer.invoke('sessions:create'),
+  create: (cwd) => ipcRenderer.invoke('sessions:create', cwd),
   snapshot: (id) => ipcRenderer.invoke('sessions:snapshot', id),
   input: (id, data) => ipcRenderer.invoke('sessions:input', id, data),
   resize: (id, cols, rows) => ipcRenderer.invoke('sessions:resize', id, cols, rows),
   close: (id) => ipcRenderer.invoke('sessions:close', id),
   stop: (id) => ipcRenderer.invoke('sessions:stop', id),
   restart: (id) => ipcRenderer.invoke('sessions:restart', id),
+  rename: (id, name) => ipcRenderer.invoke('sessions:rename', id, name),
   folder: () => ipcRenderer.invoke('workspace:folder'),
-  chooseFolder: () => ipcRenderer.invoke('workspace:choose-folder'),
+  chooseFolder: (defaultPath) => ipcRenderer.invoke('workspace:choose-folder', defaultPath),
   onEvent: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, data: SessionEvent) => callback(data)
     ipcRenderer.on('sessions:event', listener)

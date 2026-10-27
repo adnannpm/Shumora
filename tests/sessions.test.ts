@@ -88,3 +88,18 @@ describe('SessionManager', () => {
     expect(p.every((s) => s.killed)).toBe(true); expect(m.list().every((s) => s.status === 'exited')).toBe(true)
   })
 })
+
+it('renames session metadata without resetting output, generation or process', () => {
+  const { manager: m, processes: p, events } = fixture()
+  const s = m.create('/tmp'); p[0].data('hello')
+  expect(m.rename(s.id, '  Backend  ')).toEqual({ ...s, name: 'Backend' })
+  expect(m.snapshot(s.id)).toMatchObject({ session: { name: 'Backend', generation: 1 }, output: 'hello' })
+  expect(events.at(-1)).toEqual({ type: 'state', session: { ...s, name: 'Backend' } })
+  expect(p).toHaveLength(1); expect(p[0].killed).toBe(false)
+  p[0].exit(0)
+  expect(m.list()[0].name).toBe('Backend')
+  for (const name of ['', '   ', 'a'.repeat(121), 'bad\nname', 42]) {
+    expect(() => m.rename(s.id, name as string)).toThrow(/Invalid session name/)
+  }
+  expect(() => m.rename('missing', 'Name')).toThrow(/Unknown session/)
+})

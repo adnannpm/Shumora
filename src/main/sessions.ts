@@ -48,6 +48,13 @@ export class SessionManager {
     }
     this.publish(e); return { ...e.session }
   }
+  rename(id: string, name: string): Session {
+    const e = this.get(id)
+    if (typeof name !== 'string' || !name.trim() || name.trim().length > 120 || /[\x00-\x1f\x7f]/.test(name)) throw new Error('Invalid session name')
+    e.session.name = name.trim()
+    this.publish(e)
+    return { ...e.session }
+  }
   snapshot(id: string): Snapshot { const e = this.get(id); return { session: { ...e.session }, output: e.output, seq: e.seq } }
   input(id: string, data: string) {
     if (this.closed.has(id)) {

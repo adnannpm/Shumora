@@ -86,9 +86,11 @@ function registerIPC() {
     'updates:download': () => updates.download(),
     'updates:install': () => updates.install(),
     'sessions:list': () => sessions.list(),
-    'sessions:create': () => {
+    'sessions:create': (cwd?: string) => {
       if (sessions.list().length >= 32) throw new Error('MVP supports up to 32 sessions per workspace')
-      return sessions.create(folder)
+      const target = cwd === undefined ? folder : cwd
+      if (typeof target !== 'string' || !statSync(target).isDirectory()) throw new Error('Working directory is not a folder')
+      return sessions.create(target)
     },
     'sessions:snapshot': (id: string) => sessions.snapshot(id),
     'sessions:input': (id: string, data: string) => sessions.input(id, data),
@@ -100,11 +102,12 @@ function registerIPC() {
     },
     'sessions:stop': (id: string) => sessions.stop(id),
     'sessions:restart': (id: string) => sessions.restart(id),
+    'sessions:rename': (id: string, name: string) => sessions.rename(id, name),
     'workspace:folder': () => folder,
-    'workspace:choose-folder': async () => {
-      const result = await dialog.showOpenDialog(window!, { title: 'Folder for new Pi sessions', defaultPath: folder, properties: ['openDirectory'] })
-      if (!result.canceled && result.filePaths[0]) folder = result.filePaths[0]
-      return folder
+    'workspace:choose-folder': async (defaultPath?: string) => {
+      if (defaultPath !== undefined && typeof defaultPath !== 'string') throw new Error('Invalid directory')
+      const result = await dialog.showOpenDialog(window!, { title: 'Folder for new Pi session', defaultPath: defaultPath || folder, properties: ['openDirectory'] })
+      return result.canceled ? null : result.filePaths[0] || null
     }
   }
   for (const [channel, handler] of Object.entries(handlers)) {

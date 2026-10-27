@@ -270,21 +270,31 @@ h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.3px; }
 .folder-button span:nth-child(2) { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: "Cascadia Code", Consolas, monospace; }
 .workspace-folder { max-width: 320px; margin-right: auto; }
 .layout-switch { display: flex; flex-shrink: 0; gap: 2px; padding: 3px; background: var(--sidebar); border: 1px solid var(--line); border-radius: 5px; }
-.tab-workspace { display: grid; flex: 1; min-height: 0; min-width: 0; overflow: hidden; background: #10151e; }
+.tab-workspace { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; background: #10151e; }
 .tab-group-bar { display: flex; align-items: center; min-width: 0; overflow: hidden; background: var(--sidebar); border-bottom: 1px solid var(--line); }
 .tab-group-bar.active-group { border-bottom-color: #6385cc; }
-.session-tablist { display: flex; align-items: stretch; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
-.session-tab { position: relative; display: flex; align-items: stretch; flex-shrink: 0; border-right: 1px solid var(--line); color: var(--muted); }
+.session-tablist { display: flex; flex: 1; align-items: stretch; min-width: 0; overflow: hidden; }
+.session-tab { position: relative; display: flex; align-items: stretch; flex: 1 1 0; min-width: 0; overflow: hidden; container-type: inline-size; border-right: 1px solid var(--line); color: var(--muted); }
 .session-tab { touch-action: pan-y; user-select: none; transition: transform 140ms ease; }
 .session-tab > [role=tab] { cursor: grab; }
 .session-tab.sliding { z-index: 2; transition: none; background: var(--selected); }
 .session-tab.sliding > [role=tab] { cursor: grabbing; }
 .session-tab.selected { color: var(--selected-text); background: var(--surface); }
+.tab-rename-input { flex: 1; width: 0; min-width: 0; margin: 6px 4px 6px 8px; padding: 3px 6px; border: 1px solid var(--accent); border-radius: 4px; background: var(--surface); color: var(--selected-text); font-size: 12px; user-select: text; }
 .session-tab:hover { background: var(--selected); }
 /* Paint selection above both buttons so their hover backgrounds cannot cover it. */
 .session-tab.selected::after { content: ''; position: absolute; inset: 0 0 auto; height: 2px; background: var(--accent); pointer-events: none; z-index: 1; }
-.session-tab > [role=tab] { display: flex; align-items: center; gap: 8px; border: 0; background: transparent; padding: 11px 8px 11px 14px; min-width: 90px; font-size: 12px; white-space: nowrap; }
-.close-tab { align-self: center; width: 26px; height: 26px; margin-right: 5px; border: 0; border-radius: 3px; background: transparent; color: #596575; font-size: 18px; line-height: 1; }
+.session-tab > [role=tab] { display: flex; flex: 1; min-width: 0; overflow: hidden; align-items: center; justify-content: center; border: 0; background: transparent; padding: 11px 34px; font-size: 12px; white-space: nowrap; }
+.session-tab > [role=tab] > .status-dot { position: absolute; left: 14px; }
+.session-tab-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.close-tab { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; border: 0; border-radius: 3px; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; }
+@container (max-width: 100px) {
+  .session-tab > [role=tab] { padding-inline: 8px; }
+  .session-tab > [role=tab] > .status-dot { display: none; }
+  .session-tab > .close-tab { visibility: hidden; right: 0; background: var(--selected); }
+  .session-tab:hover > .close-tab, .session-tab:focus-within > .close-tab { visibility: visible; }
+}
+.session-tab:has(.tab-rename-input) .close-tab { display: none; }
 .close-tab:hover { background: var(--selected); color: var(--accent); }
 .session-panel { min-height: 0; min-width: 0; overflow: hidden; }
 .terminal-pane { flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: #10151e; color-scheme: dark; }
@@ -299,15 +309,15 @@ h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.3px; }
 .terminal-host { flex: 1; min-height: 0; min-width: 0; overflow: hidden; padding: 0; background: #10151e; }
 /* FitAddon subtracts xterm padding, not parent padding. Keep the host unpadded
    so the reported PTY rows always fit inside the visible content box. */
-.terminal-host .xterm { height: 100%; padding: 12px 10px; }
+.terminal-host .xterm { height: 100%; padding: 0; }
 /* Hide extra scrollbar chrome, preserving wheel handling and scrollback. */
 .terminal-host .xterm .xterm-scrollable-element > .scrollbar { visibility: hidden !important; pointer-events: none; }
 .terminal-host .xterm .xterm-viewport { scrollbar-width: none; }
 .terminal-host .xterm .xterm-viewport::-webkit-scrollbar { width: 0; height: 0; }
-.group-separator { background: #cbd2dd; touch-action: none; z-index: 2; }
-.split-right > .group-separator { cursor: col-resize; }
-.split-down > .group-separator { cursor: row-resize; }
-.group-separator:hover, .group-separator:focus-visible { background: #6385cc; outline: none; }
+.group-separator { background: var(--line); touch-action: none; z-index: 2; }
+.separator-right { cursor: col-resize; }
+.separator-down { cursor: row-resize; }
+.group-separator:hover, .group-separator:focus-visible { background: var(--accent); outline: none; }
 .terminal-error, .global-error { padding: 14px; color: #8f2531; background: #fff1f0; border-bottom: 1px solid #efc7cb; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .terminal-error p { margin: 5px 0 0; }
 .global-error { display: flex; justify-content: space-between; gap: 12px; }
