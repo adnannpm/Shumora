@@ -162,10 +162,7 @@ export default function App() {
     const value = (point - (right ? bounds.left : bounds.top)) / (right ? bounds.width : bounds.height) * 100
     dispatch({ type: 'resize', path: separator.path, ratio: Math.round(value) })
   }
-  const gridStyle: CSSProperties = !split ? { gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: '42px minmax(0, 1fr)' }
-    : layout.orientation === 'right'? {gridTemplateColumns: `minmax(0, ${ratio}fr) 6px minmax(0, ${100 - ratio}fr)`,gridTemplateRows: '42px minmax(0, 1fr)',}
-    : {gridTemplateColumns: 'minmax(0, 1fr)',gridTemplateRows: `42px minmax(0, ${ratio}fr) 6px 42px minmax(0, ${100 - ratio}fr)`,}
-  const needsPartner = !split && layout.groups[0].ids.length === 1
+  const needsPartner = layout.groups[layout.focused].ids.length === 1
   const focusedSession = sessions.find(s => s.id === layout.groups[layout.focused]?.active)
   return <div className="workspace flex h-dvh overflow-hidden">
     <Sidebar routerInstalled={routerInstalled} page={page} onPage={value => { setSetupPlugin(null); setPage(value) }} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />

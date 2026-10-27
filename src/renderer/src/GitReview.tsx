@@ -64,7 +64,12 @@ const lines = (changes: GitFileChange[], key: 'insertions' | 'deletions') =>
 export function GitReviewButton({ sessionId, sessionName, visible, sessions = [] }: { sessionId: string; sessionName?: string; visible: boolean; sessions?: Session[] }) {
   const [open, setOpen] = useState<'review' | 'branch'>()
   const { status, error, refresh } = useGitStatus(sessionId, visible || !!open)
-  if (!status?.isRepo) return null
+  if (!status?.isRepo) return <div className="git-control" role="group" aria-label="Source control">
+    <Button size="xs" variant="outline" className="git-button" disabled={!error} onClick={() => void refresh()} title={error || 'Open a terminal in a Git repository to review changes'}>
+      <span aria-hidden>⎇</span> {error ? 'Retry Git status' : status ? 'Not a Git repository' : 'Loading Git…'}
+    </Button>
+    {error && <span role="alert" className="git-status-error">{error}</span>}
+  </div>
   const count = status.changes.length
   const scope = sessionName ? ` (${sessionName})` : ''
   const branchLabel = status.detached ? 'HEAD (detached)' : status.branch ?? 'git'

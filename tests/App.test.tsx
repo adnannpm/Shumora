@@ -12,6 +12,8 @@ function setup(count = 1, approved = true) {
   let sessions: Session[] = Array.from({ length: count }, (_, i) => ({ id: String(i + 1), name: `Pi ${i + 1}`, cwd: '/tmp', status: 'running', generation: 1 }))
   let counter = count
   const api: WorkspaceAPI = {
+    gitStatus: vi.fn(async () => ({ isRepo: false, changes: [] })),
+    gitDiff: vi.fn(), gitStage: vi.fn(), gitUnstage: vi.fn(), gitStageAll: vi.fn(), gitUnstageAll: vi.fn(), gitDiscard: vi.fn(), gitCommit: vi.fn(), gitCommitModels: vi.fn(), gitGenerateMessage: vi.fn(), gitBranches: vi.fn(), gitSwitch: vi.fn(),
     list: vi.fn(async () => sessions), create: vi.fn(async (cwd = '/tmp') => { const n = ++counter; const s: Session = { id: String(n), name: `Pi ${n}`, cwd, status: 'running', generation: 1 }; sessions = [...sessions, s]; return s }),
     rename: vi.fn(async (id, name) => { const session = { ...sessions.find(s => s.id === id)!, name }; sessions = sessions.map(s => s.id === id ? session : s); return session }),
     close: vi.fn(async () => approved), folder: async () => '/tmp', chooseFolder: vi.fn(async () => '/project'), onEvent: () => () => {}, snapshot: vi.fn(), input: vi.fn(), resize: vi.fn(), stop: vi.fn(), restart: vi.fn()
