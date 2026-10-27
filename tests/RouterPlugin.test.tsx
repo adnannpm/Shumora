@@ -49,6 +49,8 @@ it('starts with empty output instead of restoring previous operation errors', as
   }
   render(<Provider><RouterDetails /></Provider>)
   await screen.findByRole('button', { name: 'Install' })
+  expect(screen.queryByRole('log')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Show output' }))
   expect(screen.getByRole('log').textContent).not.toContain('npm EACCES stack trace')
   expect(screen.queryByRole('alert')).toBeNull()
 })

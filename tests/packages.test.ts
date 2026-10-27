@@ -4,6 +4,21 @@ const html = '<article data-package-card="true" data-package-name="@demo/tools" 
 it('extracts safe text and pagination from the real gallery markup', () => {
   expect(parsePackagePage(html, 1)).toEqual({ items: [{ name: '@demo/tools', description: 'Tools & skills', author: 'Demo', types: ['extension', 'skill'], downloads: 100, version: '1.2.3' }], page: 1, pages: 3 })
 })
+it('loads preview media separately and rejects unsafe image URLs', async () => {
+  const page = html.replace('</article>', '</article><article data-package-card="true" data-package-name="unsafe"></article>')
+  const fetchPage = vi.fn(async (url: string) => url.includes('/preview-media?') ? JSON.stringify({ previews: [
+    { name: '@demo/tools', media: { url: 'https://images.example.com/demo.png' } },
+    { name: 'unsafe', media: { url: 'javascript:alert(1)' } }
+  ] }) : page)
+  const result = await new PackageService(fetchPage, vi.fn()).catalog({})
+  expect(result.items[0].thumbnail).toBe('https://images.example.com/demo.png')
+  expect(result.items[1].thumbnail).toBeUndefined()
+  expect(fetchPage.mock.calls.some(([url]) => url.includes('name=%40demo%2Ftools'))).toBe(true)
+})
+it('keeps the catalog usable when the preview API fails', async () => {
+  const service = new PackageService(async url => { if (url.includes('/preview-media?')) throw new Error('offline'); return html }, vi.fn())
+  expect((await service.catalog({})).items[0].name).toBe('@demo/tools')
+})
 it('installs only an exact approved catalog version with fixed arguments', async () => {
   const run = vi.fn(async (_args, output) => output('installed\n'))
   const service = new PackageService(async () => html, run)

@@ -1,25 +1,42 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Provider } from '../src/renderer/src/Provider'
 import { Packages } from '../src/renderer/src/Packages'
 afterEach(cleanup)
-it('loads real catalog data and requires confirmation for global installation', async () => {
-  const install = vi.fn(async () => ({ status: 'success', output: 'installed' }))
-  window.packages = { status: async () => ({ configured: false, installed: false }), mutate: install, catalog: async () => ({ items: [{ name: 'demo-tools', description: 'Tools', author: 'Demo', types: ['extension'], downloads: 10, version: '1.2.3' }], page: 1, pages: 2 }), install, operation: async () => ({ status: 'idle', output: '' }), onOperation: () => () => {} } as any
-  render(<Provider><Packages banner={<div>Updates banner</div>} /></Provider>)
+
+const baseQuery = { page: 1, search: '', type: '', sort: 'downloads' }
+
+it('loads real catalog data, shows a compact identity fallback without a thumbnail, and selects a package', async () => {
+  window.packages = { catalog: async () => ({ items: [{ name: 'demo-tools', description: 'Tools', author: 'Demo', types: ['extension'], downloads: 10, version: '1.2.3' }], page: 1, pages: 2 }) } as any
+  const onSelect = vi.fn()
+  render(<Provider><Packages query={baseQuery} onQueryChange={() => {}} onSelect={onSelect} banner={<div>Updates banner</div>} /></Provider>)
   expect(screen.getByText('Updates banner')).toBeTruthy()
+  // No thumbnail: falls back to a compact identity badge, not a large placeholder image.
+  expect(screen.queryByRole('img')).toBeNull()
+  expect(await screen.findByText('DE')).toBeTruthy()
   fireEvent.click(await screen.findByRole('button', { name: 'View demo-tools' }))
-  expect(screen.queryByText('Updates banner')).toBeNull()
-  fireEvent.click(await screen.findByRole('button', { name: 'Install globally' }))
-  expect(install).not.toHaveBeenCalled()
-  fireEvent.click(await screen.findByRole('button', { name: 'Confirm install' }))
-  await waitFor(() => expect(install).toHaveBeenCalledWith('install', 'demo-tools', '1.2.3'))
-  expect(screen.getByRole('log').textContent).toContain('installed')
-  fireEvent.click(screen.getByRole('button', { name: 'Back to packages' }))
-  expect(screen.getByText('Updates banner')).toBeTruthy()
-  fireEvent.click(await screen.findByRole('button', { name: 'View demo-tools' }))
-  expect(screen.getByRole('log').textContent).not.toContain('installed')
-  expect(screen.getByRole('log').textContent).toContain('No package operation yet.')
+  expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ name: 'demo-tools' }))
+})
+
+it('shows thumbnails in cards and falls back to the identity badge when an image fails', async () => {
+  window.packages = { catalog: async () => ({ items: [{ name: 'preview-demo', description: 'Preview', author: 'Demo', types: ['theme'], downloads: 1, version: '1.0.0', thumbnail: 'https://images.example.com/demo.png' }], page: 1, pages: 1 }) } as any
+  render(<Provider><Packages query={baseQuery} onQueryChange={() => {}} onSelect={() => {}} /></Provider>)
+  const image = await screen.findByRole('img', { name: 'preview-demo preview' })
+  expect(image.getAttribute('src')).toBe('https://images.example.com/demo.png')
+  fireEvent.error(image)
+  expect(screen.queryByRole('img', { name: 'preview-demo preview' })).toBeNull()
+  expect(screen.getByText('PR')).toBeTruthy()
+})
+
+it('preserves search/filter/page state across the parent instead of resetting it internally', async () => {
+  const catalog = vi.fn(async () => ({ items: [], page: 2, pages: 3 }))
+  window.packages = { catalog } as any
+  const onQueryChange = vi.fn()
+  render(<Provider><Packages query={{ page: 2, search: 'theme pack', type: 'theme', sort: 'name' }} onQueryChange={onQueryChange} onSelect={() => {}} /></Provider>)
+  await screen.findByText('Page 2 of 3')
+  expect(catalog).toHaveBeenCalledWith({ page: 2, search: 'theme pack', type: 'theme', sort: 'name' })
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+  expect(onQueryChange).toHaveBeenCalledWith({ page: 3 })
 })

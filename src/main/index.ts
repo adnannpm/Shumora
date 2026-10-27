@@ -122,7 +122,13 @@ function createWindow() {
     title: 'Shumora', backgroundColor: '#ffffff', autoHideMenuBar: true,
     webPreferences: { preload: join(__dirname, '../preload/index.js'), nodeIntegration: false, contextIsolation: true, sandbox: true }
   })
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    try {
+      const target = new URL(url)
+      if (target.protocol === 'https:' && !target.username && !target.password) void shell.openExternal(target.href).catch(() => {})
+    } catch { /* Invalid external URLs are never opened. */ }
+    return { action: 'deny' }
+  })
   window.webContents.on('will-navigate', (event) => event.preventDefault())
   window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
   window.on('close', (event) => {

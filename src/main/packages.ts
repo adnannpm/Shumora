@@ -5,6 +5,18 @@ function nodes(node: any): any[] { return [node, ...(node.childNodes || []).flat
 function attr(node: any, name: string): string { return node?.attrs?.find((a: any) => a.name === name)?.value || '' }
 function text(node: any): string { return node.nodeName === '#text' ? node.value : (node.childNodes || []).map(text).join('') }
 const validName = (name: string) => /^(?:@[a-z0-9._-]+\/)?[a-z0-9][a-z0-9._-]*$/.test(name) && name.length <= 214
+// npm package.json repository fields are free-form (string, {url}, git+ssh, shorthand, etc).
+// Only a plain https URL is ever surfaced to the renderer as a clickable source link.
+function safeRepository(value: unknown): string | undefined {
+  const raw = typeof value === 'string' ? value : typeof (value as any)?.url === 'string' ? (value as any).url : ''
+  if (!raw) return undefined
+  const cleaned = raw.replace(/^git\+/, '').replace(/\.git$/, '')
+  try {
+    const url = new URL(cleaned)
+    if (url.protocol === 'https:' && !url.username && !url.password) return url.href
+  } catch { /* Invalid or non-URL repository fields are treated as absent. */ }
+  return undefined
+}
 export function parsePackagePage(html: string, page: number): PackagePage {
   const all = nodes(parse(html))
   const items: PiPackage[] = all.filter(n => attr(n, 'data-package-card') === 'true').flatMap(n => {
@@ -14,9 +26,10 @@ export function parsePackagePage(html: string, page: number): PackagePage {
     const description = children.find(n => attr(n, 'class').split(' ').includes('packages-desc'))
     const meta = children.find(n => attr(n, 'class') === 'packages-meta')
     const report = children.find(n => attr(n, 'href').includes('package-version='))
+    const repository = children.filter(n => n.tagName === 'a' && text(n).trim().toLowerCase() === 'repo').map(n => safeRepository(attr(n, 'href'))).find(Boolean)
     let version = ''
     try { version = new URL(attr(report, 'href')).searchParams.get('package-version') || '' } catch {}
-    return [{ name, description: description ? text(description).slice(0, 2000) : '', author: meta ? text(meta.childNodes?.find((n: any) => n.tagName === 'span') || meta).slice(0, 200) : '', types: attr(n, 'data-package-types').split(/\s+/).filter(Boolean), downloads: Number(attr(n, 'data-package-downloads')) || 0, version }]
+    return [{ name, description: description ? text(description).slice(0, 2000) : '', author: meta ? text(meta.childNodes?.find((n: any) => n.tagName === 'span') || meta).slice(0, 200) : '', types: attr(n, 'data-package-types').split(/\s+/).filter(Boolean), downloads: Number(attr(n, 'data-package-downloads')) || 0, version, ...(repository ? { repository } : {}) }]
   })
   let pages = page
   for (const n of all) { try { const url = new URL(attr(n, 'href'), 'https://pi.dev'); if (url.pathname === '/packages') pages = Math.max(pages, Math.min(10000, Number(url.searchParams.get('page')) || 1)) } catch {} }
@@ -33,6 +46,26 @@ export class PackageService {
     if (!this.detect) throw new Error('Package detection is unavailable')
     return this.detect(name)
   }
+  private async previews(items: PiPackage[]): Promise<void> {
+    // The gallery resolves media separately. Missing previews must never block browsing.
+    for (let offset = 0; offset < items.length; offset += 16) {
+      const batch = items.slice(offset, offset + 16)
+      try {
+        const params = new URLSearchParams()
+        for (const item of batch) params.append('name', item.name)
+        const data = JSON.parse(await this.fetchPage(`https://pi.dev/api/packages/preview-media?${params}`))
+        if (!Array.isArray(data.previews)) continue
+        for (const preview of data.previews) {
+          const item = batch.find(item => item.name === preview?.name)
+          if (!item || typeof preview?.media?.url !== 'string') continue
+          try {
+            const url = new URL(preview.media.url, 'https://pi.dev')
+            if (url.protocol === 'https:' && !url.username && !url.password) item.thumbnail = url.href
+          } catch { /* Invalid media is treated as absent. */ }
+        }
+      } catch { /* Preview metadata is optional. */ }
+    }
+  }
   async detail(name: string): Promise<PiPackage> {
     if (!validName(name)) throw new Error('Invalid package name')
     const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}/latest`, { signal: AbortSignal.timeout(15000), redirect: 'error' })
@@ -40,7 +73,9 @@ export class PackageService {
     const pkg = await response.json() as any
     if (pkg.name !== name || typeof pkg.version !== 'string' || !/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(pkg.version)) throw new Error('Invalid npm package metadata')
     this.approved.set(name, pkg.version)
-    return { name, version: pkg.version, description: typeof pkg.description === 'string' ? pkg.description.slice(0, 2000) : '', author: typeof pkg.author === 'string' ? pkg.author : pkg.author?.name || '', types: [], downloads: 0 }
+    const item: PiPackage = { name, version: pkg.version, description: typeof pkg.description === 'string' ? pkg.description.slice(0, 2000) : '', author: typeof pkg.author === 'string' ? pkg.author : pkg.author?.name || '', types: [], downloads: 0, repository: safeRepository(pkg.repository) }
+    await this.previews([item])
+    return item
   }
   operation() { return { ...this.progress } }
   private log(text: string) { this.progress = { ...this.progress, output: (this.progress.output + text).slice(-100000) }; this.emit(this.operation()) }
@@ -49,6 +84,7 @@ export class PackageService {
     if (!Number.isInteger(page) || page < 1 || page > 10000 || typeof search !== 'string' || search.length > 200 || !['', 'extension', 'skill', 'theme', 'prompt'].includes(type) || !['downloads', 'recent', 'name'].includes(sort)) throw new Error('Invalid package query')
     const url = new URL('https://pi.dev/packages'); url.search = new URLSearchParams({ page: String(page), name: search, type, sort }).toString()
     const result = parsePackagePage(await this.fetchPage(url.toString()), page)
+    await this.previews(result.items)
     for (const item of result.items) if (/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(item.version)) this.approved.set(item.name, item.version)
     if (this.detect) for (const item of result.items) { try { item.installation = this.detect(item.name) } catch { /* Unverified status is not treated as missing. */ } }
     return result

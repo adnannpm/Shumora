@@ -1,5 +1,5 @@
 import type { PluginOperation } from './plugins'
-export interface PiPackage { name: string; description: string; author: string; types: string[]; downloads: number; version: string; installation?: PackageInstallation }
+export interface PiPackage { name: string; description: string; author: string; types: string[]; downloads: number; version: string; thumbnail?: string; repository?: string; installation?: PackageInstallation }
 export interface PackageInstallation { configured: boolean; installed: boolean; installedVersion?: string; source?: string }
 export type PackageAction = 'install' | 'update' | 'uninstall'
 export interface PackageQuery { page?: number; search?: string; type?: string; sort?: string }
