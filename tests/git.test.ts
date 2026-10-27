@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { GitService, parseBranch, parseNumstat, parseStatus } from '../src/main/git'
@@ -10,12 +10,16 @@ const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encodin
 const file = (name: string, text: string) => writeFileSync(path.join(dir, name), text)
 const read = (name: string) => readFileSync(path.join(dir, name), 'utf8')
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'shumora-git-'))
+  // Git canonicalizes repository roots (macOS /var is a symlink to /private/var).
+  dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'shumora-git-')))
   git('init', '-q', '-b', 'main'); git('config', 'user.email', 't@example.com'); git('config', 'user.name', 'T'); git('config', 'commit.gpgsign', 'false')
+  // Keep fixture bytes deterministic regardless of the runner's global Git config.
+  git('config', 'core.autocrlf', 'false'); git('config', 'core.eol', 'lf')
   file('a.ts', 'one\ntwo\n'); file('gone.ts', 'x\n')
   git('add', '.'); git('commit', '-qm', 'feat: initial commit')
 })
-afterEach(() => rmSync(dir, { recursive: true, force: true }))
+// Windows can briefly retain file handles after Git exits on a large diff.
+afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }))
 
 it('parses porcelain status into staged and unstaged parts', () => {
   const out = '## main...origin/main [ahead 2, behind 1]\0MM a b.ts\0R  new.ts\0old.ts\0?? n.ts\0UU c.ts\0 D d.ts\0'
