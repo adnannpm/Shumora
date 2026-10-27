@@ -13,6 +13,18 @@ const api: WorkspaceAPI = {
   restart: (id) => ipcRenderer.invoke('sessions:restart', id),
   folder: () => ipcRenderer.invoke('workspace:folder'),
   chooseFolder: () => ipcRenderer.invoke('workspace:choose-folder'),
+  gitStatus: (id) => ipcRenderer.invoke('git:status', id),
+  gitDiff: (id, path, area) => ipcRenderer.invoke('git:diff', id, path, area),
+  gitStage: (id, path) => ipcRenderer.invoke('git:stage', id, path),
+  gitUnstage: (id, path) => ipcRenderer.invoke('git:unstage', id, path),
+  gitStageAll: (id) => ipcRenderer.invoke('git:stage-all', id),
+  gitUnstageAll: (id) => ipcRenderer.invoke('git:unstage-all', id),
+  gitDiscard: (id, path) => ipcRenderer.invoke('git:discard', id, path),
+  gitCommit: (id, message) => ipcRenderer.invoke('git:commit', id, message),
+  gitCommitModels: () => ipcRenderer.invoke('git:commit-models'),
+  gitGenerateMessage: (id, model) => ipcRenderer.invoke('git:generate-message', id, model),
+  gitBranches: (id) => ipcRenderer.invoke('git:branches', id),
+  gitSwitch: (id, branch, options) => ipcRenderer.invoke('git:switch', id, branch, options),
   onEvent: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, data: SessionEvent) => callback(data)
     ipcRenderer.on('sessions:event', listener)

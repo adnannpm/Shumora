@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef, useState, type CSSProperties } from 'rea
 import { Button, Dialog, Portal } from '@chakra-ui/react'
 import type { Session } from '../../shared/types'
 import { TerminalPane } from './TerminalPane'
+import { GitReviewButton } from './GitReview'
 import { Sidebar, type Page } from './Sidebar'
 import { Settings } from './Settings'
 import { Library } from './Library'
@@ -90,12 +91,15 @@ export default function App() {
     : layout.orientation === 'right' ? { gridTemplateColumns: `minmax(0, ${ratio}fr) 6px minmax(0, ${100 - ratio}fr)`, gridTemplateRows: '42px minmax(0, 1fr)' }
     : { gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: `42px minmax(0, ${ratio}fr) 6px 42px minmax(0, ${100 - ratio}fr)` }
   const needsPartner = !split && layout.groups[0].ids.length === 1
+  // Git review follows the active session of the focused group, so split views share one control.
+  const focusedSession = sessions.find(s => s.id === layout.groups[layout.focused]?.active)
   return <div className="workspace flex h-dvh overflow-hidden">
     <Sidebar routerInstalled={routerInstalled} page={page} onPage={setPage} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
     <main className="flex min-w-0 flex-1 flex-col" style={{ display: page === 'workspace' ? 'flex' : 'none' }}>
       <header className="toolbar">
         <h1>AI Workspace</h1>
         <button className="folder-button workspace-folder" title="Working directory for new sessions" aria-label="Choose folder for new sessions" onClick={() => { void window.workspace.chooseFolder().then(setFolder).catch(e => setError(String(e))) }}><span aria-hidden="true">▱</span><span title={folder}>{folder || 'Loading folder…'}</span></button>
+        {focusedSession && <GitReviewButton key={focusedSession.id} sessionId={focusedSession.id} sessionName={focusedSession.name} sessions={sessions} visible={page === 'workspace'} />}
         <div className="layout-switch" aria-label="Terminal layout">
           <Button size="xs" variant="ghost" disabled={busy || !sessions.length} aria-label={needsPartner ? 'New session in split right' : 'Split right'} onClick={() => doSplit('right')}>{needsPartner ? '+ Split right' : 'Split right'}</Button>
           <Button size="xs" variant="ghost" disabled={busy || !sessions.length} aria-label={needsPartner ? 'New session in split down' : 'Split down'} onClick={() => doSplit('down')}>{needsPartner ? '+ Split down' : 'Split down'}</Button>
