@@ -23,6 +23,8 @@ import { RouterService } from './router-service'
 import { routerKeys, routerCreateKey } from './router-keys'
 import { routerHealth } from './router-health'
 import type { PluginAction } from '../shared/plugins'
+import { GitService } from './git'
+import { generateCommitMessage, routerChatModels } from './commit-message'
 
 process.env.PATH = enrichedPath(process.platform, process.env)
 
@@ -61,6 +63,13 @@ let plugins: PluginService
 let piPlugin: PluginService<'pi'>
 const router = new RouterService(routerHost)
 const catalog = new RouterCatalog()
+const git = new GitService((file) => shell.trashItem(file))
+// Git calls take a session id; the working directory always comes from the main process.
+function sessionCwd(id: unknown) {
+  const session = sessions.list().find((s) => s.id === id)
+  if (!session) throw new Error('Unknown session')
+  return session.cwd
+}
 function registerIPC() {
   const handlers: Record<string, (...args: any[]) => unknown> = {
     'meetings:snapshot': () => meetingSnapshot(),
@@ -135,6 +144,25 @@ function registerIPC() {
     },
     'sessions:stop': (id: string) => sessions.stop(id),
     'sessions:restart': (id: string) => sessions.restart(id),
+    'git:status': (id: string) => git.status(sessionCwd(id)),
+    'git:diff': (id: string, file: string, area) => git.diff(sessionCwd(id), file, area),
+    'git:stage': (id: string, file: string) => git.stage(sessionCwd(id), file),
+    'git:unstage': (id: string, file: string) => git.unstage(sessionCwd(id), file),
+    'git:stage-all': (id: string) => git.stageAll(sessionCwd(id)),
+    'git:unstage-all': (id: string) => git.unstageAll(sessionCwd(id)),
+    'git:discard': (id: string, file: string) => git.discard(sessionCwd(id), file),
+    'git:commit': (id: string, message: string) => git.commit(sessionCwd(id), message),
+    'git:commit-models': () => routerChatModels(),
+    'git:generate-message': async (id: string, model: string) =>
+      generateCommitMessage(model, await git.commitContext(sessionCwd(id))),
+    'git:branches': (id: string) => git.branches(sessionCwd(id)),
+    'git:switch': (id: string, branch: string, options: unknown) => {
+      const o = (options && typeof options === 'object' ? options : {}) as Record<string, unknown>
+      return git.switchBranch(sessionCwd(id), branch, {
+        create: o.create === true,
+        stash: o.stash === true,
+      })
+    },
     'sessions:rename': (id: string, name: string) => sessions.rename(id, name),
     'workspace:folder': () => folder,
     'workspace:choose-folder': async (defaultPath?: string) => {

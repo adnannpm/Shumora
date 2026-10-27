@@ -337,6 +337,93 @@ h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.3px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 
+/* Git review. Colors follow the app theme via the :root / :root.dark variables. */
+:root {
+  --git-add: #1a7f37; --git-add-bg: #e6f6ea; --git-del: #cf222e; --git-del-bg: #fdecec;
+  --git-mod: #9a6700; --git-ren: #2456c4; --git-hunk: #2456c4; --git-hunk-bg: #eef3fd;
+  --git-empty-bg: #f6f7f9; --git-hover: #f0f2f5;
+}
+:root.dark {
+  --git-add: #4ac26b; --git-add-bg: rgba(46, 160, 67, 0.16); --git-del: #f47067; --git-del-bg: rgba(229, 83, 75, 0.16);
+  --git-mod: #d4a72c; --git-ren: #8cafff; --git-hunk: #8cafff; --git-hunk-bg: rgba(140, 175, 255, 0.1);
+  --git-empty-bg: rgba(255, 255, 255, 0.025); --git-hover: rgba(255, 255, 255, 0.05);
+}
+/* Lives in the themed workspace toolbar, left of the layout switch. */
+.git-control { display: flex; flex-shrink: 0; gap: 4px; }
+.git-branch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.git-caret { font-size: 9px; color: var(--muted); }
+.git-button { flex-shrink: 0; gap: 6px !important; max-width: 300px; font-family: "Cascadia Code", Consolas, monospace; color: var(--text) !important; border-color: var(--line) !important; }
+.git-button:hover { background: var(--git-hover) !important; }
+.git-button.dirty { border-color: var(--git-mod) !important; }
+.git-count, .git-clean { color: var(--muted); font-size: 11px; }
+.git-plus { color: var(--git-add); }
+.git-minus { color: var(--git-del); }
+.git-review { height: 88vh; background: var(--surface) !important; color: var(--text) !important; }
+.git-review-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; border-bottom: 1px solid var(--line); padding-block: 10px !important; }
+.git-review-actions { display: flex; align-items: center; gap: 12px; }
+.git-review-actions .git-divider { width: 1px; height: 20px; background: var(--line); }
+.git-branch { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 8px; font-family: "Cascadia Code", Consolas, monospace; }
+.git-review-body { padding: 0 !important; display: flex; flex-direction: column; min-height: 0; }
+.git-layout { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; flex: 1; min-height: 0; }
+.git-sidebar { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--sidebar); }
+.git-files { flex: 1; min-height: 0; overflow: auto; padding: 6px; font-size: 12px; }
+.git-section + .git-section { margin-top: 8px; }
+.git-section header { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+.git-section ul { list-style: none; margin: 0; padding: 0; }
+.git-section-empty { margin: 0; padding: 2px 8px 6px; color: var(--muted); font-size: 12px; }
+.git-badge { min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--line); color: var(--text); font-size: 10px; text-align: center; }
+.git-spacer { flex: 1; }
+.git-files button { display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 8px; border-radius: 6px; text-align: left; color: var(--text); }
+.git-files button:hover { background: var(--git-hover); }
+.git-files button.active { background: var(--selected); color: var(--selected-text); }
+.git-commit { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
+.git-commit textarea, .git-commit select, .git-search { width: 100%; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit; font-size: 12px; }
+.git-commit textarea { padding: 6px 8px; resize: vertical; min-height: 64px; font-family: "Cascadia Code", Consolas, monospace; }
+.git-commit select { flex: 1; min-width: 0; height: 28px; padding: 0 6px; }
+.git-commit textarea:focus-visible, .git-commit select:focus-visible, .git-search:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+.git-commit-row { display: flex; gap: 8px; }
+.git-hint, .git-commit-error, .git-commit-notice { margin: 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
+.git-commit-error { color: var(--git-del); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 120px; overflow: auto; }
+.git-commit-notice { color: var(--git-add); }
+.git-branches { height: auto; max-height: 70vh; }
+.git-branch-body { display: flex; flex-direction: column; gap: 8px; padding: 12px !important; }
+.git-search { height: 32px; padding: 0 10px; }
+.git-branch-list { overflow: auto; max-height: 50vh; }
+.git-group-title { margin: 8px 0 2px; padding: 0 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+.git-branch-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border-radius: 6px; text-align: left; font-size: 13px; color: var(--text); }
+.git-branch-item:hover:not(:disabled) { background: var(--git-hover); }
+.git-branch-item.current { color: var(--selected-text); background: var(--selected); }
+.git-branch-item.create { color: var(--accent); }
+.git-check { width: 14px; flex-shrink: 0; color: var(--git-add); }
+.git-branch-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; }
+.git-branch-meta { flex-shrink: 0; color: var(--muted); font-size: 11px; }
+.git-warning { margin: 0; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--git-mod); color: var(--text); font-size: 12px; line-height: 1.5; }
+.git-switch-confirm { display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.5; }
+.git-switch-confirm p { margin: 0; }
+.git-switch-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.git-pre { white-space: pre-wrap; }
+.git-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: "Cascadia Code", Consolas, monospace; direction: rtl; text-align: left; }
+.git-mark { width: 16px; text-align: center; font-weight: 700; font-family: "Cascadia Code", Consolas, monospace; }
+.git-mark.modified { color: var(--git-mod); } .git-mark.added, .git-mark.untracked { color: var(--git-add); } .git-mark.deleted, .git-mark.conflicted { color: var(--git-del); } .git-mark.renamed { color: var(--git-ren); }
+.git-staged { color: var(--git-add); font-size: 9px; }
+.git-stat { font-size: 11px; white-space: nowrap; }
+.git-diff { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.git-diff-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--text); }
+.git-diff-toolbar > div { display: flex; gap: 8px; flex-shrink: 0; }
+.git-note, .git-empty { padding: 16px; color: var(--muted); font-size: 12px; }
+.git-table { flex: 1; overflow: auto; font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; line-height: 1.5; color: var(--text); }
+.git-row { display: grid; grid-template-columns: 1fr 1fr; }
+.git-head { position: sticky; top: 0; z-index: 1; background: var(--surface); border-bottom: 1px solid var(--line); color: var(--muted); }
+.git-head span { padding: 4px 12px; }
+.git-hunk { grid-template-columns: 1fr; background: var(--git-hunk-bg); color: var(--git-hunk); }
+.git-hunk span { padding: 2px 12px; }
+.git-cell { display: flex; min-width: 0; border-right: 1px solid var(--line); }
+.git-cell i { flex-shrink: 0; width: 48px; padding-right: 8px; text-align: right; color: var(--muted); font-style: normal; user-select: none; }
+.git-cell code { flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; padding-right: 8px; }
+.git-cell.removed { background: var(--git-del-bg); }
+.git-cell.added { background: var(--git-add-bg); }
+.git-cell.empty { background: var(--git-empty-bg); }
+
 /* Automatic Meeting Room */
 .meeting-page-host { flex: 1; min-width: 0; overflow: hidden; }
 .meeting-page { overflow: hidden; }

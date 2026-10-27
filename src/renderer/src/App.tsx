@@ -3,6 +3,7 @@ import { useEffect, useReducer, useRef, useState, type CSSProperties } from 'rea
 import { Button, Dialog, Menu, Portal } from '@chakra-ui/react'
 import type { Session } from '../../shared/types'
 import { TerminalPane } from './TerminalPane'
+import { GitReviewButton } from './GitReview'
 import { Sidebar, type Page } from './Sidebar'
 import { Settings } from './Settings'
 import { MeetingRoom } from './MeetingRoom'
@@ -161,13 +162,18 @@ export default function App() {
     const value = (point - (right ? bounds.left : bounds.top)) / (right ? bounds.width : bounds.height) * 100
     dispatch({ type: 'resize', path: separator.path, ratio: Math.round(value) })
   }
-  const needsPartner = layout.groups[layout.focused].ids.length === 1
+  const gridStyle: CSSProperties = !split ? { gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: '42px minmax(0, 1fr)' }
+    : layout.orientation === 'right'? {gridTemplateColumns: `minmax(0, ${ratio}fr) 6px minmax(0, ${100 - ratio}fr)`,gridTemplateRows: '42px minmax(0, 1fr)',}
+    : {gridTemplateColumns: 'minmax(0, 1fr)',gridTemplateRows: `42px minmax(0, ${ratio}fr) 6px 42px minmax(0, ${100 - ratio}fr)`,}
+  const needsPartner = !split && layout.groups[0].ids.length === 1
+  const focusedSession = sessions.find(s => s.id === layout.groups[layout.focused]?.active)
   return <div className="workspace flex h-dvh overflow-hidden">
     <Sidebar routerInstalled={routerInstalled} page={page} onPage={value => { setSetupPlugin(null); setPage(value) }} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
     <main className="flex min-w-0 flex-1 flex-col" style={{ display: page === 'workspace' ? 'flex' : 'none' }}>
-      <header className="toolbar">
+      <header className="toolbar">       
         <h1>{t("Terminals")}</h1>
         <button className="folder-button workspace-folder" title={t("Active terminal folder. Click to open a new terminal in another folder.")} aria-label={t("New terminal in folder…")} disabled={busy} onClick={() => void add(layout.focused, undefined, true)}><span aria-hidden="true">▱</span><span title={activeSession?.cwd || folder}>{activeSession?.cwd || folder || t("Loading folder…")}</span></button>
+        {focusedSession && <GitReviewButton key={focusedSession.id} sessionId={focusedSession.id} sessionName={focusedSession.name} sessions={sessions} visible={page === 'workspace'} />}
         <div className="layout-switch" aria-label={t("Terminal layout")}>
           <Button size="xs" variant="ghost" disabled={busy || !sessions.length || layout.groups.length >= 4} aria-label={needsPartner ? t("New session in split right") : t("Split right")} onClick={() => doSplit('right')}>{needsPartner ? t("+ Split right") : t("Split right")}</Button>
           <Button size="xs" variant="ghost" disabled={busy || !sessions.length || layout.groups.length >= 4} aria-label={needsPartner ? t("New session in split down") : t("Split down")} onClick={() => doSplit('down')}>{needsPartner ? t("+ Split down") : t("Split down")}</Button>
