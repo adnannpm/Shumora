@@ -87,7 +87,9 @@ it('stages all, unstages all, trashes untracked files and restores deletions', a
   expect(trash).toHaveBeenCalledWith(path.join(root, 'sub', 'new file.ts'))
   expect(existsSync(path.join(dir, 'sub', 'new file.ts'))).toBe(false)
   expect((await service.status(dir)).changes).toEqual([])
-})
+// This multi-operation integration test starts many real Git processes; Windows
+// release runners can exceed Vitest's 5s default under concurrent suite load.
+}, 30_000)
 
 it('commits staged changes and builds commit context from recent subjects', async () => {
   const service = new GitService(async () => {})

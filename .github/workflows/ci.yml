@@ -5,9 +5,30 @@ on:
     branches: [main]
 permissions:
   contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  verify:
-    runs-on: ubuntu-latest
+  platform:
+    name: Validate (${{ matrix.platform }}, ${{ matrix.arch }})
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+            arch: x64
+          - os: windows-2022
+            platform: win
+            arch: x64
+          - os: macos-15
+            platform: mac
+            arch: arm64
+          - os: macos-15-intel
+            platform: mac
+            arch: x64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -19,3 +40,17 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - name: Validate unpacked application (no signing or publishing)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx --no-install electron-builder --dir --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+  # Preserve the required check name while aggregating all release platforms.
+  verify:
+    needs: [platform]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every platform to pass
+        env:
+          RESULT: ${{ needs.platform.result }}
+        run: test "$RESULT" = success
