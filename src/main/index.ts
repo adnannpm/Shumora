@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { statSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { SessionManager } from './sessions'
-import { resolveLaunch } from './launch'
+import { resolveLaunch, enrichedPath } from './launch'
 import { autoUpdater } from 'electron-updater'
 import { UpdateManager } from './updates'
 import { openDatabase } from './database'
@@ -20,6 +20,8 @@ import { RouterService } from './router-service'
 import { routerKeys, routerCreateKey } from './router-keys'
 import { routerHealth } from './router-health'
 import type { PluginAction } from '../shared/plugins'
+
+process.env.PATH = enrichedPath(process.platform, process.env)
 
 let window: BrowserWindow | undefined
 let folder = homedir()
