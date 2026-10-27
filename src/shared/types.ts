@@ -38,15 +38,16 @@ export interface GitBranches { current?: string; local: GitBranch[]; remote: Git
 export interface GitSwitchOptions { create?: boolean; stash?: boolean }
 export interface WorkspaceAPI {
   list(): Promise<Session[]>
-  create(): Promise<Session>
+  create(cwd?: string): Promise<Session>
   snapshot(id: string): Promise<Snapshot>
   input(id: string, data: string): Promise<void>
   resize(id: string, cols: number, rows: number): Promise<void>
   close(id: string): Promise<boolean>
   stop(id: string): Promise<void>
   restart(id: string): Promise<Session>
+  rename(id: string, name: string): Promise<Session>
   folder(): Promise<string>
-  chooseFolder(): Promise<string>
+  chooseFolder(defaultPath?: string): Promise<string | null>
   onEvent(callback: (event: SessionEvent) => void): () => void
   gitStatus(id: string): Promise<GitRepoStatus>
   gitDiff(id: string, path: string, area: GitDiffArea): Promise<GitDiff>

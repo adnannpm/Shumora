@@ -1,29 +1,67 @@
 // @vitest-environment jsdom
 import React from 'react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Session, WorkspaceAPI } from '../src/shared/types'
 vi.mock('../src/renderer/src/TerminalPane', () => ({ TerminalPane: ({ session, visible, onFocus }: { session: Session; visible: boolean; onFocus: () => void }) => <div data-testid={session.id} data-visible={visible} onClick={onFocus}>{session.error}</div> }))
 import App from '../src/renderer/src/App'
 import { Provider } from '../src/renderer/src/Provider'
-afterEach(cleanup)
+beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }))
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 function setup(count = 1, approved = true) {
   let sessions: Session[] = Array.from({ length: count }, (_, i) => ({ id: String(i + 1), name: `Pi ${i + 1}`, cwd: '/tmp', status: 'running', generation: 1 }))
   let counter = count
   const api: WorkspaceAPI = {
-    list: vi.fn(async () => sessions), create: vi.fn(async () => { const n = ++counter; const s: Session = { id: String(n), name: `Pi ${n}`, cwd: '/tmp', status: 'running', generation: 1 }; sessions = [...sessions, s]; return s }),
-    close: vi.fn(async () => approved), folder: async () => '/tmp', chooseFolder: async () => '/project', onEvent: () => () => {}, snapshot: vi.fn(), input: vi.fn(), resize: vi.fn(), stop: vi.fn(), restart: vi.fn()
+    list: vi.fn(async () => sessions), create: vi.fn(async (cwd = '/tmp') => { const n = ++counter; const s: Session = { id: String(n), name: `Pi ${n}`, cwd, status: 'running', generation: 1 }; sessions = [...sessions, s]; return s }),
+    rename: vi.fn(async (id, name) => { const session = { ...sessions.find(s => s.id === id)!, name }; sessions = sessions.map(s => s.id === id ? session : s); return session }),
+    close: vi.fn(async () => approved), folder: async () => '/tmp', chooseFolder: vi.fn(async () => '/project'), onEvent: () => () => {}, snapshot: vi.fn(), input: vi.fn(), resize: vi.fn(), stop: vi.fn(), restart: vi.fn()
   }
   window.plugins = { status: async () => ({ id: '9router', installed: true }) } as any
   window.workspace = api; render(<Provider><App /></Provider>); return api
 }
+it('keeps full names available on hover without a terminal dropdown', async () => {
+  setup(20)
+  const tab = await screen.findByRole('tab', { name: 'Pi 20' })
+  expect(tab.title).toBe('Pi 20')
+  expect(screen.queryByRole('button', { name: 'List terminals in group 1' })).toBeNull()
+})
+it('slides tabs horizontally without browser dragging or restarting Pi', async () => {
+  vi.stubGlobal('PointerEvent', MouseEvent)
+  const api = setup(3); await screen.findByRole('tab', { name: 'Pi 3' })
+  const tabs = screen.getAllByRole('tab').map(tab => tab.parentElement!)
+  tabs.forEach((tab, i) => { tab.getBoundingClientRect = () => ({ left: i * 100, right: (i + 1) * 100, width: 100 } as DOMRect); tab.setPointerCapture = vi.fn() })
+  screen.getByRole('tablist', { name: 'Session group 1' }).getBoundingClientRect = () => ({ left: 0, right: 300, width: 300 } as DOMRect)
+  expect(tabs[2].getAttribute('draggable')).toBeNull()
+  fireEvent.pointerDown(tabs[2], { clientX: 250, button: 0 })
+  fireEvent.pointerMove(tabs[2], { clientX: 20, clientY: 500 })
+  fireEvent.pointerUp(tabs[2], { clientX: 20 })
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Pi 3', 'Pi 1', 'Pi 2'])
+  expect(api.create).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled(); expect(api.restart).not.toHaveBeenCalled()
+})
+it('does not capture normal clicks and releases capture after sliding before selecting another tab', async () => {
+  vi.stubGlobal('PointerEvent', MouseEvent)
+  setup(2); await screen.findByRole('tab', { name: 'Pi 2' })
+  const first = screen.getByRole('tab', { name: 'Pi 1' }).parentElement!
+  const capture = vi.fn(), release = vi.fn()
+  first.setPointerCapture = capture; first.releasePointerCapture = release; first.hasPointerCapture = () => true
+  fireEvent.pointerDown(first, { clientX: 50, button: 0 })
+  expect(capture).not.toHaveBeenCalled()
+  fireEvent.pointerUp(first, { clientX: 50 })
+  expect(screen.getByRole('tab', { name: 'Pi 1' }).getAttribute('aria-selected')).toBe('true')
+  fireEvent.pointerDown(first, { clientX: 50, button: 0 })
+  fireEvent.pointerMove(first, { clientX: 70, buttons: 1 })
+  fireEvent.pointerUp(first, { clientX: 70 })
+  expect(release).toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('tab', { name: 'Pi 2' }))
+  expect(screen.getByRole('tab', { name: 'Pi 2' }).getAttribute('aria-selected')).toBe('true')
+})
 it('shows startup as a tab with workspace navigation and creates in the active group', async () => {
   const api = setup(); await screen.findByRole('tab', { name: 'Pi 1' })
   expect(screen.getByRole('complementary', { name: 'Main sidebar' })).toBeTruthy()
   const manage = screen.getByRole('group', { name: 'Manage' })
   expect(manage.querySelector('[aria-label="Library"]')).toBeTruthy()
   expect(manage.querySelector('[aria-label="Settings"]')).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'AI Workspace' }).getAttribute('aria-current')).toBe('page')
+  expect(screen.getByRole('button', { name: 'Terminals' }).getAttribute('aria-current')).toBe('page')
   expect(api.create).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
   await screen.findByRole('tab', { name: 'Pi 2' })
@@ -38,7 +76,7 @@ it('opens settings and collapses navigation without stopping or recreating sessi
   expect(screen.getByTestId('1')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
   expect(screen.getByRole('button', { name: 'Expand sidebar' }).getAttribute('aria-expanded')).toBe('false')
-  fireEvent.click(screen.getByRole('button', { name: 'AI Workspace' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Terminals' }))
   expect(screen.getByRole('tab', { name: 'Pi 1' })).toBeTruthy()
   expect(api.create).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled()
 })
@@ -52,7 +90,7 @@ it('opens 9router and Library without recreating or stopping terminal sessions',
     expect(screen.queryByRole('tab', { name: 'Pi 1' })).toBeNull()
     expect(screen.getByTestId('1')).toBeTruthy()
   }
-  fireEvent.click(screen.getByRole('button', { name: 'AI Workspace' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Terminals' }))
   expect(screen.getByRole('tab', { name: 'Pi 1' })).toBeTruthy()
   expect(api.create).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled()
 })
@@ -77,8 +115,9 @@ it('moves the active tab into a split, supports both orientations and keyboard r
   expect(api.create).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled()
   const divider = screen.getByRole('separator')
   fireEvent.keyDown(divider, { key: 'ArrowRight' }); expect(divider.getAttribute('aria-valuenow')).toBe('55')
+  fireEvent.click(screen.getByRole('tab', { name: 'Pi 1' }))
   fireEvent.click(screen.getByRole('button', { name: 'Split down' }))
-  expect(screen.getByRole('separator').getAttribute('aria-orientation')).toBe('horizontal')
+  expect(screen.getAllByRole('separator').map(separator => separator.getAttribute('aria-orientation'))).toEqual(['vertical', 'horizontal'])
   fireEvent.click(screen.getByRole('button', { name: 'Merge groups' }))
   expect(screen.getAllByRole('tablist')).toHaveLength(1)
 })
@@ -97,6 +136,82 @@ it('explicitly creates a split partner when only one tab exists', async () => {
   await screen.findByRole('tab', { name: 'Pi 2' })
   expect(api.create).toHaveBeenCalledTimes(1)
   expect(screen.getAllByRole('tablist')).toHaveLength(2)
-  fireEvent.click(screen.getByRole('button', { name: 'Choose folder for new sessions' }))
-  await waitFor(() => expect(screen.getByTitle('/project')).toBeTruthy())
+  fireEvent.click(screen.getByRole('button', { name: 'New terminal in folder…' }))
+  await screen.findByRole('tab', { name: 'Pi 3' })
+  expect(api.create).toHaveBeenLastCalledWith('/project')
+})
+it('renames a tab inline on Enter without restarting its process', async () => {
+  const api = setup(2)
+  fireEvent.doubleClick(await screen.findByRole('tab', { name: 'Pi 1' }))
+  const input = screen.getByRole('textbox', { name: 'Rename terminal' })
+  expect(document.activeElement).toBe(input)
+  fireEvent.change(input, { target: { value: '  Backend  ' } })
+  fireEvent.keyDown(input, { key: 'Enter' })
+  await screen.findByRole('tab', { name: 'Backend' })
+  expect(api.rename).toHaveBeenCalledWith('1', 'Backend')
+  expect(screen.getByRole('tab', { name: 'Pi 2' })).toBeTruthy()
+  expect(api.restart).not.toHaveBeenCalled()
+})
+it('cancels rename with Escape, ignores blanks and saves on blur', async () => {
+  const api = setup()
+  const edit = async (name: string) => {
+    fireEvent.doubleClick(await screen.findByRole('tab', { name: 'Pi 1' }))
+    const input = screen.getByRole('textbox', { name: 'Rename terminal' })
+    fireEvent.change(input, { target: { value: name } })
+    return input
+  }
+  fireEvent.keyDown(await edit('Cancelled'), { key: 'Escape' })
+  expect(api.rename).not.toHaveBeenCalled()
+  fireEvent.keyDown(await edit('   '), { key: 'Enter' })
+  expect(api.rename).not.toHaveBeenCalled()
+  const input = await edit('Frontend')
+  fireEvent.keyDown(input, { key: 'ArrowLeft' })
+  expect(document.activeElement).toBe(input)
+  fireEvent.blur(input)
+  await screen.findByRole('tab', { name: 'Frontend' })
+})
+it('keeps folders per session and inherits the active session folder', async () => {
+  const api = setup()
+  await screen.findByRole('tab', { name: 'Pi 1' })
+  fireEvent.click(screen.getByRole('button', { name: 'New session options in group 1' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'New terminal in folder…' }))
+  await screen.findByRole('tab', { name: 'Pi 2' })
+  expect(api.chooseFolder).toHaveBeenCalledWith('/tmp')
+  expect(api.create).toHaveBeenLastCalledWith('/project')
+  expect(screen.getByTitle('/project')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
+  await screen.findByRole('tab', { name: 'Pi 3' })
+  expect(api.create).toHaveBeenLastCalledWith('/project')
+  fireEvent.click(screen.getByRole('tab', { name: 'Pi 1' }))
+  expect(screen.getByTitle('/tmp')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
+  await screen.findByRole('tab', { name: 'Pi 4' })
+  expect(api.create).toHaveBeenLastCalledWith('/tmp')
+  expect(api.restart).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled()
+})
+it('does not create a session when folder selection is cancelled', async () => {
+  const api = setup()
+  await screen.findByRole('tab', { name: 'Pi 1' })
+  vi.mocked(api.chooseFolder).mockResolvedValueOnce(null)
+  fireEvent.click(screen.getByRole('button', { name: 'New terminal in folder…' }))
+  await waitFor(() => expect(api.chooseFolder).toHaveBeenCalled())
+  expect(api.create).not.toHaveBeenCalled()
+  expect(screen.getByTitle('/tmp')).toBeTruthy()
+})
+
+it('creates up to four panes from the focused session and disables further splits', async () => {
+  const api = setup()
+  await screen.findByRole('tab', { name: 'Pi 1' })
+  fireEvent.click(screen.getByRole('button', { name: 'New session in split right' }))
+  await screen.findByRole('tab', { name: 'Pi 2' })
+  fireEvent.click(screen.getByRole('button', { name: 'New session in split down' }))
+  await screen.findByRole('tab', { name: 'Pi 3' })
+  fireEvent.click(screen.getByRole('tab', { name: 'Pi 1' }))
+  fireEvent.click(screen.getByRole('button', { name: 'New session in split down' }))
+  await screen.findByRole('tab', { name: 'Pi 4' })
+  expect(screen.getAllByRole('tablist')).toHaveLength(4)
+  expect(screen.getAllByRole('separator')).toHaveLength(3)
+  expect(screen.getByRole('button', { name: 'New session in split right' }).hasAttribute('disabled')).toBe(true)
+  expect(api.create).toHaveBeenCalledTimes(3)
+  expect(api.restart).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled()
 })

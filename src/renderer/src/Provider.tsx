@@ -1,6 +1,7 @@
 import { ChakraProvider, createSystem, defaultConfig, defineConfig } from '@chakra-ui/react'
 import type { ReactNode } from 'react'
 import { AppearanceProvider } from './Appearance'
+import { LanguageProvider } from './Language'
 
 // Tailwind owns the reset and workspace layout. Chakra owns component recipes.
 const system = createSystem(defaultConfig, defineConfig({
@@ -25,5 +26,5 @@ const system = createSystem(defaultConfig, defineConfig({
   }
 }))
 export function Provider({ children }: { children: ReactNode }) {
-  return <ChakraProvider value={system}><AppearanceProvider>{children}</AppearanceProvider></ChakraProvider>
+  return <ChakraProvider value={system}><LanguageProvider><AppearanceProvider>{children}</AppearanceProvider></LanguageProvider></ChakraProvider>
 }

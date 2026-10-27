@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { Provider } from '../src/renderer/src/Provider'
 import { RouterProviders, RouterModels } from '../src/renderer/src/RouterCatalog'
 afterEach(cleanup)
@@ -74,10 +74,11 @@ it('filters real models and edits aliases', async () => {
   window.plugins = { routerModelEnabled: enabled, routerModels: async () => [{ id: 'openai/gpt-4.1', name: 'GPT 4.1', provider: 'openai', alias: 'gpt-4.1', enabled: true, providerAlias: 'openai', modelId: 'gpt-4.1' }], routerModelAlias: alias } as any
   render(<Provider><RouterModels /></Provider>)
   await screen.findByText('GPT 4.1')
+  await waitFor(() => expect((screen.getByRole('button', { name: 'Disable GPT 4.1' }) as HTMLButtonElement).disabled).toBe(false))
   fireEvent.change(screen.getByRole('textbox', { name: 'Alias for GPT 4.1' }), { target: { value: 'coding' } })
   fireEvent.click(screen.getByRole('button', { name: 'Save alias for GPT 4.1' }))
   expect(alias).toHaveBeenCalledWith('openai/gpt-4.1', 'coding')
-  await screen.findByRole('button', { name: 'Disable GPT 4.1' })
+  await waitFor(() => expect((screen.getByRole('button', { name: 'Disable GPT 4.1' }) as HTMLButtonElement).disabled).toBe(false))
   fireEvent.click(screen.getByRole('button', { name: 'Disable GPT 4.1' }))
   expect(enabled).toHaveBeenCalledWith('openai', 'gpt-4.1', false)
   fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), { target: { value: 'missing' } })

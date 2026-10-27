@@ -4,12 +4,19 @@ import { join } from 'node:path'
 import { statSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { SessionManager } from './sessions'
-import { resolveLaunch } from './launch'
+import { MeetingBridge } from './meeting-bridge'
+import { MeetingManager } from './meetings'
+import type { MeetingInput } from '../shared/meetings'
+import { resolveLaunch, enrichedPath } from './launch'
 import { autoUpdater } from 'electron-updater'
 import { UpdateManager } from './updates'
 import { openDatabase } from './database'
-import { PluginService } from './plugins'
-import { pluginHost, routerHost } from './plugin-host'
+import { PackageService } from './packages'
+import { packageStatus, configuredPackageNames } from './package-status'
+import { checkLibraryUpdates } from './library-updates'
+import { fetchPackagePage } from './package-fetch'
+import { PluginService, piDefinition } from './plugins'
+import { pluginHost, piPluginHost, routerHost, runPiPackage } from './plugin-host'
 import { routerLogin, routerLogout, routerAuthStatus } from './router-auth'
 import { RouterCatalog } from './router-catalog'
 import { RouterService } from './router-service'
@@ -19,21 +26,41 @@ import type { PluginAction } from '../shared/plugins'
 import { GitService } from './git'
 import { generateCommitMessage, routerChatModels } from './commit-message'
 
+process.env.PATH = enrichedPath(process.platform, process.env)
+
 let window: BrowserWindow | undefined
 let folder = homedir()
 let closing = false
 let database: ReturnType<typeof openDatabase> | undefined
-const sessions = new SessionManager((cwd) => {
+const bridge = new MeetingBridge(() => publishMeeting())
+const meetings = new MeetingManager(bridge, () => publishMeeting())
+function meetingSnapshot() {
+  return { state: meetings.snapshot(), agents: Object.fromEntries(sessions.list().map(s => [s.id, s.status === 'running' ? bridge.status(s.id) : 'disconnected'])) }
+}
+function publishMeeting() {
+  if (window && !window.isDestroyed()) window.webContents.send('meetings:change', meetingSnapshot())
+}
+const sessions = new SessionManager((cwd, id, generation) => {
   if (!statSync(cwd).isDirectory()) throw new Error('Working directory is not a folder')
   const launch = resolveLaunch(process.platform, process.env, process.env.PATH || process.env.Path || '')
   const env = Object.fromEntries(Object.entries(process.env).filter(([key, value]) => value !== undefined && key !== 'ELECTRON_RUN_AS_NODE')) as Record<string, string>
-  return pty.spawn(launch.file, launch.args, { name: 'xterm-256color', cols: 100, rows: 30, cwd, env: { ...env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } })
+  const token = bridge.register(id, generation)
+  const extension = join(__dirname, '../../resources/meeting-extension.mjs')
+  try {
+    return pty.spawn(launch.file, [...launch.args, '--extension', extension], { name: 'xterm-256color', cols: 100, rows: 30, cwd, env: { ...env, TERM: 'xterm-256color', COLORTERM: 'truecolor', SHUMORA_MEETING_PORT: String(bridge.port), SHUMORA_MEETING_TOKEN: token } })
+  } catch (error) { bridge.remove(id); throw error }
 }, (event) => {
+  if (event.type === 'removed' || (event.type === 'state' && event.session.status !== 'running')) bridge.remove(event.type === 'removed' ? event.id : event.session.id)
   if (window && !window.isDestroyed()) window.webContents.send('sessions:event', event)
+  if (event.type !== 'data') publishMeeting()
 })
 
 let updates: UpdateManager
+const packages = new PackageService(fetchPackagePage, runPiPackage, () => { if (sessions.list().some(s => s.status === 'running')) throw new Error('Stop running Workspace sessions before installing a package.') }, operation => {
+  if (window && !window.isDestroyed()) window.webContents.send('packages:operation', operation)
+}, packageStatus)
 let plugins: PluginService
+let piPlugin: PluginService<'pi'>
 const router = new RouterService(routerHost)
 const catalog = new RouterCatalog()
 const git = new GitService((file) => shell.trashItem(file))
@@ -45,6 +72,32 @@ function sessionCwd(id: unknown) {
 }
 function registerIPC() {
   const handlers: Record<string, (...args: any[]) => unknown> = {
+    'meetings:snapshot': () => meetingSnapshot(),
+    'meetings:start': (input: MeetingInput) => {
+      if (!input || !Array.isArray(input.participants)) throw new Error('Invalid meeting setup')
+      const list = sessions.list()
+      const participants = input.participants.map(p => {
+        const session = list.find(s => s.id === p?.id && s.status === 'running')
+        if (!session) throw new Error('Meeting agent is not ready')
+        return { id: session.id, name: session.name, role: p.role }
+      })
+      meetings.start({ ...input, participants })
+    },
+    'meetings:pause': () => meetings.pause(),
+    'meetings:resume': () => meetings.resume(),
+    'meetings:stop': () => meetings.stop(),
+    'meetings:take-over': () => meetings.takeOver(),
+    'meetings:direction': text => meetings.direction(text),
+    'packages:updates': scope => checkLibraryUpdates({ names: configuredPackageNames, status: packageStatus, latest: async name => (await packages.detail(name)).version, plugins: [{ id: 'pi', check: () => piPlugin.status(true) }, { id: '9router', check: () => plugins.status(true) }] }, scope),
+    'packages:detail': name => packages.detail(name),
+    'packages:status': name => packages.status(name),
+    'packages:mutate': (action, name, version) => packages.mutate(action, name, version),
+    'packages:catalog': query => packages.catalog(query),
+    'packages:install': (name, version) => packages.install(name, version),
+    'packages:operation': () => packages.operation(),
+    'pi-plugin:status': (refresh) => { if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag'); return piPlugin.status(refresh) },
+    'pi-plugin:operation': () => piPlugin.operation(),
+    'pi-plugin:mutate': (action, version) => piPlugin.mutate(action, version),
     'plugins:status': (refresh: boolean) => {
       if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag')
       return plugins.status(refresh)
@@ -75,9 +128,11 @@ function registerIPC() {
     'updates:download': () => updates.download(),
     'updates:install': () => updates.install(),
     'sessions:list': () => sessions.list(),
-    'sessions:create': () => {
+    'sessions:create': (cwd?: string) => {
       if (sessions.list().length >= 32) throw new Error('MVP supports up to 32 sessions per workspace')
-      return sessions.create(folder)
+      const target = cwd === undefined ? folder : cwd
+      if (typeof target !== 'string' || !statSync(target).isDirectory()) throw new Error('Working directory is not a folder')
+      return sessions.create(target)
     },
     'sessions:snapshot': (id: string) => sessions.snapshot(id),
     'sessions:input': (id: string, data: string) => sessions.input(id, data),
@@ -98,18 +153,22 @@ function registerIPC() {
     'git:discard': (id: string, file: string) => git.discard(sessionCwd(id), file),
     'git:commit': (id: string, message: string) => git.commit(sessionCwd(id), message),
     'git:commit-models': () => routerChatModels(),
-    // The staged diff is sent to the model the user picked through the local 9router.
-    'git:generate-message': async (id: string, model: string) => generateCommitMessage(model, await git.commitContext(sessionCwd(id))),
+    'git:generate-message': async (id: string, model: string) =>
+      generateCommitMessage(model, await git.commitContext(sessionCwd(id))),
     'git:branches': (id: string) => git.branches(sessionCwd(id)),
     'git:switch': (id: string, branch: string, options: unknown) => {
       const o = (options && typeof options === 'object' ? options : {}) as Record<string, unknown>
-      return git.switchBranch(sessionCwd(id), branch, { create: o.create === true, stash: o.stash === true })
+      return git.switchBranch(sessionCwd(id), branch, {
+        create: o.create === true,
+        stash: o.stash === true,
+      })
     },
+    'sessions:rename': (id: string, name: string) => sessions.rename(id, name),
     'workspace:folder': () => folder,
-    'workspace:choose-folder': async () => {
-      const result = await dialog.showOpenDialog(window!, { title: 'Folder for new Pi sessions', defaultPath: folder, properties: ['openDirectory'] })
-      if (!result.canceled && result.filePaths[0]) folder = result.filePaths[0]
-      return folder
+    'workspace:choose-folder': async (defaultPath?: string) => {
+      if (defaultPath !== undefined && typeof defaultPath !== 'string') throw new Error('Invalid directory')
+      const result = await dialog.showOpenDialog(window!, { title: 'Folder for new Pi session', defaultPath: defaultPath || folder, properties: ['openDirectory'] })
+      return result.canceled ? null : result.filePaths[0] || null
     }
   }
   for (const [channel, handler] of Object.entries(handlers)) {
@@ -127,7 +186,13 @@ function createWindow() {
     title: 'Shumora', backgroundColor: '#ffffff', autoHideMenuBar: true,
     webPreferences: { preload: join(__dirname, '../preload/index.js'), nodeIntegration: false, contextIsolation: true, sandbox: true }
   })
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    try {
+      const target = new URL(url)
+      if (target.protocol === 'https:' && !target.username && !target.password) void shell.openExternal(target.href).catch(() => {})
+    } catch { /* Invalid external URLs are never opened. */ }
+    return { action: 'deny' }
+  })
   window.webContents.on('will-navigate', (event) => event.preventDefault())
   window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
   window.on('close', (event) => {
@@ -146,11 +211,15 @@ function createWindow() {
   else void window.loadFile(join(__dirname, '../renderer/index.html'))
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await bridge.listen()
   database = openDatabase(app.getPath('userData'))
   plugins = new PluginService(database, pluginHost, operation => {
     if (window && !window.isDestroyed()) window.webContents.send('plugins:operation', operation)
   })
+  piPlugin = new PluginService(database, piPluginHost, operation => {
+    if (window && !window.isDestroyed()) window.webContents.send('pi-plugin:operation', operation)
+  }, piDefinition, () => { if (sessions.list().some(s => s.status === 'running')) throw new Error('Stop all running Workspace sessions before changing Pi.') })
   const unsupported = !app.isPackaged ? 'Updates can only be installed in a packaged Shumora application.'
     : process.platform === 'darwin' ? 'macOS automatic updates require a signed and notarized release. Install a release manually for now.'
     : process.platform === 'linux' && !process.env.APPIMAGE ? 'Linux automatic updates are supported only for AppImage installations.'
@@ -173,4 +242,4 @@ app.on('before-quit', (event) => {
   void router.dispose().catch(() => {}).finally(() => { routerClosing = true; app.quit() })
 })
 let routerClosing = false
-app.on('will-quit', () => { sessions.dispose(); database?.close(); database = undefined })
+app.on('will-quit', () => { meetings.stop(); bridge.dispose(); sessions.dispose(); database?.close(); database = undefined })

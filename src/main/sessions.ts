@@ -14,7 +14,7 @@ export class SessionManager {
   private entries = new Map<string, Entry>()
   private count = 0
   private closed = new Set<string>()
-  constructor(private spawn: (cwd: string) => PtyProcess, private emit: (e: SessionEvent) => void, private historyLimit = 512_000) {}
+  constructor(private spawn: (cwd: string, id: string, generation: number) => PtyProcess, private emit: (e: SessionEvent) => void, private historyLimit = 512_000) {}
   list(): Session[] { return [...this.entries.values()].map((e) => ({ ...e.session })) }
   private get(id: string): Entry {
     if (typeof id !== 'string' || !this.entries.has(id)) throw new Error('Unknown session')
@@ -32,7 +32,7 @@ export class SessionManager {
     e.output = ''; e.seq = 0
     const generation = e.session.generation
     try {
-      const p = this.spawn(e.session.cwd); e.process = p
+      const p = this.spawn(e.session.cwd, e.session.id, generation); e.process = p
       e.subscriptions = [p.onData((data) => {
         if (e.session.generation !== generation || e.process !== p) return
         e.output = (e.output + data).slice(-this.historyLimit)
@@ -47,6 +47,13 @@ export class SessionManager {
       e.session.error = error instanceof Error ? error.message : String(error)
     }
     this.publish(e); return { ...e.session }
+  }
+  rename(id: string, name: string): Session {
+    const e = this.get(id)
+    if (typeof name !== 'string' || !name.trim() || name.trim().length > 120 || /[\x00-\x1f\x7f]/.test(name)) throw new Error('Invalid session name')
+    e.session.name = name.trim()
+    this.publish(e)
+    return { ...e.session }
   }
   snapshot(id: string): Snapshot { const e = this.get(id); return { session: { ...e.session }, output: e.output, seq: e.seq } }
   input(id: string, data: string) {
