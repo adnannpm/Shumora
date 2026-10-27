@@ -32,11 +32,10 @@ function api(changes: GitFileChange[]) {
   }
 }
 
-it('hides outside repositories', async () => {
+it('explains when the terminal folder is outside a repository', async () => {
   window.workspace = { gitStatus: async () => ({ isRepo: false, changes: [] }) } as any
-  const view = render(<Provider><GitReviewButton sessionId="one" visible /></Provider>)
-  await new Promise((r) => setTimeout(r, 0))
-  expect(view.container.textContent).toBe('')
+  render(<Provider><GitReviewButton sessionId="one" visible /></Provider>)
+  expect(await screen.findByRole('button', { name: /Not a Git repository/ })).toBeTruthy()
 })
 
 it('reviews staged and unstaged sections, stages, unstages and confirms discard', async () => {
