@@ -1,14 +1,16 @@
+export type AgentActivity = 'working' | 'waiting' | 'done' | 'error' | 'disconnected'
 export interface Session {
   id: string
   name: string
   cwd: string
   status: 'running' | 'exited' | 'error'
   generation: number
+  activity?: AgentActivity
   error?: string
   exitCode?: number
 }
 export interface Snapshot { session: Session; output: string; seq: number }
-export type SessionEvent = { type: 'opened'; session: Session } | { type: 'removed'; id: string } | { type: 'state'; session: Session } | { type: 'data'; id: string; generation: number; seq: number; data: string }
+export type SessionEvent = { type: 'activity'; id: string; generation: number; activity: AgentActivity } | { type: 'opened'; session: Session } | { type: 'removed'; id: string } | { type: 'state'; session: Session } | { type: 'data'; id: string; generation: number; seq: number; data: string }
 export type GitChangeKind = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflicted'
 export interface GitLineStats { insertions?: number; deletions?: number; binary: boolean }
 export interface GitFileChange {

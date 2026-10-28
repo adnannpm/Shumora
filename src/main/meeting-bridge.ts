@@ -1,3 +1,4 @@
+import type { AgentActivity } from '../shared/types'
 import { randomUUID } from 'node:crypto'
 import { createServer, type Server, type Socket } from 'node:net'
 export type AgentStatus = 'ready' | 'busy' | 'disconnected'
@@ -8,7 +9,7 @@ export class MeetingBridge {
   private peers = new Map<string, Peer>()
   private sockets = new Set<Socket>()
   port = 0
-  constructor(private changed: () => void, private timeout = 180000) {
+  constructor(private changed: () => void, private timeout = 180000, private activity: (id: string, generation: number, status: AgentActivity) => void = () => {}) {
     this.server = createServer(socket => this.accept(socket))
   }
   async listen() {
@@ -58,7 +59,7 @@ export class MeetingBridge {
   }
   private accept(socket: Socket) {
     this.sockets.add(socket)
-    let peer: Peer | undefined, buffer = ''
+    let peer: Peer | undefined, peerId: string | undefined, buffer = ''
     const authTimer = setTimeout(() => { if (!peer) socket.destroy() }, 5000)
     socket.setEncoding('utf8')
     socket.on('error', () => {})
@@ -71,9 +72,13 @@ export class MeetingBridge {
           const record = JSON.parse(line)
           if (!peer) {
             if (record.type !== 'hello' || record.version !== 1 || typeof record.token !== 'string' || typeof record.idle !== 'boolean') throw new Error()
-            peer = [...this.peers.values()].find(p => p.token === record.token)
+            peerId = [...this.peers.entries()].find(([, p]) => p.token === record.token)?.[0]
+            peer = peerId ? this.peers.get(peerId) : undefined
             if (!peer || peer.socket) throw new Error()
             peer.socket = socket; peer.idle = record.idle; clearTimeout(authTimer); this.changed()
+            this.activity(peerId!, peer.generation, record.idle ? 'waiting' : 'working')
+          } else if (record.type === 'activity' && ['working', 'waiting', 'done', 'error'].includes(record.status)) {
+            this.activity(peerId!, peer.generation, record.status)
           } else if (record.type === 'state' && typeof record.idle === 'boolean') {
             peer.idle = record.idle; this.changed()
           } else if (record.type === 'result' && record.id === peer.pending?.id) {
@@ -86,7 +91,7 @@ export class MeetingBridge {
     })
     socket.on('close', () => {
       clearTimeout(authTimer); this.sockets.delete(socket)
-      if (peer?.socket === socket) { peer.socket = undefined; peer.idle = false; peer.pending?.finish(new Error('Meeting agent disconnected')); this.changed() }
+      if (peer?.socket === socket) { this.activity(peerId!, peer.generation, 'disconnected'); peer.socket = undefined; peer.idle = false; peer.pending?.finish(new Error('Meeting agent disconnected')); this.changed() }
     })
   }
   dispose() {

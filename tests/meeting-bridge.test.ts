@@ -3,8 +3,8 @@ import { connect, type Socket } from 'node:net'
 import { MeetingBridge } from '../src/main/meeting-bridge'
 const cleanup: (() => void)[] = []
 afterEach(() => { cleanup.splice(0).forEach(fn => fn()) })
-async function fixture(timeout = 500) {
-  const bridge = new MeetingBridge(() => {}, timeout)
+async function fixture(timeout = 500, activity: ConstructorParameters<typeof MeetingBridge>[2] = () => {}) {
+  const bridge = new MeetingBridge(() => {}, timeout, activity)
   await bridge.listen()
   cleanup.push(() => bridge.dispose())
   const credential = bridge.register('a', 1)
@@ -22,6 +22,19 @@ async function until(check: () => boolean) {
   for (let i = 0; i < 100 && !check(); i++) await new Promise(resolve => setTimeout(resolve, 5))
   expect(check()).toBe(true)
 }
+it('forwards authenticated activity with its session generation and reports disconnection', async () => {
+  const updates: unknown[] = []
+  const { socket, credential } = await fixture(500, (...args) => updates.push(args))
+  send(socket, { type: 'hello', token: credential, version: 1, idle: true })
+  await until(() => updates.length === 1)
+  send(socket, { type: 'activity', status: 'working' })
+  send(socket, { type: 'activity', status: 'done' })
+  await until(() => updates.length === 3)
+  expect(updates).toEqual([['a', 1, 'waiting'], ['a', 1, 'working'], ['a', 1, 'done']])
+  socket.destroy()
+  await until(() => updates.length === 4)
+  expect(updates[3]).toEqual(['a', 1, 'disconnected'])
+})
 it('authenticates split records and correlates only the matching completed reply', async () => {
   const { bridge, socket, records, credential } = await fixture()
   const hello = JSON.stringify({ type: 'hello', token: credential, version: 1, idle: true }) + '\n'

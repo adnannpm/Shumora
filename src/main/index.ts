@@ -56,7 +56,9 @@ function flushFolders() {
   }
 }
 let database: ReturnType<typeof openDatabase> | undefined
-const bridge = new MeetingBridge(() => publishMeeting())
+const bridge = new MeetingBridge(() => publishMeeting(), 180000, (id, generation, activity) => {
+  sessions.setActivity(id, generation, activity)
+})
 const meetings = new MeetingManager(bridge, () => publishMeeting())
 function meetingSnapshot() {
   return { state: meetings.snapshot(), agents: Object.fromEntries(sessions.list().map(s => [s.id, s.status === 'running' ? bridge.status(s.id) : 'disconnected'])) }
