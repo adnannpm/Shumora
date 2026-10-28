@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { homedir } from 'node:os'
 import { openFolderArgument } from './open-folder'
+import { collectDiagnostics } from './diagnostics'
 import { join } from 'node:path'
 import { statSync } from 'node:fs'
 import * as pty from 'node-pty'
@@ -95,6 +96,7 @@ function sessionCwd(id: unknown) {
 }
 function registerIPC() {
   const handlers: Record<string, (...args: any[]) => unknown> = {
+    'diagnostics:run': () => collectDiagnostics(),
     'meetings:snapshot': () => meetingSnapshot(),
     'meetings:start': (input: MeetingInput) => {
       if (!input || !Array.isArray(input.participants)) throw new Error('Invalid meeting setup')

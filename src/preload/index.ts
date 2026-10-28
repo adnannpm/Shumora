@@ -1,4 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { DiagnosticsAPI } from '../shared/diagnostics'
+const diagnostics: DiagnosticsAPI = { run: () => ipcRenderer.invoke('diagnostics:run') }
+contextBridge.exposeInMainWorld('diagnostics', diagnostics)
 import type { MeetingsAPI, MeetingSnapshot } from '../shared/meetings'
 const meetings: MeetingsAPI = {
   snapshot: () => ipcRenderer.invoke('meetings:snapshot'),

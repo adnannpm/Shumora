@@ -234,13 +234,29 @@ button:disabled { opacity: .55; cursor: default; }
 .settings-nav button:hover, .settings-nav button[aria-current=page] { background: var(--selected); color: var(--selected-text); }
 .settings-content { max-width: 760px; width: 100%; padding: 32px; overflow-y: auto; }
 .settings-content-wide { flex: 1; min-width: 0; max-width: none; }
+.settings-section { padding: 24px 0; border-bottom: 1px solid var(--line); }
+.settings-section:last-child { border-bottom: 0; }
+.settings-content .settings-section > h3, .settings-row h3 { margin: 0 0 8px; }
+.settings-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px 32px; }
+.settings-row > div { flex: 1 1 280px; }
+.settings-row p, .settings-section > p { font-size: 13px; line-height: 1.7; color: var(--muted); }
+.settings-row select { padding: 8px 12px; min-width: 180px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--text); font-size: 13px; }
+.settings-section .settings-details { margin-top: 8px; }
+.settings-section .settings-details > div:last-child { border-bottom: 0; }
+.settings-section .settings-note { margin-top: 16px; }
+.settings-links { margin-top: 16px; font-size: 13px; color: var(--accent); }
+.diagnostic-details { margin-top: 20px; }
+.diagnostic-details summary { cursor: pointer; font-size: 13px; color: var(--text); }
+.diagnostic-details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.diagnostics-details dd { min-width: 0; overflow-wrap: anywhere; }
+.diagnostic-report { margin-top: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 4px; background: var(--sidebar); color: var(--text); font-size: 12px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 .settings-language { display: block; margin-top: 24px; font-size: 13px; font-weight: 600; }
 .settings-language select { display: block; margin-top: 8px; padding: 8px 12px; min-width: 220px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); }
 .settings-content h3 { font-size: 13px; font-weight: 600; margin: 28px 0 12px; }
-.theme-choices { display: flex; gap: 16px; }
-.theme-choice { width: 180px; border: 1px solid var(--line); padding: 5px; border-radius: 6px; background: var(--surface); color: var(--text); text-align: left; }
+.theme-choices { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.theme-choice { width: 160px; border: 1px solid var(--line); padding: 5px; border-radius: 6px; background: var(--surface); color: var(--text); text-align: left; }
 .theme-choice[aria-checked=true] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.theme-preview { height: 100px; display: flex; border-radius: 3px; overflow: hidden; border: 1px solid var(--line); }
+.theme-preview { height: 76px; display: flex; border-radius: 3px; overflow: hidden; border: 1px solid var(--line); }
 .theme-preview > span:first-child { width: 28%; background: #eef0f4; border-right: 1px solid #d8dde5; }
 .theme-preview > span:last-child { flex: 1; padding: 14px 10px; background: #ffffff; }
 .theme-preview i { display: block; height: 5px; width: 75%; background: #d8dde5; margin-bottom: 9px; }
