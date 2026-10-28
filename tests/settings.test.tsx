@@ -23,6 +23,15 @@ it('switches and persists app theme, restores it on remount, and keeps terminal 
   fireEvent.click(screen.getByRole('button', { name: 'About' }))
   expect(screen.getByRole('heading', { name: 'About Shumora' })).toBeTruthy()
 })
+it('expands the Updates panel to the available width without widening other settings', () => {
+  const view = render(<Provider><Settings /></Provider>)
+  const content = view.container.querySelector('.settings-content')!
+  expect(content.classList.contains('settings-content-wide')).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'Updates' }))
+  expect(content.classList.contains('settings-content-wide')).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'Appearance' }))
+  expect(content.classList.contains('settings-content-wide')).toBe(false)
+})
 function mockSystemTheme(dark: boolean) {
   const changes = new EventTarget()
   const media = Object.assign(changes, { matches: dark, media: '(prefers-color-scheme: dark)' })

@@ -233,6 +233,7 @@ button:disabled { opacity: .55; cursor: default; }
 .settings-nav button { display: block; width: 100%; padding: 10px 12px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); text-align: left; font-size: 13px; margin-bottom: 4px; }
 .settings-nav button:hover, .settings-nav button[aria-current=page] { background: var(--selected); color: var(--selected-text); }
 .settings-content { max-width: 760px; width: 100%; padding: 32px; overflow-y: auto; }
+.settings-content-wide { flex: 1; min-width: 0; max-width: none; }
 .settings-language { display: block; margin-top: 24px; font-size: 13px; font-weight: 600; }
 .settings-language select { display: block; margin-top: 8px; padding: 8px 12px; min-width: 220px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); }
 .settings-content h3 { font-size: 13px; font-weight: 600; margin: 28px 0 12px; }
@@ -254,6 +255,22 @@ button:disabled { opacity: .55; cursor: default; }
 .theme-choice[aria-checked=true] .theme-choice-label { color: var(--accent); }
 .update-status { margin: 24px 0 16px; font-size: 13px; line-height: 1.7; color: var(--muted); }
 .update-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+.update-download-card { width: 100%; margin: 24px 0; padding: 20px 0; border-block: 1px solid var(--line); }
+.update-download-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.update-download-heading { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.settings-content .update-download-heading h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.update-download-heading p { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.update-download-percent { flex-shrink: 0; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
+.update-download-card progress { display: block; height: 6px; border: 0; border-radius: 3px; overflow: hidden; appearance: none; background: var(--line); }
+.update-download-card progress::-webkit-progress-bar { background: var(--line); border-radius: 999px; }
+.update-download-card progress::-webkit-progress-value { background: var(--accent); border-radius: 999px; transition: width 250ms ease; }
+.update-download-card progress::-moz-progress-bar { background: var(--accent); border-radius: 999px; }
+.update-download-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-top: 16px; }
+.update-download-footer p { flex: 1 1 220px; margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.update-download-card.is-ready .update-download-heading h3 { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .update-download-card progress::-webkit-progress-value { transition: none; } }
+.update-actions button.update-primary-action, .update-download-card button.update-primary-action { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.update-actions button.update-primary-action:hover:not(:disabled), .update-download-card button.update-primary-action:hover:not(:disabled) { background: var(--accent); color: var(--surface); filter: brightness(1.1); }
 .update-release-notes { border-top: 1px solid var(--line); margin-top: 24px; }
 .settings-content progress { width: 100%; accent-color: var(--accent); }
 .release-notes { overflow-wrap: anywhere; font-family: inherit; font-size: 13px; line-height: 1.8; }

@@ -20,7 +20,7 @@ export function Settings() {
       <nav className="settings-nav" aria-label={t("Settings sections")}>
         {(['appearance', 'terminal', 'updates', 'about'] as const).map(id => <button key={id} aria-current={section === id ? "page" : undefined} onClick={() => setSection(id)}>{id === 'appearance' ? t("Appearance") : id === 'terminal' ? t("Terminal") : id === 'updates' ? t("Updates") : t("About")}</button>)}
       </nav>
-      <section className="settings-content">
+      <section className={`settings-content${section === 'updates' ? ' settings-content-wide' : ''}`}>
         {section === 'appearance' && <>
           <h2>{t("Appearance")}</h2><p>{t("Choose how Shumora looks. Your preference is saved on this device.")}</p>
           <label className="settings-language">{t('Language')}<select aria-label={t('Language')} value={language} onChange={event => setLanguage(event.target.value === 'id' ? 'id' : 'en')}><option value="en">English</option><option value="id">Bahasa Indonesia</option></select></label>

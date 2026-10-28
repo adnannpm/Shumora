@@ -57,9 +57,9 @@ const sessions = new SessionManager((cwd, id, generation) => {
 })
 
 let updates: UpdateManager
-const packages = new PackageService(fetchPackagePage, runPiPackage, () => { if (sessions.list().some(s => s.status === 'running')) throw new Error('Stop running Workspace sessions before installing a package.') }, operation => {
+const packages = new PackageService(fetchPackagePage, runPiPackage, () => {}, operation => {
   if (window && !window.isDestroyed()) window.webContents.send('packages:operation', operation)
-}, packageStatus)
+}, packageStatus, sessions)
 let plugins: PluginService
 let piPlugin: PluginService<'pi'>
 const router = new RouterService(routerHost)
@@ -130,6 +130,7 @@ function registerIPC() {
     'updates:install': () => updates.install(),
     'sessions:list': () => sessions.list(),
     'sessions:create': (cwd?: string) => {
+      if (packages.operation().status === 'running') throw new Error('Wait for the package operation to finish before starting sessions.')
       if (sessions.list().length >= 32) throw new Error('MVP supports up to 32 sessions per workspace')
       const target = cwd === undefined ? folder : cwd
       if (typeof target !== 'string' || !statSync(target).isDirectory()) throw new Error('Working directory is not a folder')
@@ -144,7 +145,10 @@ function registerIPC() {
       return true
     },
     'sessions:stop': (id: string) => sessions.stop(id),
-    'sessions:restart': (id: string) => sessions.restart(id),
+    'sessions:restart': (id: string) => {
+      if (packages.operation().status === 'running') throw new Error('Wait for the package operation to finish before starting sessions.')
+      return sessions.restart(id)
+    },
     'git:status': (id: string) => git.status(sessionCwd(id)),
     'git:diff': (id: string, file: string, area) => git.diff(sessionCwd(id), file, area),
     'git:stage': (id: string, file: string) => git.stage(sessionCwd(id), file),

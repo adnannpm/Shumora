@@ -31,24 +31,30 @@ export function Updates() {
   return <>
     <h2>{t("Updates")}</h2><p>{t("Check stable GitHub Releases and install a new Shumora version when you are ready.")}</p>
     <dl className="settings-details"><div><dt>{t("Installed version")}</dt><dd>{state.currentVersion}</dd></div>{state.version && <div><dt>{t("Available version")}</dt><dd>{state.version}</dd></div>}</dl>
-    <div className="update-status" role="status">
+    {!['downloading', 'downloaded'].includes(state.status) && <div className="update-status" role="status">
       {state.status === 'idle' && t("Updates are checked only when you request them.")}
       {state.status === 'unsupported' && state.reason}
       {state.status === 'checking' && t("Checking for updates…")}
       {state.status === 'current' && t("You are using the latest available version.")}
       {state.status === 'available' && t("Shumora {version} is available.", { version: state.version || "" })}
-      {state.status === 'downloading' && t("Downloading update… {percent}%", { percent: state.percent ?? 0 })}
-      {state.status === 'downloaded' && t("Update downloaded. Restart to install it.")}
       {state.status === 'installing' && t("Stopping sessions and restarting to install…")}
       {state.status === 'error' && t("Update failed: {error}", { error: state.error || "" })}
-    </div>
+    </div>}
     {error && <p role="alert">{t(error)}</p>}
-    {state.status === 'downloading' && <progress aria-label={t("Update download progress")} max={100} value={state.percent ?? 0} />}
-    <div className="update-actions">
-      <Button size="sm" variant="outline" disabled={busy || state.status === 'unsupported' || state.status === 'downloaded'} onClick={() => void run('check')}>{t("Check for updates")}</Button>
-      {state.status === 'available' && <Button size="sm" colorPalette="brand" onClick={() => void run('download')}>{t("Download update")}</Button>}
-      {state.status === 'downloaded' && <Button size="sm" colorPalette="brand" onClick={() => void requestInstall()}>{t("Restart & install")}</Button>}
-    </div>
+    {['downloading', 'downloaded'].includes(state.status) && <section className={`update-download-card${state.status === 'downloaded' ? ' is-ready' : ''}`} aria-label={t("Update download")}>
+      <div className="update-download-header">
+        <div className="update-download-heading"><h3 role="status">{state.status === 'downloaded' ? t("Update ready to install") : t("Downloading update")}</h3><p>{t("Shumora {version}", { version: state.version || '' })}</p></div>
+        <span className="update-download-percent">{state.status === 'downloaded' ? 100 : state.percent ?? 0}%</span>
+      </div>
+      <progress aria-label={t("Update download progress")} max={100} value={state.status === 'downloaded' ? 100 : state.percent ?? 0} />
+      <div className="update-download-footer"><p>{state.status === 'downloaded' ? t("Download complete. Install whenever you are ready.") : t("You can keep working while the update downloads.")}</p>
+        {state.status === 'downloaded' && <Button className="update-primary-action" size="sm" colorPalette="brand" onClick={() => void requestInstall()}>{t("Restart & install")}</Button>}
+      </div>
+    </section>}
+    {!['downloading', 'downloaded'].includes(state.status) && <div className="update-actions">
+      <Button size="sm" variant="outline" disabled={busy || state.status === 'unsupported'} onClick={() => void run('check')}>{t("Check for updates")}</Button>
+      {state.status === 'available' && <Button className="update-primary-action" size="sm" colorPalette="brand" onClick={() => void run('download')}>{t("Download update")}</Button>}
+    </div>}
     {state.notes && <section className="update-release-notes"><h3>{t("Release notes")}</h3><div className="release-notes"><Markdown skipHtml components={{ a: ({ children, href }) => <span>{children}{href ? ` (${href})` : ''}</span>, img: ({ alt }) => <span>{alt}</span> }}>{state.notes}</Markdown></div></section>}
     <p className="settings-note">{t("Nothing is downloaded or installed automatically on exit. Restarting stops all Pi sessions. Save your work before installing. macOS auto-install is unavailable until release signing is configured.")}</p>
     <Dialog.Root role="alertdialog" open={confirm} onOpenChange={({ open }) => { if (!installing) setConfirm(open) }} placement="center" size="sm" initialFocusEl={() => cancel.current} closeOnInteractOutside={false}>
