@@ -16,6 +16,7 @@ import { initialLayout, layoutReducer, layoutRects, type Layout } from './layout
 export default function App() {
   const { t } = useLanguage()
   const [sessions, setSessions] = useState<Session[]>([])
+  const [unread, setUnread] = useState<string[]>([])
   const [page, setPage] = useState<Page>('workspace')
   const [setupPlugin, setSetupPlugin] = useState<'pi' | '9router' | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -32,6 +33,11 @@ export default function App() {
     return () => { alive = false; window.removeEventListener('focus', check) }
   }, [])
   const [layout, dispatch] = useReducer(layoutReducer, initialLayout)
+  const visibleState = useRef({ page, layout })
+  visibleState.current = { page, layout }
+  useEffect(() => {
+    if (page === 'workspace') setUnread(ids => ids.filter(id => !layout.groups.some(group => group.active === id)))
+  }, [page, layout])
   const [folder, setFolder] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -103,6 +109,14 @@ export default function App() {
     const pending: import('../../shared/types').SessionEvent[] = []
     function apply(event: import('../../shared/types').SessionEvent) {
       if (event.type === 'data') return
+      if (event.type === 'activity') {
+        setSessions(list => list.map(session => session.id === event.id && session.generation === event.generation ? { ...session, activity: event.activity } : session))
+        const view = visibleState.current
+        if (['done', 'error'].includes(event.activity) && (view.page !== 'workspace' || !view.layout.groups.some(group => group.active === event.id))) {
+          setUnread(ids => ids.includes(event.id) ? ids : [...ids, event.id])
+        }
+        return
+      }
       if (event.type === 'opened') {
         setSessions(list => list.some(s => s.id === event.session.id) ? list : [...list, event.session])
         dispatch({ type: 'add', id: event.session.id, group: 0 })
@@ -209,9 +223,9 @@ export default function App() {
                     if (event.key === 'Enter' || event.key === 'Escape') {
                       event.preventDefault(); finishRename(event.key === 'Enter', true)
                     }
-                  }} /> : <button role="tab" id={`tab-${id}`} aria-selected={group.active === id} aria-controls={`panel-${id}`} title={s.name} tabIndex={group.active === id ? 0 : -1} onClick={() => dispatch({ type: 'select', group: index, id })} onDoubleClick={() => {
+                  }} /> : <button role="tab" id={`tab-${id}`} aria-selected={group.active === id} aria-controls={`panel-${id}`} aria-label={s.name} title={s.name} tabIndex={group.active === id ? 0 : -1} onClick={() => dispatch({ type: 'select', group: index, id })} onDoubleClick={() => {
                   endSlide(); dispatch({ type: 'select', group: index, id }); renameDone.current = false; setRenaming({ id, name: s.name })
-                }}><span className={`status-dot ${s.status}`} aria-hidden="true" /><span className="session-tab-name">{s.name}</span></button>}
+                }}><span className={`status-dot ${s.status}`} aria-hidden="true" /><span className="session-tab-name">{s.name}</span>{s.status === 'running' && s.activity && <span className={`agent-tab-status agent-${s.activity}`}>{t(({ working: 'Working', waiting: 'Waiting for input', done: 'Done', error: 'Agent error', disconnected: 'Status unavailable' })[s.activity])}</span>}{unread.includes(id) && <span className="agent-unread" aria-label={t('Unread agent update')}>●</span>}</button>}
                 <button className="close-tab" aria-label={t("Close {name}", { name: s.name })} title={t("Close {name}", { name: s.name })} disabled={closing.includes(id)} onClick={() => { if (s.status === 'running') setCloseTarget(s); else void close(id) }}>×</button>
               </div>
             })}

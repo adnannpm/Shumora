@@ -90,6 +90,8 @@ export const indonesian: Record<string, string> = {
   'Light': 'Terang', 'Dark': 'Gelap', 'Auto': 'Otomatis', 'About': 'Tentang', 'About Shumora': 'Tentang Shumora',
   'Choose how Shumora looks. Your preference is saved on this device.': 'Pilih tampilan Shumora. Preferensi kamu disimpan di perangkat ini.',
   'Auto follows your operating system’s theme. The terminal stays dark in all modes. Changing appearance does not restart your sessions.': 'Otomatis mengikuti tema sistem operasi. Terminal tetap gelap di semua mode. Mengubah tampilan tidak memulai ulang sesi.',
+  'Working': 'Bekerja', 'Waiting for input': 'Menunggu input', 'Done': 'Selesai', 'Agent error': 'Error agen',
+  'Status unavailable': 'Status tidak tersedia', 'Unread agent update': 'Status agen belum dibaca',
   'General': 'Umum', 'About & Updates': 'Tentang & Pembaruan', 'Troubleshooting': 'Pemecahan masalah',
   'Report details': 'Detail laporan', 'Language and appearance for this device.': 'Bahasa dan tampilan untuk perangkat ini.',
   'Terminal behavior and tools for troubleshooting Pi.': 'Perilaku terminal dan alat untuk memeriksa masalah Pi.',

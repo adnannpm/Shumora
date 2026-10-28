@@ -31,6 +31,18 @@ it('focuses an Explorer-opened terminal and switches back from Settings', async 
   expect(screen.getByTestId('explorer').getAttribute('data-visible')).toBe('true')
   expect(api.create).not.toHaveBeenCalled()
 })
+it('shows activity and an unread badge for a hidden agent, clearing it when selected', async () => {
+  const api = setup(2)
+  await screen.findByRole('tab', { name: 'Pi 2' })
+  fireEvent.click(screen.getByRole('tab', { name: 'Pi 1' }))
+  const listener = vi.mocked(api.onEvent).mock.calls[0][0]
+  act(() => listener({ type: 'activity', id: '2', generation: 1, activity: 'working' }))
+  expect(screen.getByRole('tab', { name: 'Pi 2' }).textContent).toContain('Working')
+  act(() => listener({ type: 'activity', id: '2', generation: 1, activity: 'done' }))
+  expect(screen.getByLabelText('Unread agent update')).toBeTruthy()
+  fireEvent.click(screen.getByRole('tab', { name: 'Pi 2' }))
+  await waitFor(() => expect(screen.queryByLabelText('Unread agent update')).toBeNull())
+})
 it('keeps full names available on hover without a terminal dropdown', async () => {
   setup(20)
   const tab = await screen.findByRole('tab', { name: 'Pi 20' })
