@@ -1,4 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { AppearanceAPI } from '../shared/appearance'
+const appearance: AppearanceAPI = {
+  systemDark: () => ipcRenderer.invoke('appearance:system-dark'),
+  onSystemTheme: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, dark: boolean) => callback(dark)
+    ipcRenderer.on('appearance:system-theme', listener)
+    return () => ipcRenderer.removeListener('appearance:system-theme', listener)
+  }
+}
+contextBridge.exposeInMainWorld('appearance', appearance)
 import type { DiagnosticsAPI } from '../shared/diagnostics'
 const diagnostics: DiagnosticsAPI = { run: () => ipcRenderer.invoke('diagnostics:run') }
 contextBridge.exposeInMainWorld('diagnostics', diagnostics)

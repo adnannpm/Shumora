@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, nativeTheme } from 'electron'
 import { homedir } from 'node:os'
 import { openFolderArgument } from './open-folder'
 import { collectDiagnostics } from './diagnostics'
@@ -96,6 +96,7 @@ function sessionCwd(id: unknown) {
 }
 function registerIPC() {
   const handlers: Record<string, (...args: any[]) => unknown> = {
+    'appearance:system-dark': () => nativeTheme.shouldUseDarkColors,
     'diagnostics:run': () => collectDiagnostics(),
     'meetings:snapshot': () => meetingSnapshot(),
     'meetings:start': (input: MeetingInput) => {
@@ -248,6 +249,10 @@ function createWindow() {
 }
 
 if (primaryInstance) app.whenReady().then(async () => {
+  nativeTheme.themeSource = 'system'
+  nativeTheme.on('updated', () => {
+    if (window && !window.isDestroyed()) window.webContents.send('appearance:system-theme', nativeTheme.shouldUseDarkColors)
+  })
   await bridge.listen()
   database = openDatabase(app.getPath('userData'))
   plugins = new PluginService(database, pluginHost, operation => {
