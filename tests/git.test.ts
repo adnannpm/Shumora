@@ -115,6 +115,24 @@ it('reports commit hook failures', async () => {
   await expect(service.commit(dir, 'msg')).rejects.toThrow('lint failed')
 })
 
+it('pushes commits to configured remote and rejects detached HEAD', async () => {
+  const bareDir = mkdtempSync(path.join(tmpdir(), 'shumora-bare-'))
+  try {
+    execFileSync('git', ['init', '--bare', '-q', '-b', 'main'], { cwd: bareDir })
+    git('remote', 'add', 'origin', bareDir)
+    const service = new GitService(async () => {})
+    await service.push(dir)
+    const remoteLog = execFileSync('git', ['log', '--format=%s'], { cwd: bareDir, encoding: 'utf8' }).trim()
+    expect(remoteLog).toBe('feat: initial commit')
+
+    // Detached head rejection
+    git('checkout', '--detach', 'HEAD', '-q')
+    await expect(service.push(dir)).rejects.toThrow(/detached HEAD/)
+  } finally {
+    rmSync(bareDir, { recursive: true, force: true })
+  }
+})
+
 it('lists, creates and switches branches, stashing when asked', async () => {
   const service = new GitService(async () => {})
   git('branch', 'feature/x')

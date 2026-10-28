@@ -26,6 +26,7 @@ function api(changes: GitFileChange[]) {
     gitDiff: vi.fn(async (_id: string, path: string, area: string) => ({ path, area, untracked: false, binary: false, tooLarge: false, patch: `@@ -1 +1 @@\n-old\n+${area}\n` })),
     gitStage: vi.fn(async () => {}), gitUnstage: vi.fn(async () => {}), gitStageAll: vi.fn(async () => {}), gitUnstageAll: vi.fn(async () => {}),
     gitDiscard: vi.fn(async () => {}), gitCommit: vi.fn(async () => ({ hash: 'abc123' })),
+    gitPush: vi.fn(async () => {}),
     gitCommitModels: vi.fn(async () => ['kr/auto', 'ag/flash']), gitGenerateMessage: vi.fn(async () => 'feat: generated'),
     gitBranches: vi.fn(async () => ({ current: 'main', local: [{ name: 'main', current: true }, { name: 'dev', current: false }], remote: [{ name: 'origin/release', localName: 'release' }] })),
     gitSwitch: vi.fn(async () => ({ stashed: false }))
@@ -53,18 +54,18 @@ it('reviews staged and unstaged sections, stages, unstages and confirms discard'
 
   // Unstaged part is selected first and diffed against the index.
   await waitFor(() => expect(mock.gitDiff).toHaveBeenCalledWith('one', 'src/a.ts', 'unstaged'))
-  fireEvent.click(screen.getByText('+ Stage'))
+  fireEvent.click(screen.getByText('git add'))
   await waitFor(() => expect(mock.gitStage).toHaveBeenCalledWith('one', 'src/a.ts'))
-  fireEvent.click(screen.getByText('✕ Discard'))
+  fireEvent.click(screen.getByText('git restore'))
   expect(await screen.findByText(/staged changes are kept/)).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
+  fireEvent.click(screen.getByRole('button', { name: 'git restore' }))
   await waitFor(() => expect(mock.gitDiscard).toHaveBeenCalledWith('one', 'src/a.ts'))
 
   fireEvent.click(within(staged).getByText('src/a.ts'))
   await waitFor(() => expect(mock.gitDiff).toHaveBeenCalledWith('one', 'src/a.ts', 'staged'))
-  fireEvent.click(screen.getByText('− Unstage'))
+  fireEvent.click(screen.getByText('git restore --staged'))
   await waitFor(() => expect(mock.gitUnstage).toHaveBeenCalledWith('one', 'src/a.ts'))
-  fireEvent.click(within(changes).getByTitle('Stage all'))
+  fireEvent.click(within(changes).getByTitle(/git add \./))
   await waitFor(() => expect(mock.gitStageAll).toHaveBeenCalledWith('one'))
 })
 
@@ -96,14 +97,26 @@ it('generates a message with the chosen model and commits', async () => {
   const select = await screen.findByRole('combobox', { name: 'Model for commit messages' })
   await waitFor(() => expect((select as HTMLSelectElement).value).toBe('kr/auto'))
   fireEvent.change(select, { target: { value: 'ag/flash' } })
-  fireEvent.click(screen.getByText('✨ Generate'))
+  fireEvent.click(screen.getByText('Generate'))
   const box = screen.getByRole('textbox', { name: 'Commit message' }) as HTMLTextAreaElement
   await waitFor(() => expect(box.value).toBe('feat: generated'))
   expect(mock.gitGenerateMessage).toHaveBeenCalledWith('one', 'ag/flash')
   fireEvent.change(box, { target: { value: 'feat: edited' } })
-  fireEvent.click(screen.getByText(/✓ Commit 1 file/))
+  fireEvent.click(screen.getByText(/git commit \(1 file\)/))
   await waitFor(() => expect(mock.gitCommit).toHaveBeenCalledWith('one', 'feat: edited'))
   expect(await screen.findByText('Committed abc123')).toBeTruthy()
+})
+
+it('pushes commits to the remote', async () => {
+  const mock = api([])
+  mock.gitStatus.mockResolvedValue({ isRepo: true, branch: 'main', ahead: 2, changes: [] } as any)
+  window.workspace = mock as any
+  render(<Provider><GitReviewButton sessionId="one" visible /></Provider>)
+  fireEvent.click(await screen.findByTitle('Working tree clean'))
+  const pushBtn = await screen.findByRole('button', { name: /git push/ })
+  expect(pushBtn.textContent).toContain('git push (2)')
+  fireEvent.click(pushBtn)
+  await waitFor(() => expect(mock.gitPush).toHaveBeenCalledWith('one'))
 })
 
 it('switches branches and warns about running sessions and uncommitted work', async () => {

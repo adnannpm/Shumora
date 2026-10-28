@@ -153,6 +153,7 @@ function registerIPC() {
     'git:unstage-all': (id: string) => git.unstageAll(sessionCwd(id)),
     'git:discard': (id: string, file: string) => git.discard(sessionCwd(id), file),
     'git:commit': (id: string, message: string) => git.commit(sessionCwd(id), message),
+    'git:push': (id: string) => git.push(sessionCwd(id)),
     'git:commit-models': () => routerChatModels(),
     'git:generate-message': async (id: string, model: string) =>
       generateCommitMessage(model, await git.commitContext(sessionCwd(id))),
