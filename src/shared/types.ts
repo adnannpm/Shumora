@@ -8,7 +8,7 @@ export interface Session {
   exitCode?: number
 }
 export interface Snapshot { session: Session; output: string; seq: number }
-export type SessionEvent = { type: 'removed'; id: string } | { type: 'state'; session: Session } | { type: 'data'; id: string; generation: number; seq: number; data: string }
+export type SessionEvent = { type: 'opened'; session: Session } | { type: 'removed'; id: string } | { type: 'state'; session: Session } | { type: 'data'; id: string; generation: number; seq: number; data: string }
 export type GitChangeKind = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflicted'
 export interface GitLineStats { insertions?: number; deletions?: number; binary: boolean }
 export interface GitFileChange {

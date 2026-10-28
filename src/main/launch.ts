@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 const PKG = ['@earendil-works', 'pi-coding-agent', 'dist', 'cli.js']
@@ -12,6 +12,8 @@ function fallbackDirs(windows: boolean, env: NodeJS.ProcessEnv): string[] {
   const j = (base: string | undefined, ...rest: string[]) => (base ? [p.join(base, ...rest)] : [])
   if (windows) {
     return [
+      ...j(home, '.pi', 'agent', 'bin'),
+      ...j(env.LOCALAPPDATA, 'pi-node', 'current'),
       ...j(env.APPDATA, 'npm'),
       ...j(env.LOCALAPPDATA, 'pnpm'),
       ...j(home, '.bun', 'bin'),
@@ -33,7 +35,7 @@ function fallbackDirs(windows: boolean, env: NodeJS.ProcessEnv): string[] {
 }
 
 // Windows: places where the npm/bun/pnpm global package root may live.
-function cliCandidates(env: NodeJS.ProcessEnv, shimDir: string): string[] {
+export function windowsPiPackageCandidates(env: NodeJS.ProcessEnv, shimDir: string, read: (file: string) => string = file => readFileSync(file, 'utf8')): string[] {
   const p = path.win32
   const home = env.USERPROFILE || env.HOME || ''
   const roots = [
@@ -44,7 +46,16 @@ function cliCandidates(env: NodeJS.ProcessEnv, shimDir: string): string[] {
     ...(env.LOCALAPPDATA ? [p.join(env.LOCALAPPDATA, 'pnpm', 'global', '5', 'node_modules')] : []),
     ...(home ? [p.join(home, '.bun', 'install', 'global', 'node_modules')] : []),
   ]
-  return roots.map((r) => p.join(r, ...PKG))
+  const candidates = roots.map(r => p.join(r, ...PKG.slice(0, 2), 'package.json'))
+  // The official installer activates versioned releases through current-version.
+  const installRoot = p.join(shimDir, '..', 'install')
+  try {
+    const version = read(p.join(installRoot, 'current-version')).trim()
+    if (version && version !== '.' && version !== '..' && /^[0-9A-Za-z._+-]+$/.test(version)) {
+      candidates.unshift(p.join(installRoot, 'releases', version, 'node_modules', ...PKG.slice(0, 2), 'package.json'))
+    }
+  } catch { /* Not a managed installer layout. */ }
+  return candidates
 }
 
 function loginShellPath(env: NodeJS.ProcessEnv): string {
@@ -81,7 +92,8 @@ export function resolveLaunch(
   // npm installs expose a .cmd shim. Run its known package entry with real Node;
   // never feed executable paths or renderer input through cmd.exe evaluation.
   const shimDir = paths.dirname(file)
-  const cli = env.PI_CLI_PATH || cliCandidates(env, shimDir).find(exists)
+  const managedLauncher = paths.join(shimDir, 'pi-launcher.js')
+  const cli = env.PI_CLI_PATH || (exists(managedLauncher) ? managedLauncher : windowsPiPackageCandidates(env, shimDir).map(file => paths.join(paths.dirname(file), 'dist', 'cli.js')).find(exists))
   const node = env.PI_NODE_EXECUTABLE || [paths.join(shimDir, 'node.exe'), ...dirs.map((dir) => paths.join(dir, 'node.exe'))].find(exists)
   if (!node || !cli || !exists(cli)) throw new Error('Cannot resolve Windows Pi launcher. Set PI_NODE_EXECUTABLE to node.exe and PI_CLI_PATH to Pi dist/cli.js, or PI_EXECUTABLE to a native Pi .exe.')
   return { file: node, args: [cli] }

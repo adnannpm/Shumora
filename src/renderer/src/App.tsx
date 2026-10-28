@@ -103,6 +103,12 @@ export default function App() {
     const pending: import('../../shared/types').SessionEvent[] = []
     function apply(event: import('../../shared/types').SessionEvent) {
       if (event.type === 'data') return
+      if (event.type === 'opened') {
+        setSessions(list => list.some(s => s.id === event.session.id) ? list : [...list, event.session])
+        dispatch({ type: 'add', id: event.session.id, group: 0 })
+        setSetupPlugin(null); setPage('workspace')
+        return
+      }
       if (event.type === 'removed') {
         setSessions(list => list.filter(s => s.id !== event.id)); dispatch({ type: 'remove', id: event.id })
       } else setSessions(list => list.some(s => s.id === event.session.id) ? list.map(s => s.id === event.session.id ? event.session : s) : [...list, event.session])

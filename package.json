@@ -83,6 +83,7 @@
       ],
       "signAndEditExecutable": true
     },
+    "nsis": { "include": "resources/windows-context-menu.nsh" },
     "artifactName": "Shumora-${version}-${os}-${arch}.${ext}",
     "mac": {
       "icon": "resources/icons/icon.png",

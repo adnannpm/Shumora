@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { homedir } from 'node:os'
+import { openFolderArgument } from './open-folder'
 import { join } from 'node:path'
 import { statSync } from 'node:fs'
 import * as pty from 'node-pty'
@@ -32,6 +33,27 @@ process.env.PATH = enrichedPath(process.platform, process.env)
 let window: BrowserWindow | undefined
 let folder = homedir()
 let closing = false
+let rendererReady = false
+const pendingFolders: string[] = []
+const primaryInstance = app.requestSingleInstanceLock()
+if (!primaryInstance) app.quit()
+app.on('second-instance', (_event, argv) => {
+  const target = openFolderArgument(argv)
+  if (target) { pendingFolders.push(target); if (rendererReady) flushFolders() }
+  if (window?.isMinimized()) window.restore()
+  window?.show(); window?.focus()
+})
+function flushFolders() {
+  while (pendingFolders.length) {
+    const target = pendingFolders.shift()!
+    try {
+      if (packages.operation().status === 'running') throw new Error('Wait for the package operation to finish before opening a folder.')
+      if (sessions.list().length >= 32) throw new Error('Workspace supports up to 32 sessions.')
+      const session = sessions.create(target)
+      window?.webContents.send('sessions:event', { type: 'opened', session })
+    } catch (error) { void dialog.showMessageBox({ type: 'error', title: 'Open in Shumora', message: String(error) }) }
+  }
+}
 let database: ReturnType<typeof openDatabase> | undefined
 const bridge = new MeetingBridge(() => publishMeeting())
 const meetings = new MeetingManager(bridge, () => publishMeeting())
@@ -128,7 +150,11 @@ function registerIPC() {
     'updates:check': () => updates.check(),
     'updates:download': () => updates.download(),
     'updates:install': () => updates.install(),
-    'sessions:list': () => sessions.list(),
+    'sessions:list': () => {
+      rendererReady = true
+      setImmediate(flushFolders)
+      return sessions.list()
+    },
     'sessions:create': (cwd?: string) => {
       if (packages.operation().status === 'running') throw new Error('Wait for the package operation to finish before starting sessions.')
       if (sessions.list().length >= 32) throw new Error('MVP supports up to 32 sessions per workspace')
@@ -192,6 +218,8 @@ function createWindow() {
     icon: join(__dirname, '../../resources/icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     webPreferences: { preload: join(__dirname, '../preload/index.js'), nodeIntegration: false, contextIsolation: true, sandbox: true }
   })
+  rendererReady = false
+  window.webContents.on('did-start-loading', () => { rendererReady = false })
   window.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const target = new URL(url)
@@ -217,7 +245,7 @@ function createWindow() {
   else void window.loadFile(join(__dirname, '../renderer/index.html'))
 }
 
-app.whenReady().then(async () => {
+if (primaryInstance) app.whenReady().then(async () => {
   await bridge.listen()
   database = openDatabase(app.getPath('userData'))
   plugins = new PluginService(database, pluginHost, operation => {
@@ -237,6 +265,7 @@ app.whenReady().then(async () => {
     closing = true
   }, unsupported)
   registerIPC()
+  folder = openFolderArgument(process.argv) || folder
   sessions.create(folder)
   createWindow()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })

@@ -4,7 +4,7 @@ import { spawn, type ChildProcess, execFile } from 'node:child_process'
 import type { PluginHost } from './plugins'
 import type { RouterHost } from './router-service'
 import { routerHealth } from './router-health'
-import { resolveLaunch } from './launch'
+import { resolveLaunch, windowsPiPackageCandidates } from './launch'
 export async function runPiPackage(args: string[], output: (text: string) => void): Promise<void> {
   const launch = resolveLaunch(process.platform, process.env, process.env.PATH || process.env.Path || '')
   await run(launch.file, [...launch.args, ...args], 300_000, output)
@@ -73,7 +73,9 @@ function createPluginHost(command: string, packageName: string, repository: stri
     const real = realpathSync(file)
     let dir = path.dirname(real)
     // npm symlinks on Unix and .cmd shims on Windows have different layouts.
-    const candidates = [path.join(path.dirname(file), 'node_modules', packageName, 'package.json')]
+    const candidates = command === 'pi' && process.platform === 'win32'
+      ? windowsPiPackageCandidates(process.env, path.win32.dirname(file))
+      : [path.join(path.dirname(file), 'node_modules', packageName, 'package.json')]
     for (let i = 0; i < 5; i++) { candidates.push(path.join(dir, 'package.json')); dir = path.dirname(dir) }
     for (const candidate of candidates) {
       if (!existsSync(candidate)) continue

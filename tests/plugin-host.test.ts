@@ -1,18 +1,19 @@
 import { EventEmitter } from 'node:events'
 import { afterEach, expect, it, vi } from 'vitest'
 
-const exec = vi.hoisted(() => ({ callback: undefined as any, child: undefined as any, shim: false }))
+const exec = vi.hoisted(() => ({ callback: undefined as any, child: undefined as any, shim: false, files: {} as Record<string, string> }))
 vi.mock('node:child_process', () => ({ execFile: vi.fn((_file, _args, _options, callback) => { exec.callback = callback; return exec.child }) }))
 vi.mock('node:fs', () => ({
   accessSync: (file: string) => {
+    if (file in exec.files) return
     const name = file.split(/[\\/]/).pop()
     if (exec.shim ? name !== 'npm.cmd' && name !== 'node.exe' : name !== 'npm' && name !== 'npm.exe') throw new Error('not found')
   },
-  constants: { F_OK: 0, X_OK: 1 }, existsSync: (file: string) => exec.shim && /npm-cli\.js$/.test(file), readFileSync: vi.fn(), realpathSync: (file: string) => file
+  constants: { F_OK: 0, X_OK: 1 }, existsSync: (file: string) => file in exec.files || exec.shim && /npm-cli\.js$/.test(file), readFileSync: (file: string) => { if (!(file in exec.files)) throw new Error('missing'); return exec.files[file] }, realpathSync: (file: string) => file
 }))
-import { pluginHost } from '../src/main/plugin-host'
+import { pluginHost, piPluginHost } from '../src/main/plugin-host'
 import { execFile } from 'node:child_process'
-afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); exec.shim = false })
+afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); exec.shim = false; exec.files = {}; vi.unstubAllEnvs() })
 
 it.each(['linux', 'darwin', 'win32'] as const)('streams stdout/stderr before completion on %s', async platform => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
@@ -27,6 +28,17 @@ it.each(['linux', 'darwin', 'win32'] as const)('streams stdout/stderr before com
   expect(settled).toBe(false)
   exec.callback(new Error('npm exited 1'), '', 'EACCES')
   await expect(pending).rejects.toThrow('EACCES')
+})
+it('detects the active release of the official Windows Pi installer', async () => {
+  vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
+  const bin = 'C:\\Users\\Alice Smith\\.pi\\agent\\bin'
+  vi.stubEnv('PI_EXECUTABLE', `${bin}\\pi.cmd`)
+  exec.files = {
+    [`${bin}\\pi.cmd`]: '',
+    ['C:\\Users\\Alice Smith\\.pi\\agent\\install\\current-version']: '1.4.0\r\n',
+    ['C:\\Users\\Alice Smith\\.pi\\agent\\install\\releases\\1.4.0\\node_modules\\@earendil-works\\pi-coding-agent\\package.json']: JSON.stringify({ name: '@earendil-works/pi-coding-agent', version: '1.4.0' })
+  }
+  await expect(piPluginHost.detect()).resolves.toEqual({ installed: true, installedVersion: '1.4.0', executable: `${bin}\\pi.cmd` })
 })
 it('runs Windows npm.cmd through node and npm-cli.js without a shell', async () => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')

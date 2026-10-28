@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Session, WorkspaceAPI } from '../src/shared/types'
 vi.mock('../src/renderer/src/TerminalPane', () => ({ TerminalPane: ({ session, visible, onFocus }: { session: Session; visible: boolean; onFocus: () => void }) => <div data-testid={session.id} data-visible={visible} onClick={onFocus}>{session.error}</div> }))
 import App from '../src/renderer/src/App'
@@ -16,11 +16,21 @@ function setup(count = 1, approved = true) {
     gitDiff: vi.fn(), gitStage: vi.fn(), gitUnstage: vi.fn(), gitStageAll: vi.fn(), gitUnstageAll: vi.fn(), gitDiscard: vi.fn(), gitCommit: vi.fn(), gitCommitModels: vi.fn(), gitGenerateMessage: vi.fn(), gitBranches: vi.fn(), gitSwitch: vi.fn(),
     list: vi.fn(async () => sessions), create: vi.fn(async (cwd = '/tmp') => { const n = ++counter; const s: Session = { id: String(n), name: `Pi ${n}`, cwd, status: 'running', generation: 1 }; sessions = [...sessions, s]; return s }),
     rename: vi.fn(async (id, name) => { const session = { ...sessions.find(s => s.id === id)!, name }; sessions = sessions.map(s => s.id === id ? session : s); return session }),
-    close: vi.fn(async () => approved), folder: async () => '/tmp', chooseFolder: vi.fn(async () => '/project'), onEvent: () => () => {}, snapshot: vi.fn(), input: vi.fn(), resize: vi.fn(), stop: vi.fn(), restart: vi.fn()
+    close: vi.fn(async () => approved), folder: async () => '/tmp', chooseFolder: vi.fn(async () => '/project'), onEvent: vi.fn(() => () => {}), snapshot: vi.fn(), input: vi.fn(), resize: vi.fn(), stop: vi.fn(), restart: vi.fn()
   }
   window.plugins = { status: async () => ({ id: '9router', installed: true }) } as any
   window.workspace = api; render(<Provider><App /></Provider>); return api
 }
+it('focuses an Explorer-opened terminal and switches back from Settings', async () => {
+  const api = setup()
+  await screen.findByRole('tab', { name: 'Pi 1' })
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+  const listener = vi.mocked(api.onEvent).mock.calls[0][0]
+  act(() => listener({ type: 'opened', session: { id: 'explorer', name: 'Pi 2', cwd: 'C:\\Projects', status: 'running', generation: 1 } }))
+  expect((await screen.findByRole('tab', { name: 'Pi 2' })).getAttribute('aria-selected')).toBe('true')
+  expect(screen.getByTestId('explorer').getAttribute('data-visible')).toBe('true')
+  expect(api.create).not.toHaveBeenCalled()
+})
 it('keeps full names available on hover without a terminal dropdown', async () => {
   setup(20)
   const tab = await screen.findByRole('tab', { name: 'Pi 20' })
