@@ -39,6 +39,8 @@ export interface GitRemoteBranch { name: string; localName: string; date?: strin
 export interface GitBranches { current?: string; local: GitBranch[]; remote: GitRemoteBranch[] }
 export interface GitSwitchOptions { create?: boolean; stash?: boolean }
 export interface WorkspaceAPI {
+  notificationsEnabled?(): Promise<boolean>
+  setNotificationsEnabled?(enabled: boolean): Promise<void>
   list(): Promise<Session[]>
   create(cwd?: string): Promise<Session>
   snapshot(id: string): Promise<Snapshot>

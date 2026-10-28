@@ -33,6 +33,8 @@ import type { PluginsAPI, PluginOperation, PiPluginAPI } from '../shared/plugins
 import type { UpdatesAPI, UpdateState } from '../shared/updates'
 import type { WorkspaceAPI, SessionEvent } from '../shared/types'
 const api: WorkspaceAPI = {
+  notificationsEnabled: () => ipcRenderer.invoke('agents:notifications'),
+  setNotificationsEnabled: enabled => ipcRenderer.invoke('agents:set-notifications', enabled),
   list: () => ipcRenderer.invoke('sessions:list'),
   create: (cwd) => ipcRenderer.invoke('sessions:create', cwd),
   snapshot: (id) => ipcRenderer.invoke('sessions:snapshot', id),

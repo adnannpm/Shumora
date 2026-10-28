@@ -17,6 +17,11 @@ export default function App() {
   const { t } = useLanguage()
   const [sessions, setSessions] = useState<Session[]>([])
   const [unread, setUnread] = useState<string[]>([])
+  useEffect(() => {
+    let enabled = true
+    try { enabled = window.localStorage.getItem('shumora.agent-notifications') !== 'false' } catch { /* Use default. */ }
+    void window.workspace?.setNotificationsEnabled?.(enabled).catch(() => {})
+  }, [])
   const [page, setPage] = useState<Page>('workspace')
   const [setupPlugin, setSetupPlugin] = useState<'pi' | '9router' | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)

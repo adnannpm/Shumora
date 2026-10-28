@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell, nativeTheme } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, nativeTheme, Notification } from 'electron'
 import { homedir } from 'node:os'
 import { openFolderArgument } from './open-folder'
 import { collectDiagnostics } from './diagnostics'
@@ -56,8 +56,21 @@ function flushFolders() {
   }
 }
 let database: ReturnType<typeof openDatabase> | undefined
+let agentNotifications = true
 const bridge = new MeetingBridge(() => publishMeeting(), 180000, (id, generation, activity) => {
-  sessions.setActivity(id, generation, activity)
+  if (!sessions.setActivity(id, generation, activity)) return
+  if (!agentNotifications || !['done', 'error'].includes(activity) || !window || window.isFocused() || !Notification.isSupported()) return
+  const session = sessions.list().find(s => s.id === id)
+  if (!session) return
+  const notification = new Notification({ title: session.name, body: activity === 'done' ? 'Agent finished' : 'Agent encountered an error' })
+  notification.on('click', () => {
+    const current = sessions.list().find(s => s.id === id)
+    if (!current || !window || window.isDestroyed()) return
+    if (window.isMinimized()) window.restore()
+    window.show(); window.focus()
+    window.webContents.send('sessions:event', { type: 'opened', session: current })
+  })
+  notification.show()
 })
 const meetings = new MeetingManager(bridge, () => publishMeeting())
 function meetingSnapshot() {
@@ -98,6 +111,11 @@ function sessionCwd(id: unknown) {
 }
 function registerIPC() {
   const handlers: Record<string, (...args: any[]) => unknown> = {
+    'agents:notifications': () => agentNotifications,
+    'agents:set-notifications': (enabled: unknown) => {
+      if (typeof enabled !== 'boolean') throw new Error('Invalid notification setting')
+      agentNotifications = enabled
+    },
     'appearance:system-dark': () => nativeTheme.shouldUseDarkColors,
     'diagnostics:run': () => collectDiagnostics(),
     'meetings:snapshot': () => meetingSnapshot(),

@@ -1,5 +1,5 @@
 import { useLanguage } from './Language'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@chakra-ui/react'
 import { useReleaseNotes } from './ReleaseNotes'
 import { useAppearance } from './Appearance'
@@ -13,6 +13,21 @@ const sections = { general: 'General', workspace: 'Workspace', about: 'About & U
 export function Settings() {
   const { t, language, setLanguage } = useLanguage()
   const [section, setSection] = useState<Section>('general')
+  const [notifications, setNotifications] = useState(true)
+  const [notificationError, setNotificationError] = useState(false)
+  useEffect(() => {
+    let enabled = true
+    try { enabled = window.localStorage.getItem('shumora.agent-notifications') !== 'false' } catch { /* Use default. */ }
+    setNotifications(enabled)
+    void window.workspace?.setNotificationsEnabled?.(enabled).catch(() => setNotificationError(true))
+  }, [])
+  async function changeNotifications(enabled: boolean) {
+    try {
+      await window.workspace.setNotificationsEnabled?.(enabled)
+      window.localStorage.setItem('shumora.agent-notifications', String(enabled))
+      setNotifications(enabled); setNotificationError(false)
+    } catch { setNotificationError(true) }
+  }
   const { show } = useReleaseNotes()
   const { theme, setTheme } = useAppearance()
   return <main className="settings-page flex min-w-0 flex-1 flex-col">
@@ -43,6 +58,7 @@ export function Settings() {
         {section === 'workspace' && <>
           <h2>{t('Workspace')}</h2><p>{t('Terminal behavior and tools for troubleshooting Pi.')}</p>
           <section className="settings-section"><h3>{t('Terminal')}</h3><dl className="settings-details"><div><dt>{t('Terminal appearance')}</dt><dd>{t('Always dark')}</dd></div><div><dt>{t('Runtime')}</dt><dd>{t('Installed Pi Coding Agent')}</dd></div><div><dt>{t('Session behavior')}</dt><dd>{t('Hidden sessions keep running')}</dd></div></dl><p className="settings-note">{t('Font and terminal palette controls are not available yet.')}</p></section>
+          <section className="settings-section"><div className="settings-row"><div><h3>{t('Agent notifications')}</h3><p>{t('Notify when an agent finishes or fails while Shumora is in the background.')}</p></div><input type="checkbox" aria-label={t('Agent notifications')} checked={notifications} onChange={event => void changeNotifications(event.target.checked)} /></div>{notificationError && <p role="alert">{t('Could not save notification preference.')}</p>}</section>
           <section className="settings-section"><Diagnostics embedded /></section>
         </>}
         {section === 'about' && <>
