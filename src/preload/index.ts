@@ -54,6 +54,7 @@ const api: WorkspaceAPI = {
   gitUnstageAll: (id) => ipcRenderer.invoke('git:unstage-all', id),
   gitDiscard: (id, path) => ipcRenderer.invoke('git:discard', id, path),
   gitCommit: (id, message) => ipcRenderer.invoke('git:commit', id, message),
+  gitPush: (id) => ipcRenderer.invoke('git:push', id),
   gitCommitModels: () => ipcRenderer.invoke('git:commit-models'),
   gitGenerateMessage: (id, model) => ipcRenderer.invoke('git:generate-message', id, model),
   gitBranches: (id) => ipcRenderer.invoke('git:branches', id),

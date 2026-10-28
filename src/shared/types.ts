@@ -61,6 +61,7 @@ export interface WorkspaceAPI {
   gitUnstageAll(id: string): Promise<void>
   gitDiscard(id: string, path: string): Promise<void>
   gitCommit(id: string, message: string): Promise<{ hash: string }>
+  gitPush(id: string): Promise<void>
   gitCommitModels(): Promise<string[]>
   gitGenerateMessage(id: string, model: string): Promise<string>
   gitBranches(id: string): Promise<GitBranches>
