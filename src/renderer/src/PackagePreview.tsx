@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { PiPackage } from '../../shared/packages'
 
 // A short, stable identity badge for packages without (or with a broken) thumbnail.
@@ -9,10 +9,13 @@ function initials(name: string): string {
 }
 
 export function PackagePreview({ item, variant = 'card' }: { item: Pick<PiPackage, 'name' | 'thumbnail'>; variant?: 'card' | 'detail' }) {
+  // A new image identity gets fresh state before it can emit an error.
+  // A passive reset effect could otherwise erase an early image failure.
+  return <PreviewContent key={JSON.stringify([item.name, item.thumbnail])} item={item} variant={variant} />
+}
+
+function PreviewContent({ item, variant }: { item: Pick<PiPackage, 'name' | 'thumbnail'>; variant: 'card' | 'detail' }) {
   const [failed, setFailed] = useState(false)
-  // Reset the broken-image flag when the package or its thumbnail URL changes,
-  // otherwise a previous failure could incorrectly suppress a new package's image.
-  useEffect(() => { setFailed(false) }, [item.name, item.thumbnail])
   const showImage = !!item.thumbnail && !failed
   const className = variant === 'detail' ? 'package-preview package-preview-detail' : 'package-preview package-preview-card'
   return <div className={className}>
