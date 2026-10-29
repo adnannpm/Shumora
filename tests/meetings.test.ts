@@ -3,6 +3,15 @@ import { MeetingManager } from '../src/main/meetings'
 const participants = [{ id: 'a', name: 'Design', role: 'Design' }, { id: 'b', name: 'Code', role: 'Engineering' }]
 const input = { agenda: 'Launch', participants, leader: 'b', language: 'en' as const }
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))
+it('supports Chinese Council prompts and user labels', () => {
+  const prompt = vi.fn((_id: string, _text: string) => new Promise<string>(() => {}))
+  const manager = new MeetingManager({ status: () => 'ready', prompt }, () => {})
+  manager.start({ ...input, language: 'zh' })
+  expect(prompt.mock.calls[0][1]).toContain('Respond in Simplified Chinese (简体中文)')
+  manager.direction('请讨论风险')
+  expect(manager.snapshot().messages[0]).toMatchObject({ author: '你', text: '请讨论风险' })
+  manager.stop()
+})
 it('runs automatic turns but invites the user between rounds and before the summary', async () => {
   const prompt = vi.fn(async (_id: string, text: string) => `Reply ${text.includes('Reply') ? 'with context' : 'first'}`)
   const manager = new MeetingManager({ status: () => 'ready', prompt }, () => {})

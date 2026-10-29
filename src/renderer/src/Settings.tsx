@@ -1,4 +1,4 @@
-import { useLanguage } from './Language'
+import { isLanguage, useLanguage } from './Language'
 import { useEffect, useState } from 'react'
 import { Button } from '@chakra-ui/react'
 import { useReleaseNotes } from './ReleaseNotes'
@@ -40,7 +40,7 @@ export function Settings() {
       <section className="settings-content settings-content-wide">
         {section === 'general' && <>
           <h2>{t("General")}</h2><p>{t("Language and appearance for this device.")}</p>
-          <section className="settings-section"><div className="settings-row"><div><h3 id="language-label">{t('Language')}</h3><p>{t('Choose the language used by Shumora. Terminal output and AI replies are not translated.')}</p></div><select aria-labelledby="language-label" aria-label={t('Language')} value={language} onChange={event => setLanguage(event.target.value === 'id' ? 'id' : 'en')}><option value="en">English</option><option value="id">Bahasa Indonesia</option></select></div></section>
+          <section className="settings-section"><div className="settings-row"><div><h3 id="language-label">{t('Language')}</h3><p>{t('Choose the language used by Shumora. Terminal output and AI replies are not translated.')}</p></div><select aria-labelledby="language-label" aria-label={t('Language')} value={language} onChange={event => setLanguage(isLanguage(event.target.value) ? event.target.value : 'en')}><option value="en">English</option><option value="id">Bahasa Indonesia</option><option value="zh">中文（简体）</option></select></div></section>
           <section className="settings-section"><h3 id="theme-label">{t("Application theme")}</h3>
           <div className="theme-choices" role="radiogroup" aria-labelledby="theme-label">
             {themes.map(value => <button key={value} role="radio" aria-label={t(themeLabels[value])} aria-checked={theme === value} tabIndex={theme === value ? 0 : -1} onClick={() => setTheme(value)} onKeyDown={event => {

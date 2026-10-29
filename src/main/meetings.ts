@@ -6,13 +6,13 @@ export class MeetingManager {
   private controller?: AbortController
   private epoch = 0
   private order: string[] = []
-  private language: 'en' | 'id' = 'en'
+  private language: MeetingInput['language'] = 'en'
   constructor(private agents: Agents, private changed: () => void) {}
   snapshot(): MeetingState { return structuredClone(this.state) }
   private publish() { this.state.revision++; this.changed() }
   start(input: MeetingInput) {
     if (['running', 'paused'].includes(this.state.phase)) throw new Error('Meeting is already active')
-    if (!input || typeof input.agenda !== 'string' || !input.agenda.trim() || input.agenda.length > 4000 || !Array.isArray(input.participants) || input.participants.length < 2 || input.participants.length > 8 || !['en', 'id'].includes(input.language)) throw new Error('Invalid meeting setup')
+    if (!input || typeof input.agenda !== 'string' || !input.agenda.trim() || input.agenda.length > 4000 || !Array.isArray(input.participants) || input.participants.length < 2 || input.participants.length > 8 || !['en', 'id', 'zh'].includes(input.language)) throw new Error('Invalid meeting setup')
     const ids = new Set<string>()
     for (const p of input.participants) {
       if (!p || typeof p.id !== 'string' || ids.has(p.id) || typeof p.name !== 'string' || !p.name.trim() || p.name.length > 120 || typeof p.role !== 'string' || p.role.length > 80) throw new Error('Invalid meeting participants')
@@ -32,7 +32,7 @@ export class MeetingManager {
   direction(text: string) {
     if (!['running', 'paused'].includes(this.state.phase) || typeof text !== 'string' || !text.trim() || text.length > 2000) throw new Error('Invalid meeting direction')
     if (this.state.messages.length > 40) throw new Error('Too many meeting directions')
-    this.state.messages.push({ author: this.language === 'id' ? 'Kamu' : 'You', text: text.trim(), kind: 'direction' }); this.publish()
+    this.state.messages.push({ author: this.language === 'id' ? 'Kamu' : this.language === 'zh' ? '你' : 'You', text: text.trim(), kind: 'direction' }); this.publish()
     if (this.state.awaitingUser) this.resume()
   }
   private async advance() {
@@ -44,7 +44,7 @@ export class MeetingManager {
     const controller = new AbortController(); this.controller = controller; this.publish()
     const prompt = [
       'You are in a cross-division meeting inside your existing Pi session. DISCUSSION ONLY: do not call tools, execute commands, edit files or delegate work. Decisions are proposals requiring separate user approval.',
-      `Respond in ${this.language === 'id' ? 'Bahasa Indonesia' : 'English'}. Keep your answer under 2000 characters.`,
+      `Respond in ${this.language === 'id' ? 'Bahasa Indonesia' : this.language === 'zh' ? 'Simplified Chinese (简体中文)' : 'English'}. Keep your answer under 2000 characters.`,
       `Agenda: ${this.state.agenda}`, `Your division: ${participant.role || participant.name}`,
       `Participants: ${this.state.participants.map(p => `${p.name}: ${p.role}`).join(', ')}`,
       'The user is an active meeting participant, not a spectator. Address the user directly, answer their latest questions before adding new recommendations, and end with one concrete question or decision for them. Use Markdown for readable responses.',
