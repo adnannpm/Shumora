@@ -176,6 +176,20 @@ export class GitService {
     return { hash: hash.stdout.trim() }
   }
 
+  /** Pushes commits to the remote repository. */
+  async push(cwd: string): Promise<void> {
+    const state = await this.require(cwd)
+    if (state.detached) throw new Error('Cannot push in detached HEAD state')
+    const args = ['push']
+    if (!state.upstream && state.branch) {
+      const remotes = await this.run(state.root, ['remote'])
+      const remoteList = remotes.stdout.split('\n').map((s) => s.trim()).filter(Boolean)
+      if (remoteList.length === 1) args.push('-u', remoteList[0], state.branch)
+    }
+    const result = await this.run(state.root, args, { timeout: 120_000 })
+    if (result.code) throw new Error((result.stderr || result.stdout).trim() || 'git push failed')
+  }
+
   /** Recent subjects and the staged diff, used to draft a commit message in the repository's style. */
   async commitContext(cwd: string): Promise<CommitContext> {
     const state = await this.require(cwd)

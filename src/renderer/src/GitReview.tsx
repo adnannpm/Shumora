@@ -94,6 +94,7 @@ function GitReviewDialog({ sessionId, status, error, refresh, onClose }: { sessi
   const [diff, setDiff] = useState<GitDiff>()
   const [actionError, setActionError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [pushing, setPushing] = useState(false)
   const [confirm, setConfirm] = useState<GitFileChange>()
   const request = useRef(0)
 
@@ -118,6 +119,10 @@ function GitReviewDialog({ sessionId, status, error, refresh, onClose }: { sessi
     setBusy(true); setActionError('')
     try { await run(); await refresh() } catch (e) { setActionError(String(e)) } finally { setBusy(false); setConfirm(undefined) }
   }
+  async function doPush() {
+    setPushing(true); setActionError('')
+    try { await ws.gitPush(sessionId); await refresh() } catch (e) { setActionError(String(e)) } finally { setPushing(false) }
+  }
   const ws = window.workspace
 
   return <Dialog.Root open onOpenChange={({ open }) => { if (!open) onClose() }} placement="center" size="cover" scrollBehavior="inside">
@@ -125,7 +130,10 @@ function GitReviewDialog({ sessionId, status, error, refresh, onClose }: { sessi
       <Dialog.Header className="git-review-header">
         <Dialog.Title>Source control <span className="git-branch">⎇ {status.detached ? 'HEAD (detached)' : status.branch}{status.operation ? ` · ${status.operation} in progress` : ''}</span></Dialog.Title>
         <div className="git-review-actions">
-          <Button size="xs" variant="outline" onClick={() => void refresh()} title="Refresh changes">↻ Refresh</Button>
+          <Button size="xs" variant="outline" colorPalette={status.ahead ? 'brand' : undefined} disabled={busy || pushing || status.detached || !!status.operation} loading={pushing} onClick={() => void doPush()} title={status.ahead ? `git push (${status.ahead} commit${status.ahead > 1 ? 's' : ''} to ${status.upstream || 'remote'})` : 'git push'}>
+            git push{status.ahead ? ` (${status.ahead})` : ''}
+          </Button>
+          <Button size="xs" variant="outline" disabled={busy || pushing} onClick={() => void refresh()} title="Refresh changes">↻ Refresh</Button>
           <span className="git-divider" aria-hidden />
           <Dialog.CloseTrigger asChild><Button size="xs" variant="ghost" aria-label="Close" title="Close">✕</Button></Dialog.CloseTrigger>
         </div>
@@ -136,9 +144,9 @@ function GitReviewDialog({ sessionId, status, error, refresh, onClose }: { sessi
           <div className="git-sidebar">
             <div className="git-files">
               <FileSection title="Staged changes" area="staged" changes={staged} current={current} onSelect={setSelected}
-                action={staged.length ? <Button size="2xs" variant="ghost" disabled={busy} onClick={() => void act(() => ws.gitUnstageAll(sessionId))} title="Unstage all">− All</Button> : null} />
+                action={staged.length ? <Button size="2xs" variant="ghost" disabled={busy} onClick={() => void act(() => ws.gitUnstageAll(sessionId))} title="git restore --staged . (Unstage all)">git restore --staged .</Button> : null} />
               <FileSection title="Changes" area="unstaged" changes={unstaged} current={current} onSelect={setSelected}
-                action={unstaged.length ? <Button size="2xs" variant="ghost" disabled={busy} onClick={() => void act(() => ws.gitStageAll(sessionId))} title="Stage all">+ All</Button> : null} />
+                action={unstaged.length ? <Button size="2xs" variant="ghost" disabled={busy} onClick={() => void act(() => ws.gitStageAll(sessionId))} title="git add . (Stage all)">git add .</Button> : null} />
               {status.truncated && <p className="git-note">Showing the first {status.changes.length} files.</p>}
             </div>
             <CommitBox sessionId={sessionId} stagedCount={staged.length} blocked={status.changes.some((c) => c.status === 'conflicted')} refresh={refresh} />
@@ -148,10 +156,10 @@ function GitReviewDialog({ sessionId, status, error, refresh, onClose }: { sessi
               <span className="git-path" title={current.path}>{change.oldPath && current.area === 'staged' ? `${change.oldPath} → ` : ''}{current.path}</span>
               <div>
                 {current.area === 'staged'
-                  ? <Button size="xs" variant="outline" disabled={busy} onClick={() => void act(() => ws.gitUnstage(sessionId, change.path))}>− Unstage</Button>
+                  ? <Button size="xs" variant="outline" disabled={busy} onClick={() => void act(() => ws.gitUnstage(sessionId, change.path))} title={`git restore --staged ${change.path}`}>git restore --staged</Button>
                   : <>
-                    <Button size="xs" variant="outline" colorPalette="red" disabled={busy || change.status === 'conflicted'} onClick={() => setConfirm(change)}>✕ Discard</Button>
-                    <Button size="xs" colorPalette="brand" disabled={busy} onClick={() => void act(() => ws.gitStage(sessionId, change.path))}>{change.status === 'conflicted' ? '✓ Mark resolved' : '+ Stage'}</Button>
+                    <Button size="xs" variant="outline" colorPalette="red" disabled={busy || change.status === 'conflicted'} onClick={() => setConfirm(change)} title={`git restore ${change.path}`}>git restore</Button>
+                    <Button size="xs" colorPalette="brand" disabled={busy} onClick={() => void act(() => ws.gitStage(sessionId, change.path))} title={change.status === 'conflicted' ? `git add ${change.path} (resolve)` : `git add ${change.path}`}>{change.status === 'conflicted' ? 'git add (resolve)' : 'git add'}</Button>
                   </>}
               </div>
             </div>
@@ -162,14 +170,14 @@ function GitReviewDialog({ sessionId, status, error, refresh, onClose }: { sessi
     </Dialog.Content></Dialog.Positioner></Portal>
     <Dialog.Root role="alertdialog" open={!!confirm} placement="center" size="sm" closeOnInteractOutside={false} onOpenChange={({ open }) => { if (!open && !busy) setConfirm(undefined) }}>
       <Portal><Dialog.Backdrop /><Dialog.Positioner><Dialog.Content>
-        <Dialog.Header><Dialog.Title>Discard changes to {confirm?.path}?</Dialog.Title></Dialog.Header>
+        <Dialog.Header><Dialog.Title>git restore {confirm?.path}?</Dialog.Title></Dialog.Header>
         <Dialog.Body><Dialog.Description>{confirm?.status === 'untracked'
           ? 'This new file will be moved to the system trash.'
           : confirm?.staged ? 'Unstaged edits are lost. The file returns to its staged version; staged changes are kept.'
           : 'Unstaged edits are lost. The file returns to its last committed version.'}</Dialog.Description></Dialog.Body>
         <Dialog.Footer>
-          <Button variant="outline" disabled={busy} onClick={() => setConfirm(undefined)}>Keep file</Button>
-          <Button colorPalette="red" loading={busy} onClick={() => { const c = confirm; if (c) void act(() => ws.gitDiscard(sessionId, c.path)) }}>Discard</Button>
+          <Button variant="outline" disabled={busy} onClick={() => setConfirm(undefined)}>Cancel</Button>
+          <Button colorPalette="red" loading={busy} onClick={() => { const c = confirm; if (c) void act(() => ws.gitDiscard(sessionId, c.path)) }}>git restore</Button>
         </Dialog.Footer>
       </Dialog.Content></Dialog.Positioner></Portal>
     </Dialog.Root>
@@ -226,19 +234,19 @@ function CommitBox({ sessionId, stagedCount, blocked, refresh }: { sessionId: st
   }
   const idle = state === 'idle'
   return <form className="git-commit" aria-label="Commit" onSubmit={(e) => { e.preventDefault(); if (idle && stagedCount && message.trim() && !blocked) void commit() }}>
-    <textarea aria-label="Commit message" placeholder={stagedCount ? 'Commit message' : 'Stage changes to commit'} value={message} rows={3} maxLength={10_000} disabled={!idle}
+    <textarea aria-label="Commit message" placeholder={stagedCount ? 'Commit message' : 'git add files to commit'} value={message} rows={3} maxLength={10_000} disabled={!idle}
       onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.currentTarget.form?.requestSubmit() } }} />
     <div className="git-commit-row">
       <select aria-label="Model for commit messages" value={chosen} disabled={!idle || !models?.length} onChange={(e) => pick(e.target.value)} title={modelError || 'Model used to write the message'}>
         {!models ? <option value="">Loading models…</option> : !models.length ? <option value="">9router unavailable</option> : models.map((m) => <option key={m} value={m}>{m}</option>)}
       </select>
       <Button size="xs" variant="outline" type="button" loading={state === 'generating'} disabled={!idle || !stagedCount || !chosen} onClick={() => void generate()}
-        title={modelError || (stagedCount ? 'Write a message from the staged diff in this repository\'s style' : 'Stage changes first')}>✨ Generate</Button>
+        title={modelError || (stagedCount ? 'Write a message from the staged diff in this repository\'s style' : 'git add files first')}>Generate</Button>
     </div>
     <Button size="sm" colorPalette="brand" type="submit" width="full" loading={state === 'committing'} disabled={!idle || !stagedCount || !message.trim() || blocked}>
-      ✓ Commit{stagedCount ? ` ${stagedCount} file${stagedCount === 1 ? '' : 's'}` : ''}
+      git commit{stagedCount ? ` (${stagedCount} file${stagedCount === 1 ? '' : 's'})` : ''}
     </Button>
-    <p className="git-hint">{modelError ? modelError : 'Generate sends the staged diff to the selected model through 9router. Ctrl+Enter commits.'}</p>
+    <p className="git-hint">{modelError ? modelError : 'Generate creates a commit message from staged changes via 9router. Ctrl+Enter runs git commit.'}</p>
     {error && <p className="git-commit-error" role="alert">{error}</p>}
     {notice && <p className="git-commit-notice" role="status">{notice}</p>}
   </form>
