@@ -3,7 +3,7 @@ export type SplitTree = number | { orientation: 'right' | 'down'; ratio: number;
 export interface Layout { groups: TabGroup[]; focused: number; orientation: 'right' | 'down'; tree: SplitTree }
 export const initialLayout: Layout = { groups: [{ ids: [], active: '' }], focused: 0, orientation: 'right', tree: 0 }
 export type LayoutAction =
-  | { type: 'init'; ids: string[] }
+  | { type: 'init'; ids: string[]; saved?: unknown }
   | { type: 'select'; group: number; id: string }
   | { type: 'focus'; group: number }
   | { type: 'add'; group: number; id: string }
@@ -13,6 +13,31 @@ export type LayoutAction =
   | { type: 'move'; group: number }
   | { type: 'drop'; id: string; group: number; before?: string }
   | { type: 'merge' }
+export function restoreLayout(saved: unknown, ids: string[]): Layout {
+  const fallback = { ...initialLayout, groups: [{ ids, active: ids[0] || '' }] }
+  if (!ids.length || !saved || typeof saved !== 'object') return fallback
+  const value = saved as Layout
+  if (!Array.isArray(value.groups) || !value.groups.length || value.groups.length > 4 || !Number.isInteger(value.focused) || value.focused < 0 || value.focused >= value.groups.length || !['right', 'down'].includes(value.orientation)) return fallback
+  const leaves = new Set<number>()
+  function validTree(tree: SplitTree, depth = 0): boolean {
+    if (typeof tree === 'number') {
+      if (!Number.isInteger(tree) || tree < 0 || tree >= value.groups.length || leaves.has(tree)) return false
+      leaves.add(tree); return true
+    }
+    return !!tree && depth < 3 && ['right', 'down'].includes(tree.orientation) && Number.isFinite(tree.ratio) && tree.ratio >= 25 && tree.ratio <= 75 && validTree(tree.first, depth + 1) && validTree(tree.second, depth + 1)
+  }
+  if (!validTree(value.tree) || leaves.size !== value.groups.length) return fallback
+  const seen = new Set<string>()
+  const groups: TabGroup[] = []
+  for (const group of value.groups) {
+    if (!group || !Array.isArray(group.ids) || group.ids.some(id => typeof id !== 'string')) return fallback
+    const kept = group.ids.filter(id => { if (!ids.includes(id) || seen.has(id)) return false; seen.add(id); return true })
+    groups.push({ ids: kept, active: kept.includes(group.active) ? group.active : kept[0] || '' })
+  }
+  groups[0].ids.push(...ids.filter(id => !seen.has(id)))
+  if (!groups[0].active) groups[0].active = groups[0].ids[0] || ''
+  return collapse({ groups, focused: value.focused, orientation: value.orientation, tree: value.tree })
+}
 function without(group: TabGroup, id: string): TabGroup {
   const ids = group.ids.filter(i => i !== id)
   return { ids, active: group.active === id ? ids[Math.min(group.ids.indexOf(id), ids.length - 1)] || '' : group.active }
@@ -29,7 +54,7 @@ function collapse(state: Layout): Layout {
 }
 export function layoutReducer(state: Layout, action: LayoutAction): Layout {
   switch (action.type) {
-    case 'init': return { ...initialLayout, groups: [{ ids: action.ids, active: action.ids[0] || '' }] }
+    case 'init': return restoreLayout(action.saved, action.ids)
     case 'focus': return state.groups[action.group] ? { ...state, focused: action.group } : state
     case 'select': return state.groups[action.group]?.ids.includes(action.id) ? { ...state, focused: action.group, groups: state.groups.map((g, i) => i === action.group ? { ...g, active: action.id } : g) } : state
     case 'add': {

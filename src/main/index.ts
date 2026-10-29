@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { statSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { SessionManager } from './sessions'
+import { loadTerminals, saveTerminals } from './workspace-state'
 import { MeetingBridge } from './meeting-bridge'
 import { meetingExtensionPath } from './meeting-extension-path'
 import { MeetingManager } from './meetings'
@@ -35,6 +36,8 @@ let window: BrowserWindow | undefined
 let folder = homedir()
 let closing = false
 let rendererReady = false
+let terminalStatePath: string | undefined
+let restoringTerminals = false
 const pendingFolders: string[] = []
 const primaryInstance = app.requestSingleInstanceLock()
 if (!primaryInstance) app.quit()
@@ -92,6 +95,9 @@ const sessions = new SessionManager((cwd, id, generation) => {
   if (event.type === 'removed' || (event.type === 'state' && event.session.status !== 'running')) bridge.remove(event.type === 'removed' ? event.id : event.session.id)
   if (window && !window.isDestroyed()) window.webContents.send('sessions:event', event)
   if (event.type !== 'data') publishMeeting()
+  if (!restoringTerminals && terminalStatePath && (event.type === 'state' || event.type === 'removed')) {
+    try { saveTerminals(terminalStatePath, sessions.list()) } catch (error) { console.error('Could not save workspace terminals', error) }
+  }
 })
 
 let updates: UpdateManager
@@ -258,7 +264,7 @@ function createWindow() {
     event.preventDefault()
     const choice = dialog.showMessageBoxSync(window!, {
       type: 'warning', title: 'Close Shumora?', message: 'Stop all running Pi sessions and close?',
-      detail: 'Hidden sessions are still running. Closing this app stops their processes. Conversation resume is not managed by this MVP.',
+      detail: 'Your terminal tabs, folders and layout are saved automatically. Closing stops running processes; reopening starts fresh Pi processes, not previous conversations.',
       buttons: ['Keep working', 'Stop sessions and close'], defaultId: 0, cancelId: 0
     })
     if (choice === 1) { closing = true; sessions.dispose(); window?.close() }
@@ -292,8 +298,21 @@ if (primaryInstance) app.whenReady().then(async () => {
     closing = true
   }, unsupported)
   registerIPC()
-  folder = openFolderArgument(process.argv) || folder
-  sessions.create(folder)
+  const requestedFolder = openFolderArgument(process.argv)
+  folder = requestedFolder || folder
+  terminalStatePath = join(app.getPath('userData'), 'workspace-terminals.json')
+  const savedTerminals = loadTerminals(terminalStatePath)
+  restoringTerminals = true
+  try {
+    if (savedTerminals !== null) {
+      for (const terminal of savedTerminals) sessions.create(terminal.cwd, terminal)
+    } else if (!requestedFolder) sessions.create(folder)
+    if (requestedFolder) {
+      if (sessions.list().length < 32) sessions.create(requestedFolder)
+      else console.warn('Workspace is full; cannot open the requested folder.')
+    }
+  } finally { restoringTerminals = false }
+  try { saveTerminals(terminalStatePath, sessions.list()) } catch (error) { console.error('Could not save workspace terminals', error) }
   createWindow()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })

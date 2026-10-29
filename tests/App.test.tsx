@@ -197,8 +197,8 @@ it('cancels rename with Escape, ignores blanks and saves on blur', async () => {
 it('keeps folders per session and inherits the active session folder', async () => {
   const api = setup()
   await screen.findByRole('tab', { name: 'Pi 1' })
-  fireEvent.click(screen.getByRole('button', { name: 'New session options in group 1' }))
-  fireEvent.click(await screen.findByRole('menuitem', { name: 'New terminal in folder…' }))
+  expect(screen.queryByRole('button', { name: 'New session options in group 1' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'New terminal in folder…' }))
   await screen.findByRole('tab', { name: 'Pi 2' })
   expect(api.chooseFolder).toHaveBeenCalledWith('/tmp')
   expect(api.create).toHaveBeenLastCalledWith('/project')

@@ -21,9 +21,11 @@ export class SessionManager {
     return this.entries.get(id)!
   }
   private publish(e: Entry) { this.emit({ type: 'state', session: { ...e.session } }) }
-  create(cwd: string): Session {
+  create(cwd: string, saved?: { id: string; name: string }): Session {
     if (typeof cwd !== 'string' || !cwd) throw new Error('Invalid directory')
-    const e: Entry = { session: { id: randomUUID(), name: `Pi ${++this.count}`, cwd, status: 'exited', generation: 0 }, output: '', seq: 0, subscriptions: [] }
+    const name = `Pi ${++this.count}`
+    if (saved && this.entries.has(saved.id)) throw new Error('Duplicate session')
+    const e: Entry = { session: { id: saved?.id || randomUUID(), name: saved?.name || name, cwd, status: 'exited', generation: 0 }, output: '', seq: 0, subscriptions: [] }
     this.entries.set(e.session.id, e)
     return this.start(e)
   }

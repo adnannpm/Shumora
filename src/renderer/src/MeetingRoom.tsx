@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import { useLanguage } from './Language'
+import { useCouncilRoles } from './CouncilRoles'
 import type { Session } from '../../shared/types'
 import type { MeetingSnapshot } from '../../shared/meetings'
 
@@ -10,6 +11,7 @@ export function MeetingRoom({ sessions }: { sessions: Session[]; active?: boolea
   const [agenda, setAgenda] = useState('')
   const [invited, setInvited] = useState<string[]>([])
   const [roles, setRoles] = useState<Record<string, string>>({})
+  const { roles: availableRoles } = useCouncilRoles()
   const [leader, setLeader] = useState('user')
   const [direction, setDirection] = useState('')
   const [busy, setBusy] = useState(false)
@@ -68,7 +70,7 @@ export function MeetingRoom({ sessions }: { sessions: Session[]; active?: boolea
           <label className="council-agenda">{t('Discussion topic')}<textarea aria-label={t('Discussion topic')} value={agenda} maxLength={4000} onChange={e => setAgenda(e.target.value)} placeholder={t('Example: Plan our product launch. Compare design, engineering and marketing priorities.')} /></label>
           <div className="council-launch">
             <label>{t('Moderator')}<select aria-label={t('Moderator')} value={leader} onChange={e => setLeader(e.target.value)}><option value="user">{t('You')}</option>{participants.map(s => <option value={s.id} key={s.id}>{s.name} {t('· AI moderator')}</option>)}</select></label>
-            <button className="meeting-primary" disabled={busy || !snapshot || !agenda.trim() || participants.length < 2 || participants.some(p => snapshot.agents[p.id] !== 'ready')} onClick={() => void action(async () => { await window.meetings!.start({ agenda, participants: participants.map(s => ({ id: s.id, name: s.name, role: roles[s.id]?.trim() || '' })), leader, language }); setNewMeeting(false) })}>{t(busy ? 'Starting Council…' : 'Start Council')}</button>
+            <button className="meeting-primary" disabled={busy || !snapshot || !agenda.trim() || participants.length < 2 || participants.some(p => snapshot.agents[p.id] !== 'ready')} onClick={() => void action(async () => { await window.meetings!.start({ agenda, participants: participants.map(s => ({ id: s.id, name: s.name, role: availableRoles.find(role => role.id === roles[s.id])?.name || '' })), leader, language }); setNewMeeting(false) })}>{t(busy ? 'Starting Council…' : 'Start Council')}</button>
           </div>
           <p className="council-launch-hint">{t('{count} members selected · at least 2 required', { count: participants.length })}</p>
           <p className="meeting-notice">{t('Two rounds, with your turn after each round, then a summary. The team waits for your input or permission to continue. Uses each participant’s model and credits. Tools are blocked; no tasks are executed.')}</p>
@@ -82,7 +84,7 @@ export function MeetingRoom({ sessions }: { sessions: Session[]; active?: boolea
           const ready = status === 'ready' && session.status === 'running'
           return <div className={`meeting-invite ${invited.includes(session.id) ? 'selected' : ''}`} key={session.id}>
             <label><input type="checkbox" aria-label={t('Invite {name}', { name: session.name })} checked={invited.includes(session.id)} disabled={!ready || busy || (!invited.includes(session.id) && invited.length >= 8)} onChange={e => { setInvited(ids => e.target.checked ? [...ids, session.id] : ids.filter(id => id !== session.id)); if (leader === session.id) setLeader('user') }} /><span className="council-member-info"><strong>{session.name}</strong><small className={ready ? 'council-ready' : ''}>{t(ready ? 'Ready for Council' : status === 'busy' ? 'Working — wait until idle' : 'Not connected')}</small></span></label>
-            {invited.includes(session.id) && <input aria-label={t('Division for {name}', { name: session.name })} value={roles[session.id] || ''} maxLength={80} placeholder={t('Division, e.g. Design')} onChange={e => setRoles({ ...roles, [session.id]: e.target.value })} />}
+            {invited.includes(session.id) && <select aria-label={t('Division for {name}', { name: session.name })} value={availableRoles.some(role => role.id === roles[session.id]) ? roles[session.id] : ''} disabled={busy} onChange={e => setRoles({ ...roles, [session.id]: e.target.value })}><option value="">{t('Select division')}</option>{availableRoles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select>}
           </div>
         })}</div>
         </aside>

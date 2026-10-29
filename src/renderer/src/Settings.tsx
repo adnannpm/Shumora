@@ -5,6 +5,7 @@ import { useReleaseNotes } from './ReleaseNotes'
 import { useAppearance } from './Appearance'
 import { Updates } from './Updates'
 import { Diagnostics } from './Diagnostics'
+import { CouncilRolesSettings } from './CouncilRoles'
 
 const themes = ['light', 'dark', 'auto'] as const
 const themeLabels = { light: 'Light', dark: 'Dark', auto: 'Auto' }
@@ -59,6 +60,7 @@ export function Settings() {
           <h2>{t('Workspace')}</h2><p>{t('Terminal behavior and tools for troubleshooting Pi.')}</p>
           <section className="settings-section"><h3>{t('Terminal')}</h3><dl className="settings-details"><div><dt>{t('Terminal appearance')}</dt><dd>{t('Always dark')}</dd></div><div><dt>{t('Runtime')}</dt><dd>{t('Installed Pi Coding Agent')}</dd></div><div><dt>{t('Session behavior')}</dt><dd>{t('Hidden sessions keep running')}</dd></div></dl><p className="settings-note">{t('Font and terminal palette controls are not available yet.')}</p></section>
           <section className="settings-section"><div className="settings-row"><div><h3>{t('Agent notifications')}</h3><p>{t('Notify when an agent finishes or fails while Shumora is in the background.')}</p></div><input type="checkbox" aria-label={t('Agent notifications')} checked={notifications} onChange={event => void changeNotifications(event.target.checked)} /></div>{notificationError && <p role="alert">{t('Could not save notification preference.')}</p>}</section>
+          <CouncilRolesSettings />
           <section className="settings-section"><Diagnostics embedded /></section>
         </>}
         {section === 'about' && <>

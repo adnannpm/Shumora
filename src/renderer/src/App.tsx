@@ -1,6 +1,6 @@
 import { useLanguage } from './Language'
 import { useEffect, useReducer, useRef, useState, type CSSProperties } from 'react'
-import { Button, Dialog, Menu, Portal } from '@chakra-ui/react'
+import { Button, Dialog, Portal } from '@chakra-ui/react'
 import type { Session } from '../../shared/types'
 import { TerminalPane } from './TerminalPane'
 import { GitReviewButton } from './GitReview'
@@ -38,6 +38,11 @@ export default function App() {
     return () => { alive = false; window.removeEventListener('focus', check) }
   }, [])
   const [layout, dispatch] = useReducer(layoutReducer, initialLayout)
+  const [workspaceLoaded, setWorkspaceLoaded] = useState(false)
+  useEffect(() => {
+    if (!workspaceLoaded) return
+    try { window.localStorage.setItem('shumora.terminal-layout', JSON.stringify(layout)) } catch { /* Storage may be unavailable. */ }
+  }, [layout, workspaceLoaded])
   const visibleState = useRef({ page, layout })
   visibleState.current = { page, layout }
   useEffect(() => {
@@ -135,8 +140,11 @@ export default function App() {
     const unsubscribe = window.workspace.onEvent(event => { if (!loaded) pending.push(event); else apply(event) })
     void Promise.all([window.workspace.list(), window.workspace.folder()]).then(([list, cwd]) => {
       if (disposed) return
-      setSessions(list); setFolder(cwd); dispatch({ type: 'init', ids: list.map(s => s.id) })
+      let saved: unknown
+      try { saved = JSON.parse(window.localStorage.getItem('shumora.terminal-layout') || 'null') } catch { /* Use the default layout. */ }
+      setSessions(list); setFolder(cwd); dispatch({ type: 'init', ids: list.map(s => s.id), saved })
       loaded = true; pending.forEach(apply)
+      setWorkspaceLoaded(true)
     }).catch(e => { if (!disposed) setError(String(e)) })
     return () => { disposed = true; unsubscribe() }
   }, [])
@@ -242,13 +250,6 @@ export default function App() {
             })}
           </div>
           <Button size="xs" variant="ghost" flexShrink="0" aria-label={t("New session in group {number}", { number: index + 1 })} title={t("New session")} disabled={busy} onClick={() => void add(index)}>＋</Button>
-          <Menu.Root positioning={{ placement: 'bottom-end' }}>
-            <Menu.Trigger asChild><Button size="xs" variant="ghost" flexShrink="0" aria-label={t("New session options in group {number}", { number: index + 1 })} disabled={busy}>▾</Button></Menu.Trigger>
-            <Portal><Menu.Positioner><Menu.Content>
-              <Menu.Item value="new" onClick={() => void add(index)}>{t("New terminal")}</Menu.Item>
-              <Menu.Item value="folder" onClick={() => void add(index, undefined, true)}>{t("New terminal in folder…")}</Menu.Item>
-            </Menu.Content></Menu.Positioner></Portal>
-          </Menu.Root>
           {split && <Button size="xs" variant="ghost" flexShrink="0" aria-label={t("Move active tab from group {number} to other group", { number: index + 1 })} title={t("Move active tab to other group")} disabled={busy} onClick={() => dispatch({ type: 'move', group: index })}>⇄</Button>}
         </div>)}
         {sessions.map(session => {
