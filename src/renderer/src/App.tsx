@@ -196,10 +196,16 @@ export default function App() {
         <h1>{t("Terminals")}</h1>
         <button className="folder-button workspace-folder" title={t("Active terminal folder. Click to open a new terminal in another folder.")} aria-label={t("New terminal in folder…")} disabled={busy} onClick={() => void add(layout.focused, undefined, true)}><span aria-hidden="true">▱</span><span title={activeSession?.cwd || folder}>{activeSession?.cwd || folder || t("Loading folder…")}</span></button>
         {focusedSession && <GitReviewButton key={focusedSession.id} sessionId={focusedSession.id} sessionName={focusedSession.name} sessions={sessions} visible={page === 'workspace'} />}
-        <div className="layout-switch" aria-label={t("Terminal layout")}>
-          <Button size="xs" variant="ghost" disabled={busy || !sessions.length || layout.groups.length >= 4} aria-label={needsPartner ? t("New session in split right") : t("Split right")} onClick={() => doSplit('right')}>{needsPartner ? t("+ Split right") : t("Split right")}</Button>
-          <Button size="xs" variant="ghost" disabled={busy || !sessions.length || layout.groups.length >= 4} aria-label={needsPartner ? t("New session in split down") : t("Split down")} onClick={() => doSplit('down')}>{needsPartner ? t("+ Split down") : t("Split down")}</Button>
-          {split && <Button size="xs" variant="ghost" onClick={() => dispatch({ type: 'merge' })}>{t("Merge groups")}</Button>}
+        <div className="layout-switch" role="group" aria-label={t("Terminal layout")}>
+          <button type="button" className="layout-icon-button" disabled={busy || !sessions.length || layout.groups.length >= 4} aria-label={needsPartner ? t("New session in split right") : t("Split right")} title={needsPartner ? t("New session in split right") : t("Split right")} onClick={() => doSplit('right')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M12 4v16" /></svg>
+          </button>
+          <button type="button" className="layout-icon-button" disabled={busy || !sessions.length || layout.groups.length >= 4} aria-label={needsPartner ? t("New session in split down") : t("Split down")} title={needsPartner ? t("New session in split down") : t("Split down")} onClick={() => doSplit('down')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M3 12h18" /></svg>
+          </button>
+          {split && <><span className="layout-switch-divider" aria-hidden="true" /><button type="button" className="layout-icon-button" aria-label={t("Merge groups")} title={t("Merge groups")} onClick={() => dispatch({ type: 'merge' })}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="m7 10 2 2-2 2m10-4-2 2 2 2M5 12h4m6 0h4" /></svg>
+          </button></>}
         </div>
       </header>
       {error && <div className="global-error" role="alert">{t(error)}<Button size="xs" variant="ghost" colorPalette="red" onClick={() => setError('')}>{t("Dismiss")}</Button></div>}
