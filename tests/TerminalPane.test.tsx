@@ -3,19 +3,28 @@ import React from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { cleanup, render, waitFor } from '@testing-library/react'
 import type { Session } from '../src/shared/types'
-const terminals = vi.hoisted(() => [] as Array<{ input: (data: string) => void; options: Record<string, unknown> }>)
+const terminals = vi.hoisted(() => [] as Array<{ input: (data: string) => void; options: Record<string, unknown>; addons: Array<{ dispose?: () => void }>; disposed: boolean }>)
+const imageAddons = vi.hoisted(() => [] as Array<{ options: Record<string, unknown>; dispose: ReturnType<typeof vi.fn> }>)
+vi.mock('@xterm/addon-image', () => ({ ImageAddon: class {
+  dispose = vi.fn()
+  constructor(public options: Record<string, unknown>) { imageAddons.push(this) }
+} }))
 vi.mock('@xterm/xterm', () => ({ Terminal: class {
   options: Record<string, unknown>
   input = (_: string) => {}
   cols = 80; rows = 24
   constructor(options: Record<string, unknown>) { this.options = options; terminals.push(this) }
-  loadAddon() {} open() {} write() {} focus() {} dispose() {}
+  addons: Array<{ dispose?: () => void }> = []
+  disposed = false
+  loadAddon(addon: { dispose?: () => void }) { this.addons.push(addon) }
+  open() {} write() {} focus() {}
+  dispose() { this.disposed = true; this.addons.forEach(addon => addon.dispose?.()) }
   onData(callback: (data: string) => void) { this.input = callback; return { dispose() {} } }
 } }))
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }))
 import { TerminalPane } from '../src/renderer/src/TerminalPane'
 import { Provider } from '../src/renderer/src/Provider'
-afterEach(() => { cleanup(); terminals.length = 0; vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); terminals.length = 0; imageAddons.length = 0; vi.unstubAllGlobals() })
 it('blocks input for stopped/failed sessions without recreating the terminal, and enables it after restart', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   const session: Session = { id: 'one', name: 'Pi 1', cwd: '/tmp', status: 'running', generation: 1 }
@@ -24,6 +33,9 @@ it('blocks input for stopped/failed sessions without recreating the terminal, an
   const props = { visible: false, focused: false, onFocus() {} }
   const view = render(<Provider><TerminalPane {...props} session={session} /></Provider>)
   await waitFor(() => expect(terminals).toHaveLength(1))
+  expect(imageAddons).toHaveLength(1)
+  expect(imageAddons[0].options).toEqual({ storageLimit: 16, pixelLimit: 4_194_304 })
+  expect(terminals[0].addons).toContain(imageAddons[0])
   terminals[0].input('hello'); expect(input).toHaveBeenCalledTimes(1)
   for (const status of ['exited', 'error'] as const) {
     view.rerender(<Provider><TerminalPane {...props} session={{ ...session, status }} /></Provider>)
@@ -36,4 +48,8 @@ it('blocks input for stopped/failed sessions without recreating the terminal, an
   expect(terminals).toHaveLength(2)
   terminals[1].input('again'); expect(input).toHaveBeenCalledTimes(2)
   expect(terminals[1].options.disableStdin).toBe(false)
+  expect(imageAddons).toHaveLength(2)
+  expect(imageAddons[0].dispose).toHaveBeenCalledTimes(1)
+  view.unmount()
+  expect(imageAddons[1].dispose).toHaveBeenCalledTimes(1)
 })

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { Button } from '@chakra-ui/react'
 import { FitAddon } from '@xterm/addon-fit'
+import { ImageAddon } from '@xterm/addon-image'
 import { terminalTheme } from './theme'
 import type { Session, SessionEvent } from '../../shared/types'
 
@@ -20,6 +21,8 @@ export function TerminalPane({ session, visible, focused, onFocus }: { session: 
   useEffect(() => {
     const term = new Terminal({ disableStdin: !running.current, cursorBlink: true, fontSize: 14, fontFamily: '"Cascadia Code", "DejaVu Sans Mono", Consolas, monospace', scrollback: 5000, allowProposedApi: false, theme: terminalTheme })
     const addon = new FitAddon(); term.loadAddon(addon); term.open(host.current!)
+    // Each session owns its image cache; keep memory bounded across split/hidden tabs.
+    term.loadAddon(new ImageAddon({ storageLimit: 16, pixelLimit: 4_194_304 }))
     terminal.current = term
     let disposed = false, ready = false, seq = 0
     const pending: Extract<SessionEvent, { type: 'data' }>[] = []
