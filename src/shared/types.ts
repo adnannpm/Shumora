@@ -50,6 +50,18 @@ export interface GitPushInfo {
   commits: GitCommitSummary[]
 }
 export interface GitPushOptions { branch?: string; remote?: string; setUpstream?: boolean; force?: boolean }
+export interface GitAskPassRequest {
+  requestId: string
+  prompt: string
+  key?: string
+  isUsername?: boolean
+}
+export interface GitAskPassResponse {
+  requestId: string
+  passphrase?: string
+  remember?: boolean
+  canceled?: boolean
+}
 export interface WorkspaceAPI {
   notificationsEnabled?(): Promise<boolean>
   setNotificationsEnabled?(enabled: boolean): Promise<void>
@@ -79,5 +91,7 @@ export interface WorkspaceAPI {
   gitGenerateMessage(id: string, model: string): Promise<string>
   gitBranches(id: string): Promise<GitBranches>
   gitSwitch(id: string, branch: string, options: GitSwitchOptions): Promise<{ stashed: boolean }>
+  onGitAskPass?(callback: (request: GitAskPassRequest) => void): () => void
+  gitAskPassReply?(response: GitAskPassResponse): Promise<void>
 }
 declare global { interface Window { workspace: WorkspaceAPI } }

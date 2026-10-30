@@ -489,8 +489,8 @@ export function PushDialog({ sessionId, status, refresh, onClose }: { sessionId:
     setError('')
     try {
       await window.workspace.gitPush(sessionId, { branch: selectedBranch, setUpstream: !info?.hasUpstream })
-      await refresh()
       onClose()
+      void refresh()
     } catch (e) {
       setError(String(e))
     } finally {
@@ -545,7 +545,7 @@ export function PushDialog({ sessionId, status, refresh, onClose }: { sessionId:
       <Dialog.Footer className="git-push-footer">
         <Button size="sm" variant="outline" disabled={pushing} onClick={onClose}>Cancel</Button>
         <Button size="sm" className="git-action-primary" loading={pushing} disabled={!canPush} onClick={() => void doPush()}>
-          {commitCount > 0 ? `Push ${commitCount} commit${commitCount > 1 ? 's' : ''}` : 'Push'}
+          {pushing ? 'Pushing to remote…' : commitCount > 0 ? `Push ${commitCount} commit${commitCount > 1 ? 's' : ''}` : 'Push'}
         </Button>
       </Dialog.Footer>
     </Dialog.Content></Dialog.Positioner></Portal>

@@ -31,7 +31,7 @@ contextBridge.exposeInMainWorld('meetings', meetings)
 import type { PackageAPI } from '../shared/packages'
 import type { PluginsAPI, PluginOperation, PiPluginAPI } from '../shared/plugins'
 import type { UpdatesAPI, UpdateState } from '../shared/updates'
-import type { WorkspaceAPI, SessionEvent } from '../shared/types'
+import type { WorkspaceAPI, SessionEvent, GitAskPassRequest } from '../shared/types'
 const api: WorkspaceAPI = {
   notificationsEnabled: () => ipcRenderer.invoke('agents:notifications'),
   setNotificationsEnabled: enabled => ipcRenderer.invoke('agents:set-notifications', enabled),
@@ -60,6 +60,12 @@ const api: WorkspaceAPI = {
   gitGenerateMessage: (id, model) => ipcRenderer.invoke('git:generate-message', id, model),
   gitBranches: (id) => ipcRenderer.invoke('git:branches', id),
   gitSwitch: (id, branch, options) => ipcRenderer.invoke('git:switch', id, branch, options),
+  onGitAskPass: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, request: GitAskPassRequest) => callback(request)
+    ipcRenderer.on('git:askpass-request', listener)
+    return () => ipcRenderer.removeListener('git:askpass-request', listener)
+  },
+  gitAskPassReply: (response) => ipcRenderer.invoke('git:askpass-reply', response),
   onEvent: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, data: SessionEvent) => callback(data)
     ipcRenderer.on('sessions:event', listener)

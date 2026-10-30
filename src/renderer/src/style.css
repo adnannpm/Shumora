@@ -561,6 +561,26 @@ h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.3px; }
 .git-push-empty { margin: 0; padding: 8px 0; font-size: 12px; color: var(--muted); text-align: center; }
 .git-push-footer { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line); padding: 10px 16px !important; }
 
+/* Git AskPass Dialog */
+.git-askpass-dialog { max-width: 440px; background: var(--surface) !important; color: var(--text) !important; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.git-askpass-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); padding: 12px 16px !important; }
+.git-askpass-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0; }
+.git-askpass-icon { font-size: 16px; }
+.git-askpass-body { display: flex; flex-direction: column; gap: 12px; padding: 16px !important; }
+.git-askpass-target { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; background: var(--sidebar); border: 1px solid var(--line); font-size: 11px; overflow: hidden; }
+.git-askpass-target-label { font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+.git-askpass-target-path { font-family: "Cascadia Code", Consolas, monospace; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.git-askpass-desc { font-size: 12px; color: var(--muted); margin: 0; line-height: 1.4; }
+.git-askpass-error { font-size: 11px; color: var(--git-del); background: var(--git-del-bg); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--git-del); }
+.git-askpass-input-row { display: flex; align-items: center; gap: 6px; position: relative; }
+.git-askpass-input { width: 100%; height: 36px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--sidebar); color: var(--text); font-family: "Cascadia Code", Consolas, monospace; font-size: 13px; }
+.git-askpass-input:focus-visible { outline: 2px solid var(--accent); }
+.git-askpass-eye-btn { width: 36px; height: 36px; display: grid; place-content: center; border-radius: 6px; border: 1px solid var(--line); background: var(--sidebar); color: var(--muted); cursor: pointer; flex-shrink: 0; transition: all 0.15s ease; }
+.git-askpass-eye-btn:hover { color: var(--text); background: var(--selected); }
+.git-askpass-remember { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; }
+.git-askpass-remember:hover { color: var(--text); }
+.git-askpass-footer { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line); padding: 12px 16px !important; }
+
 /* Council uses the same shell, type scale and controls as Settings. */
 .meeting-page-host { flex: 1; min-width: 0; overflow: hidden; }
 .meeting-page { overflow: hidden; color: var(--text); background: var(--surface); container-type: inline-size; }

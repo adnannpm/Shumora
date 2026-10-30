@@ -27,8 +27,9 @@ import { RouterService } from './router-service'
 import { routerKeys, routerCreateKey } from './router-keys'
 import { routerHealth } from './router-health'
 import type { PluginAction } from '../shared/plugins'
-import type { GitPushOptions } from '../shared/types'
+import type { GitPushOptions, GitAskPassResponse } from '../shared/types'
 import { GitService } from './git'
+import { AskPassService } from './askpass-service'
 import { generateCommitMessage, routerChatModels } from './commit-message'
 
 process.env.PATH = enrichedPath(process.platform, process.env)
@@ -109,7 +110,8 @@ let plugins: PluginService
 let piPlugin: PluginService<'pi'>
 const router = new RouterService(routerHost)
 const catalog = new RouterCatalog()
-const git = new GitService((file) => shell.trashItem(file))
+const askPass = new AskPassService()
+const git = new GitService((file) => shell.trashItem(file), undefined, askPass)
 // Git calls take a session id; the working directory always comes from the main process.
 function sessionCwd(id: unknown) {
   const session = sessions.list().find((s) => s.id === id)
@@ -219,6 +221,9 @@ function registerIPC() {
     'git:generate-message': async (id: string, model: string) =>
       generateCommitMessage(model, await git.commitContext(sessionCwd(id))),
     'git:branches': (id: string) => git.branches(sessionCwd(id)),
+    'git:askpass-reply': (response: GitAskPassResponse) => {
+      askPass.submitReply(response)
+    },
     'git:switch': (id: string, branch: string, options: unknown) => {
       const o = (options && typeof options === 'object' ? options : {}) as Record<string, unknown>
       return git.switchBranch(sessionCwd(id), branch, {
@@ -283,6 +288,12 @@ if (primaryInstance) app.whenReady().then(async () => {
     if (window && !window.isDestroyed()) window.webContents.send('appearance:system-theme', nativeTheme.shouldUseDarkColors)
   })
   await bridge.listen()
+  askPass.setHandler(async (request) => {
+    if (!window || window.isDestroyed()) return { requestId: request.requestId, canceled: true }
+    window.webContents.send('git:askpass-request', request)
+    return { requestId: request.requestId }
+  })
+  await askPass.start()
   database = openDatabase(app.getPath('userData'))
   plugins = new PluginService(database, pluginHost, operation => {
     if (window && !window.isDestroyed()) window.webContents.send('plugins:operation', operation)
@@ -326,4 +337,4 @@ app.on('before-quit', (event) => {
   void router.dispose().catch(() => {}).finally(() => { routerClosing = true; app.quit() })
 })
 let routerClosing = false
-app.on('will-quit', () => { meetings.stop(); bridge.dispose(); sessions.dispose(); database?.close(); database = undefined })
+app.on('will-quit', () => { meetings.stop(); bridge.dispose(); askPass.dispose(); sessions.dispose(); database?.close(); database = undefined })

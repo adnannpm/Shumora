@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import type { AskPassService } from './askpass-service'
 import type { GitBranches, GitChangeKind, GitCommitSummary, GitDiff, GitDiffArea, GitFileChange, GitLineStats, GitOperation, GitPushInfo, GitPushOptions, GitRepoStatus, GitSwitchOptions } from '../shared/types'
 
 export const MAX_DIFF_BYTES = 512 * 1024
@@ -10,15 +11,15 @@ const MAX_CONTEXT_PATCH = 24_000
 const NO_EXT = ['--no-ext-diff', '--no-textconv']
 
 export interface GitResult { code: number; stdout: string; stderr: string; overflow?: boolean }
-export interface GitRunOptions { maxBuffer?: number; timeout?: number }
+export interface GitRunOptions { maxBuffer?: number; timeout?: number; env?: Record<string, string> }
 export type GitRunner = (cwd: string, args: string[], options?: GitRunOptions) => Promise<GitResult>
 
-export const runGit: GitRunner = (cwd, args, { maxBuffer = 8 * 1024 * 1024, timeout = 15_000 } = {}) => new Promise((resolve, reject) => {
+export const runGit: GitRunner = (cwd, args, { maxBuffer = 8 * 1024 * 1024, timeout = 15_000, env = {} } = {}) => new Promise((resolve, reject) => {
   execFile('git', ['-c', 'color.ui=false', '-c', 'core.quotepath=false', ...args], {
     cwd, maxBuffer, timeout, windowsHide: true, encoding: 'utf8',
     // Optional locks off so polling never contends with the agent's own git commands;
     // literal pathspecs so file names containing *, ? or : are never treated as globs.
-    env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_LITERAL_PATHSPECS: '1', GIT_TERMINAL_PROMPT: '0', GIT_PAGER: 'cat' }
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_LITERAL_PATHSPECS: '1', GIT_TERMINAL_PROMPT: '0', GIT_PAGER: 'cat', ...env }
   }, (error, stdout, stderr) => {
     const code = (error as { code?: unknown } | null)?.code
     if (code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') return resolve({ code: 0, stdout: '', stderr: '', overflow: true })
@@ -97,7 +98,7 @@ export interface CommitContext { recent: string[]; stat: string; patch: string; 
  */
 export class GitService {
   private inflight = new Map<string, Promise<GitRepoStatus>>()
-  constructor(private trash: (file: string) => Promise<void>, private run: GitRunner = runGit) {}
+  constructor(private trash: (file: string) => Promise<void>, private run: GitRunner = runGit, private askPass?: AskPassService) {}
 
   status(cwd: string): Promise<GitRepoStatus> {
     // Several panes may share one repo; collapse concurrent polls into a single git call.
@@ -215,7 +216,8 @@ export class GitService {
     } else if (options.branch && options.branch !== state.branch && remote) {
       args.push(remote, branch)
     }
-    const result = await this.run(state.root, args, { timeout: 120_000 })
+    const askPassEnv = this.askPass?.getEnv() || {}
+    const result = await this.run(state.root, args, { timeout: 120_000, env: askPassEnv })
     if (result.code) throw new Error((result.stderr || result.stdout).trim() || 'git push failed')
   }
 
