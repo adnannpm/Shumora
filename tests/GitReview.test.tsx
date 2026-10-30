@@ -27,6 +27,18 @@ function api(changes: GitFileChange[]) {
     gitStage: vi.fn(async () => {}), gitUnstage: vi.fn(async () => {}), gitStageAll: vi.fn(async () => {}), gitUnstageAll: vi.fn(async () => {}),
     gitDiscard: vi.fn(async () => {}), gitCommit: vi.fn(async () => ({ hash: 'abc123' })),
     gitPush: vi.fn(async () => {}),
+    gitPushInfo: vi.fn(async (_id: string, branch = 'main') => ({
+      branch,
+      remote: 'origin',
+      upstream: `origin/${branch}`,
+      hasUpstream: true,
+      ahead: 2,
+      behind: 0,
+      commits: [
+        { hash: 'abc1234', subject: 'feat: add first feature', date: '10m ago' },
+        { hash: 'def5678', subject: 'fix: resolve edge case', date: '1h ago' }
+      ]
+    })),
     gitCommitModels: vi.fn(async () => ['kr/auto', 'ag/flash']), gitGenerateMessage: vi.fn(async () => 'feat: generated'),
     gitBranches: vi.fn(async () => ({ current: 'main', local: [{ name: 'main', current: true }, { name: 'dev', current: false }], remote: [{ name: 'origin/release', localName: 'release' }] })),
     gitSwitch: vi.fn(async () => ({ stashed: false }))
@@ -39,11 +51,20 @@ it('explains when the terminal folder is outside a repository', async () => {
   expect(await screen.findByRole('button', { name: /Not a Git repository/ })).toBeTruthy()
 })
 
-it('reviews staged and unstaged sections, stages, unstages and confirms discard', async () => {
+it('reviews staged and unstaged sections, stages, unstages and shows latest commit', async () => {
   const mock = api([
     { path: 'src/a.ts', status: 'modified', indexStatus: 'modified', worktreeStatus: 'modified', staged: true, unstaged: true, stagedStats: { binary: false, insertions: 1, deletions: 1 }, unstagedStats: { binary: false, insertions: 2, deletions: 0 } },
     { path: 'b.ts', status: 'untracked', worktreeStatus: 'untracked', staged: false, unstaged: true }
   ])
+  mock.gitStatus.mockResolvedValue({
+    isRepo: true,
+    branch: 'main',
+    changes: [
+      { path: 'src/a.ts', status: 'modified', indexStatus: 'modified', worktreeStatus: 'modified', staged: true, unstaged: true, stagedStats: { binary: false, insertions: 1, deletions: 1 }, unstagedStats: { binary: false, insertions: 2, deletions: 0 } },
+      { path: 'b.ts', status: 'untracked', worktreeStatus: 'untracked', staged: false, unstaged: true }
+    ],
+    lastCommit: { hash: '9a477b0', subject: 'feat: previous commit', date: '2h ago' }
+  } as any)
   window.workspace = mock as any
   render(<Provider><GitReviewButton sessionId="one" visible /></Provider>)
   fireEvent.click(await screen.findByTitle('Review 2 changed files'))
@@ -52,21 +73,30 @@ it('reviews staged and unstaged sections, stages, unstages and confirms discard'
   expect(within(staged).getByText('src/a.ts')).toBeTruthy()
   expect(within(changes).getByText('b.ts')).toBeTruthy()
 
+  // Latest commit shown in header next to git push
+  expect(screen.getByText('9a477b0')).toBeTruthy()
+  expect(screen.getByText('feat: previous commit')).toBeTruthy()
+
   // Unstaged part is selected first and diffed against the index.
   await waitFor(() => expect(mock.gitDiff).toHaveBeenCalledWith('one', 'src/a.ts', 'unstaged'))
-  fireEvent.click(screen.getByText('git add'))
-  await waitFor(() => expect(mock.gitStage).toHaveBeenCalledWith('one', 'src/a.ts'))
-  fireEvent.click(screen.getByText('git restore'))
-  expect(await screen.findByText(/staged changes are kept/)).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'git restore' }))
-  await waitFor(() => expect(mock.gitDiscard).toHaveBeenCalledWith('one', 'src/a.ts'))
 
-  fireEvent.click(within(staged).getByText('src/a.ts'))
-  await waitFor(() => expect(mock.gitDiff).toHaveBeenCalledWith('one', 'src/a.ts', 'staged'))
-  fireEvent.click(screen.getByText('git restore --staged'))
-  await waitFor(() => expect(mock.gitUnstage).toHaveBeenCalledWith('one', 'src/a.ts'))
+  // Select a file via checkbox to stage
+  const bCheck = within(changes).getByRole('checkbox', { name: 'Select b.ts in Changes' })
+  fireEvent.click(bCheck)
+  const addBtn = await screen.findByText('git add (1)')
+  fireEvent.click(addBtn)
+  await waitFor(() => expect(mock.gitStage).toHaveBeenCalledWith('one', ['b.ts']))
+
+  // Stage all
   fireEvent.click(within(changes).getByTitle(/git add \./))
   await waitFor(() => expect(mock.gitStageAll).toHaveBeenCalledWith('one'))
+
+  // Select staged file via checkbox to unstage
+  const stagedCheck = within(staged).getByRole('checkbox', { name: 'Select src/a.ts in Staged changes' })
+  fireEvent.click(stagedCheck)
+  const unstageBtn = await screen.findByText('git restore --staged (1)')
+  fireEvent.click(unstageBtn)
+  await waitFor(() => expect(mock.gitUnstage).toHaveBeenCalledWith('one', ['src/a.ts']))
 })
 
 it.each(['modified', 'untracked'] as const)('reloads the selected %s diff on refresh even when line counts are unchanged', async status => {
@@ -107,7 +137,7 @@ it('generates a message with the chosen model and commits', async () => {
   expect(await screen.findByText('Committed abc123')).toBeTruthy()
 })
 
-it('pushes commits to the remote', async () => {
+it('pushes commits to the remote with branch selection and commit details', async () => {
   const mock = api([])
   mock.gitStatus.mockResolvedValue({ isRepo: true, branch: 'main', ahead: 2, changes: [] } as any)
   window.workspace = mock as any
@@ -117,7 +147,22 @@ it('pushes commits to the remote', async () => {
   expect(pushBtn.textContent).toContain('git push')
   expect(pushBtn.querySelector('.git-push-count')?.textContent).toBe('2')
   fireEvent.click(pushBtn)
-  await waitFor(() => expect(mock.gitPush).toHaveBeenCalledWith('one'))
+
+  // Verify dialog elements: branch dropdown, commits list, and commit details
+  expect(await screen.findByText('Commits to push')).toBeTruthy()
+  expect(screen.getByText('feat: add first feature')).toBeTruthy()
+  expect(screen.getByText('fix: resolve edge case')).toBeTruthy()
+  expect(screen.getByText('abc1234')).toBeTruthy()
+
+  // Changing dropdown to dev branch
+  const select = screen.getByRole('combobox', { name: 'Target branch' }) as HTMLSelectElement
+  expect(select.value).toBe('main')
+  fireEvent.change(select, { target: { value: 'dev' } })
+  await waitFor(() => expect(mock.gitPushInfo).toHaveBeenCalledWith('one', 'dev'))
+
+  // Click push button in dialog
+  fireEvent.click(screen.getByRole('button', { name: /Push 2 commits/ }))
+  await waitFor(() => expect(mock.gitPush).toHaveBeenCalledWith('one', expect.objectContaining({ branch: 'dev' })))
 })
 
 it('switches branches and warns about running sessions and uncommitted work', async () => {
@@ -142,4 +187,28 @@ it('creates a branch from the search box', async () => {
   fireEvent.change(search, { target: { value: 'feature/new' } })
   fireEvent.click(await screen.findByText(/Create branch/))
   await waitFor(() => expect(mock.gitSwitch).toHaveBeenCalledWith('one', 'feature/new', { create: true, stash: false }))
+})
+
+it('supports multi-file checkbox selection for git add and git restore', async () => {
+  const mock = api([
+    { path: 'file1.ts', status: 'modified', worktreeStatus: 'modified', staged: false, unstaged: true },
+    { path: 'file2.ts', status: 'modified', worktreeStatus: 'modified', staged: false, unstaged: true }
+  ])
+  window.workspace = mock as any
+  render(<Provider><GitReviewButton sessionId="one" visible /></Provider>)
+  fireEvent.click(await screen.findByTitle('Review 2 changed files'))
+
+  // Initially shows "git add ."
+  expect(screen.getByText('git add .')).toBeTruthy()
+
+  // Check file1 checkbox
+  const check1 = screen.getByRole('checkbox', { name: 'Select file1.ts in Changes' })
+  fireEvent.click(check1)
+
+  // Button changes to "git add (1)"
+  expect(await screen.findByText('git add (1)')).toBeTruthy()
+
+  // Click git add (1)
+  fireEvent.click(screen.getByText('git add (1)'))
+  await waitFor(() => expect(mock.gitStage).toHaveBeenCalledWith('one', ['file1.ts']))
 })

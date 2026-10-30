@@ -27,6 +27,7 @@ import { RouterService } from './router-service'
 import { routerKeys, routerCreateKey } from './router-keys'
 import { routerHealth } from './router-health'
 import type { PluginAction } from '../shared/plugins'
+import type { GitPushOptions } from '../shared/types'
 import { GitService } from './git'
 import { generateCommitMessage, routerChatModels } from './commit-message'
 
@@ -206,13 +207,14 @@ function registerIPC() {
     },
     'git:status': (id: string) => git.status(sessionCwd(id)),
     'git:diff': (id: string, file: string, area) => git.diff(sessionCwd(id), file, area),
-    'git:stage': (id: string, file: string) => git.stage(sessionCwd(id), file),
-    'git:unstage': (id: string, file: string) => git.unstage(sessionCwd(id), file),
+    'git:stage': (id: string, file: string | string[]) => git.stage(sessionCwd(id), file),
+    'git:unstage': (id: string, file: string | string[]) => git.unstage(sessionCwd(id), file),
     'git:stage-all': (id: string) => git.stageAll(sessionCwd(id)),
     'git:unstage-all': (id: string) => git.unstageAll(sessionCwd(id)),
     'git:discard': (id: string, file: string) => git.discard(sessionCwd(id), file),
     'git:commit': (id: string, message: string) => git.commit(sessionCwd(id), message),
-    'git:push': (id: string) => git.push(sessionCwd(id)),
+    'git:push': (id: string, options?: GitPushOptions) => git.push(sessionCwd(id), options),
+    'git:push-info': (id: string, branch?: string) => git.pushInfo(sessionCwd(id), branch),
     'git:commit-models': () => routerChatModels(),
     'git:generate-message': async (id: string, model: string) =>
       generateCommitMessage(model, await git.commitContext(sessionCwd(id))),

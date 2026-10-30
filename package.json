@@ -64,7 +64,10 @@
       "resources/icons/**/*"
     ],
     "extraResources": [
-      { "from": "resources/meeting-extension.mjs", "to": "meeting-extension.mjs" }
+      {
+        "from": "resources/meeting-extension.mjs",
+        "to": "meeting-extension.mjs"
+      }
     ],
     "asarUnpack": [
       "node_modules/node-pty/**/*",
@@ -84,7 +87,9 @@
       ],
       "signAndEditExecutable": true
     },
-    "nsis": { "include": "resources/windows-context-menu.nsh" },
+    "nsis": {
+      "include": "resources/windows-context-menu.nsh"
+    },
     "artifactName": "Shumora-${version}-${os}-${arch}.${ext}",
     "mac": {
       "icon": "resources/icons/icon.png",
@@ -102,5 +107,12 @@
         "releaseType": "release"
       }
     ]
+  },
+  "allowScripts": {
+    "better-sqlite3@13.0.3": true,
+    "electron-winstaller@5.4.0": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "node-pty@1.1.0": true
   }
 }

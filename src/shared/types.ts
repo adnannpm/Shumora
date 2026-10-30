@@ -31,6 +31,7 @@ export interface GitRepoStatus {
   isRepo: boolean; root?: string; branch?: string; detached?: boolean; hasHead?: boolean
   upstream?: string; ahead?: number; behind?: number; operation?: GitOperation
   changes: GitFileChange[]; truncated?: boolean
+  lastCommit?: GitCommitSummary
 }
 export type GitDiffArea = 'staged' | 'unstaged'
 export interface GitDiff { path: string; area: GitDiffArea; untracked: boolean; binary: boolean; tooLarge: boolean; patch: string }
@@ -38,6 +39,17 @@ export interface GitBranch { name: string; current: boolean; upstream?: string; 
 export interface GitRemoteBranch { name: string; localName: string; date?: string }
 export interface GitBranches { current?: string; local: GitBranch[]; remote: GitRemoteBranch[] }
 export interface GitSwitchOptions { create?: boolean; stash?: boolean }
+export interface GitCommitSummary { hash: string; subject: string; date: string; author?: string }
+export interface GitPushInfo {
+  branch: string
+  remote?: string
+  upstream?: string
+  hasUpstream: boolean
+  ahead: number
+  behind: number
+  commits: GitCommitSummary[]
+}
+export interface GitPushOptions { branch?: string; remote?: string; setUpstream?: boolean; force?: boolean }
 export interface WorkspaceAPI {
   notificationsEnabled?(): Promise<boolean>
   setNotificationsEnabled?(enabled: boolean): Promise<void>
@@ -55,13 +67,14 @@ export interface WorkspaceAPI {
   onEvent(callback: (event: SessionEvent) => void): () => void
   gitStatus(id: string): Promise<GitRepoStatus>
   gitDiff(id: string, path: string, area: GitDiffArea): Promise<GitDiff>
-  gitStage(id: string, path: string): Promise<void>
-  gitUnstage(id: string, path: string): Promise<void>
+  gitStage(id: string, path: string | string[]): Promise<void>
+  gitUnstage(id: string, path: string | string[]): Promise<void>
   gitStageAll(id: string): Promise<void>
   gitUnstageAll(id: string): Promise<void>
   gitDiscard(id: string, path: string): Promise<void>
   gitCommit(id: string, message: string): Promise<{ hash: string }>
-  gitPush(id: string): Promise<void>
+  gitPush(id: string, options?: GitPushOptions): Promise<void>
+  gitPushInfo(id: string, branch?: string): Promise<GitPushInfo>
   gitCommitModels(): Promise<string[]>
   gitGenerateMessage(id: string, model: string): Promise<string>
   gitBranches(id: string): Promise<GitBranches>

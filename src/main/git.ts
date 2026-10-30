@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import type { GitBranches, GitChangeKind, GitDiff, GitDiffArea, GitFileChange, GitLineStats, GitOperation, GitRepoStatus, GitSwitchOptions } from '../shared/types'
+import type { GitBranches, GitChangeKind, GitCommitSummary, GitDiff, GitDiffArea, GitFileChange, GitLineStats, GitOperation, GitPushInfo, GitPushOptions, GitRepoStatus, GitSwitchOptions } from '../shared/types'
 
 export const MAX_DIFF_BYTES = 512 * 1024
 export const MAX_MESSAGE = 10_000
@@ -88,7 +88,7 @@ export function parseNumstat(out: string) {
 }
 
 const OPERATIONS: [string, GitOperation][] = [['MERGE_HEAD', 'merge'], ['rebase-merge', 'rebase'], ['rebase-apply', 'rebase'], ['CHERRY_PICK_HEAD', 'cherry-pick'], ['REVERT_HEAD', 'revert']]
-interface RepoState extends BranchInfo { root: string; head: boolean; operation?: GitOperation; changes: GitFileChange[] }
+interface RepoState extends BranchInfo { root: string; head: boolean; operation?: GitOperation; changes: GitFileChange[]; lastCommit?: GitCommitSummary }
 export interface CommitContext { recent: string[]; stat: string; patch: string; truncated: boolean }
 
 /**
@@ -104,7 +104,7 @@ export class GitService {
     const pending = this.inflight.get(cwd)
     if (pending) return pending
     const request = this.read(cwd).then((s): GitRepoStatus => s
-      ? { isRepo: true, root: s.root, branch: s.branch, detached: s.detached, hasHead: s.head, upstream: s.upstream, ahead: s.ahead, behind: s.behind, operation: s.operation, changes: s.changes.slice(0, MAX_CHANGES), truncated: s.changes.length > MAX_CHANGES }
+      ? { isRepo: true, root: s.root, branch: s.branch, detached: s.detached, hasHead: s.head, upstream: s.upstream, ahead: s.ahead, behind: s.behind, operation: s.operation, changes: s.changes.slice(0, MAX_CHANGES), truncated: s.changes.length > MAX_CHANGES, lastCommit: s.lastCommit }
       : { isRepo: false, changes: [] }
     ).finally(() => this.inflight.delete(cwd))
     this.inflight.set(cwd, request)
@@ -130,18 +130,34 @@ export class GitService {
     return { ...base, binary, tooLarge: false, patch: binary ? '' : result.stdout }
   }
 
-  async stage(cwd: string, file: string) {
-    const { root, change } = await this.find(cwd, file)
-    if (!change.unstaged) throw new Error('File has no unstaged changes')
-    await this.mutate(root, ['add', '-A', '--', ...paths(change)])
+  async stage(cwd: string, file: string | string[]) {
+    const files = Array.isArray(file) ? file : [file]
+    if (!files.length) return
+    const state = await this.require(cwd)
+    const allPaths: string[] = []
+    for (const f of files) {
+      const change = state.changes.find((c) => c.path === f)
+      if (!change) throw new Error(`File ${f} has no pending changes`)
+      if (!change.unstaged) throw new Error(`File ${f} has no unstaged changes`)
+      allPaths.push(...paths(change))
+    }
+    await this.mutate(state.root, ['add', '-A', '--', ...allPaths])
   }
 
   async stageAll(cwd: string) { await this.mutate(await this.root(cwd), ['add', '-A']) }
 
-  async unstage(cwd: string, file: string) {
-    const { root, head, change } = await this.find(cwd, file)
-    if (!change.staged) throw new Error('File has no staged changes')
-    await this.mutate(root, head ? ['restore', '--staged', '--', ...paths(change)] : ['rm', '--cached', '-r', '-q', '--', ...paths(change)])
+  async unstage(cwd: string, file: string | string[]) {
+    const files = Array.isArray(file) ? file : [file]
+    if (!files.length) return
+    const state = await this.require(cwd)
+    const allPaths: string[] = []
+    for (const f of files) {
+      const change = state.changes.find((c) => c.path === f)
+      if (!change) throw new Error(`File ${f} has no pending changes`)
+      if (!change.staged) throw new Error(`File ${f} has no staged changes`)
+      allPaths.push(...paths(change))
+    }
+    await this.mutate(state.root, state.head ? ['restore', '--staged', '--', ...allPaths] : ['rm', '--cached', '-r', '-q', '--', ...allPaths])
   }
 
   async unstageAll(cwd: string) {
@@ -177,17 +193,102 @@ export class GitService {
   }
 
   /** Pushes commits to the remote repository. */
-  async push(cwd: string): Promise<void> {
+  async push(cwd: string, options: GitPushOptions = {}): Promise<void> {
     const state = await this.require(cwd)
-    if (state.detached) throw new Error('Cannot push in detached HEAD state')
+    const branch = options.branch || state.branch
+    if (!branch) {
+      if (state.detached) throw new Error('Cannot push in detached HEAD state')
+      throw new Error('Cannot push without a branch')
+    }
     const args = ['push']
-    if (!state.upstream && state.branch) {
-      const remotes = await this.run(state.root, ['remote'])
-      const remoteList = remotes.stdout.split('\n').map((s) => s.trim()).filter(Boolean)
-      if (remoteList.length === 1) args.push('-u', remoteList[0], state.branch)
+    if (options.force) args.push('--force-with-lease')
+
+    const remotes = await this.run(state.root, ['remote'])
+    const remoteList = remotes.stdout.split('\n').map((s) => s.trim()).filter(Boolean)
+    const remote = options.remote || (remoteList.includes('origin') ? 'origin' : remoteList[0])
+
+    const upstreamOut = await this.run(state.root, ['rev-parse', '--abbrev-ref', `${branch}@{u}`])
+    const hasUpstream = upstreamOut.code === 0 && !!upstreamOut.stdout.trim()
+
+    if (options.setUpstream || (!hasUpstream && remote)) {
+      if (remote) args.push('-u', remote, branch)
+    } else if (options.branch && options.branch !== state.branch && remote) {
+      args.push(remote, branch)
     }
     const result = await this.run(state.root, args, { timeout: 120_000 })
     if (result.code) throw new Error((result.stderr || result.stdout).trim() || 'git push failed')
+  }
+
+  /** Details on unpushed commits and remote status for a branch before pushing. */
+  async pushInfo(cwd: string, targetBranch?: string): Promise<GitPushInfo> {
+    const state = await this.require(cwd)
+    const branch = targetBranch || state.branch
+    if (!branch) {
+      if (state.detached) throw new Error('Cannot push in detached HEAD state')
+      throw new Error('No branch selected')
+    }
+
+    const remotesOut = await this.run(state.root, ['remote'])
+    const remotes = remotesOut.stdout.split('\n').map((s) => s.trim()).filter(Boolean)
+    const remote = remotes.includes('origin') ? 'origin' : remotes[0]
+
+    const upstreamOut = await this.run(state.root, ['rev-parse', '--abbrev-ref', `${branch}@{u}`])
+    const hasUpstream = upstreamOut.code === 0 && !!upstreamOut.stdout.trim()
+    let upstream = hasUpstream ? upstreamOut.stdout.trim() : undefined
+
+    let targetRef: string | undefined = upstream
+    if (!targetRef && remote) {
+      const remoteRefOut = await this.run(state.root, ['rev-parse', '--verify', `${remote}/${branch}`])
+      if (remoteRefOut.code === 0) {
+        targetRef = `${remote}/${branch}`
+        upstream = `${remote}/${branch}`
+      }
+    }
+
+    let behind = 0
+    let ahead = 0
+    const commits: GitCommitSummary[] = []
+
+    if (targetRef) {
+      const [behindOut, logOut] = await Promise.all([
+        this.run(state.root, ['rev-list', '--count', `${branch}..${targetRef}`]),
+        this.run(state.root, ['log', `${targetRef}..${branch}`, '--format=%h%x00%s%x00%cr%x00%an', '-n', '50'])
+      ])
+      behind = Number(behindOut.stdout.trim()) || 0
+      if (!logOut.code && logOut.stdout.trim()) {
+        for (const line of logOut.stdout.split('\n')) {
+          if (!line.trim()) continue
+          const [hash, subject, date, author] = line.split('\0')
+          commits.push({ hash, subject: subject || '', date: date || '', author: author || undefined })
+        }
+      }
+      ahead = commits.length
+    } else {
+      let base: string | undefined
+      if (remote) {
+        for (const candidate of [`${remote}/HEAD`, `${remote}/main`, `${remote}/master`, 'main', 'master']) {
+          const mb = await this.run(state.root, ['merge-base', branch, candidate])
+          if (mb.code === 0 && mb.stdout.trim()) {
+            base = mb.stdout.trim()
+            break
+          }
+        }
+      }
+      const logArgs = base
+        ? ['log', `${base}..${branch}`, '--format=%h%x00%s%x00%cr%x00%an', '-n', '50']
+        : ['log', '-n', '20', branch, '--format=%h%x00%s%x00%cr%x00%an']
+      const logOut = await this.run(state.root, logArgs)
+      if (!logOut.code && logOut.stdout.trim()) {
+        for (const line of logOut.stdout.split('\n')) {
+          if (!line.trim()) continue
+          const [hash, subject, date, author] = line.split('\0')
+          commits.push({ hash, subject: subject || '', date: date || '', author: author || undefined })
+        }
+      }
+      ahead = commits.length
+    }
+
+    return { branch, remote, upstream, hasUpstream, ahead, behind, commits }
   }
 
   /** Recent subjects and the staged diff, used to draft a commit message in the repository's style. */
@@ -278,11 +379,18 @@ export class GitService {
     const top = await this.run(cwd, ['rev-parse', '--show-toplevel', '--absolute-git-dir']).catch(() => undefined)
     if (!top || top.code) return undefined
     const [root, gitDir] = top.stdout.trim().split('\n')
-    const [status, headCheck] = await Promise.all([
+    const [status, headCheck, lastCommitOut] = await Promise.all([
       this.run(root, ['status', '--porcelain=v1', '-z', '-b', '-uall']),
-      this.run(root, ['rev-parse', '--verify', '--quiet', 'HEAD'])
+      this.run(root, ['rev-parse', '--verify', '--quiet', 'HEAD']),
+      this.run(root, ['log', '-1', '--format=%h%x00%s%x00%cr', 'HEAD'])
     ])
     if (status.code) throw new Error(status.stderr.trim() || 'git status failed')
+    const hasHead = headCheck.code === 0
+    let lastCommit: GitCommitSummary | undefined
+    if (hasHead && lastCommitOut.code === 0 && lastCommitOut.stdout.trim()) {
+      const [hash, subject, date] = lastCommitOut.stdout.trim().split('\0')
+      if (hash) lastCommit = { hash, subject: subject || '', date: date || '' }
+    }
     const parsed = parseStatus(status.stdout)
     if (parsed.changes.some((c) => c.staged || (c.unstaged && c.status !== 'untracked'))) {
       const [staged, unstaged] = await Promise.all([
@@ -297,7 +405,7 @@ export class GitService {
       }
     }
     const operation = gitDir ? OPERATIONS.find(([file]) => existsSync(path.join(gitDir, file)))?.[1] : undefined
-    return { ...parsed, root, head: headCheck.code === 0, operation }
+    return { ...parsed, root, head: hasHead, operation, lastCommit }
   }
 }
 
