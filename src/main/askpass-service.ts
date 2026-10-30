@@ -12,6 +12,7 @@ export class AskPassService {
   private port = 0
   private token = randomUUID()
   private cache = new Map<string, string>()
+  private skipped = new Set<string>()
   private pending = new Map<string, (res: GitAskPassResponse) => void>()
   private scriptPath = ''
   private jsPath = ''
@@ -67,6 +68,7 @@ export class AskPassService {
 
   clearCache(): void {
     this.cache.clear()
+    this.skipped.clear()
   }
 
   dispose(): void {
@@ -179,6 +181,13 @@ req.end();
           this.cache.delete(key)
         }
 
+        // If this key was marked as skipped, reject immediately so SSH tries the next key
+        if (key && this.skipped.has(key)) {
+          res.writeHead(403)
+          res.end(JSON.stringify({ error: 'Skipped' }))
+          return
+        }
+
         // Return cached passphrase if available
         if (key && this.cache.has(key)) {
           const passphrase = this.cache.get(key)!
@@ -203,6 +212,15 @@ req.end();
         void this.handler({ requestId, prompt, key, isUsername })
 
         const reply = await promise
+        if (reply.skip || (reply.canceled && reply.remember)) {
+          if (key && reply.remember) {
+            this.skipped.add(key)
+          }
+          res.writeHead(403)
+          res.end(JSON.stringify({ error: 'Skipped' }))
+          return
+        }
+
         if (reply.canceled || reply.passphrase === undefined) {
           res.writeHead(403)
           res.end(JSON.stringify({ error: 'Canceled' }))

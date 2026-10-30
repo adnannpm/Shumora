@@ -61,6 +61,7 @@ export interface GitAskPassResponse {
   passphrase?: string
   remember?: boolean
   canceled?: boolean
+  skip?: boolean
 }
 export interface WorkspaceAPI {
   notificationsEnabled?(): Promise<boolean>

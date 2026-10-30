@@ -44,9 +44,20 @@ export function GitAskPassModal() {
     }
   }
 
+  const handleSkip = () => {
+    const current = request
+    setRequest(undefined)
+    if (current && window.workspace?.gitAskPassReply) {
+      void window.workspace.gitAskPassReply({
+        requestId: current.requestId,
+        skip: true,
+        remember
+      })
+    }
+  }
+
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault()
-    if (!passphrase && !request.isUsername) return
     const current = request
     setRequest(undefined)
     if (current && window.workspace?.gitAskPassReply) {
@@ -156,17 +167,33 @@ export function GitAskPassModal() {
                     <span>Remember for this session (stored in memory)</span>
                   </label>
                 )}
+
+                {!request.isUsername && (
+                  <div className="git-askpass-hint">
+                    💡 Jika Anda memakai kunci lain (seperti <code>id_ed25519</code>) atau tidak ingin memakai kunci ini, klik <strong>Skip Key</strong>. Jika kunci ini tanpa passphrase, langsung klik <strong>Unlock &amp; Continue</strong>.
+                  </div>
+                )}
               </Dialog.Body>
 
               <Dialog.Footer className="git-askpass-footer">
                 <Button size="sm" variant="outline" type="button" onClick={handleCancel}>
                   Cancel
                 </Button>
+                {!request.isUsername && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    onClick={handleSkip}
+                    title="Skip this key so Git tries other keys"
+                  >
+                    Skip Key
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   className="git-action-primary"
                   type="submit"
-                  disabled={!passphrase.trim() && !request.isUsername}
                 >
                   Unlock & Continue
                 </Button>

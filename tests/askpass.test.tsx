@@ -130,6 +130,34 @@ describe('AskPassService', () => {
 
     expect(res.status).toBe(403)
   })
+
+  it('remembers skipped keys and immediately rejects them', async () => {
+    await service.start()
+    const handler = vi.fn(async (req: GitAskPassRequest) => {
+      service.submitReply({ requestId: req.requestId, skip: true, remember: true })
+      return { requestId: req.requestId }
+    })
+    service.setHandler(handler)
+
+    const env = service.getEnv()
+    // First request: handler is called, marks key as skipped
+    const res = await fetch(`http://127.0.0.1:${env.SHUMORA_ASKPASS_PORT}/askpass`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${env.SHUMORA_ASKPASS_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: "Enter passphrase for key '/home/user/.ssh/id_rsa': " })
+    })
+    expect(res.status).toBe(403)
+    expect(handler).toHaveBeenCalledTimes(1)
+
+    // Second request: rejected immediately from skipped set without calling handler
+    const res2 = await fetch(`http://127.0.0.1:${env.SHUMORA_ASKPASS_PORT}/askpass`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${env.SHUMORA_ASKPASS_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: "Enter passphrase for key '/home/user/.ssh/id_rsa': " })
+    })
+    expect(res2.status).toBe(403)
+    expect(handler).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('GitAskPassModal UI', () => {
@@ -215,6 +243,59 @@ describe('GitAskPassModal UI', () => {
 
     await waitFor(() => {
       expect(screen.queryByText('SSH Key Passphrase')).toBeNull()
+    })
+  })
+
+  it('allows submitting an empty passphrase and clicking skip key', async () => {
+    let askPassListener: ((req: GitAskPassRequest) => void) | undefined
+    const gitAskPassReply = vi.fn(async () => {})
+
+    window.workspace = {
+      onGitAskPass: (callback: (req: GitAskPassRequest) => void) => {
+        askPassListener = callback
+        return () => { askPassListener = undefined }
+      },
+      gitAskPassReply
+    } as any
+
+    render(<Provider><GitAskPassModal /></Provider>)
+
+    // 1. Test empty passphrase submission
+    askPassListener?.({
+      requestId: 'req-empty',
+      prompt: "Enter passphrase for key '/home/hakim/.ssh/id_rsa': ",
+      key: '/home/hakim/.ssh/id_rsa'
+    })
+
+    const submitBtn = await screen.findByRole('button', { name: 'Unlock & Continue' })
+    // Button should NOT be disabled when passphrase is empty
+    expect(submitBtn.hasAttribute('disabled')).toBe(false)
+    fireEvent.click(submitBtn)
+
+    await waitFor(() => {
+      expect(gitAskPassReply).toHaveBeenCalledWith({
+        requestId: 'req-empty',
+        passphrase: '',
+        remember: true
+      })
+    })
+
+    // 2. Test Skip Key button
+    askPassListener?.({
+      requestId: 'req-skip',
+      prompt: "Enter passphrase for key '/home/hakim/.ssh/id_rsa': ",
+      key: '/home/hakim/.ssh/id_rsa'
+    })
+
+    const skipBtn = await screen.findByRole('button', { name: 'Skip Key' })
+    fireEvent.click(skipBtn)
+
+    await waitFor(() => {
+      expect(gitAskPassReply).toHaveBeenCalledWith({
+        requestId: 'req-skip',
+        skip: true,
+        remember: true
+      })
     })
   })
 })
