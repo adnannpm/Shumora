@@ -1,9 +1,12 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, nativeTheme, Notification } from 'electron'
 import { homedir } from 'node:os'
+import { openFolderArgument } from './open-folder'
+import { collectDiagnostics } from './diagnostics'
 import { join } from 'node:path'
 import { statSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { SessionManager } from './sessions'
+import { loadTerminals, saveTerminals } from './workspace-state'
 import { MeetingBridge } from './meeting-bridge'
 import { meetingExtensionPath } from './meeting-extension-path'
 import { MeetingManager } from './meetings'
@@ -24,7 +27,9 @@ import { RouterService } from './router-service'
 import { routerKeys, routerCreateKey } from './router-keys'
 import { routerHealth } from './router-health'
 import type { PluginAction } from '../shared/plugins'
+import type { GitPushOptions, GitAskPassResponse } from '../shared/types'
 import { GitService } from './git'
+import { AskPassService } from './askpass-service'
 import { generateCommitMessage, routerChatModels } from './commit-message'
 
 process.env.PATH = enrichedPath(process.platform, process.env)
@@ -32,8 +37,46 @@ process.env.PATH = enrichedPath(process.platform, process.env)
 let window: BrowserWindow | undefined
 let folder = homedir()
 let closing = false
+let rendererReady = false
+let terminalStatePath: string | undefined
+let restoringTerminals = false
+const pendingFolders: string[] = []
+const primaryInstance = app.requestSingleInstanceLock()
+if (!primaryInstance) app.quit()
+app.on('second-instance', (_event, argv) => {
+  const target = openFolderArgument(argv)
+  if (target) { pendingFolders.push(target); if (rendererReady) flushFolders() }
+  if (window?.isMinimized()) window.restore()
+  window?.show(); window?.focus()
+})
+function flushFolders() {
+  while (pendingFolders.length) {
+    const target = pendingFolders.shift()!
+    try {
+      if (packages.operation().status === 'running') throw new Error('Wait for the package operation to finish before opening a folder.')
+      if (sessions.list().length >= 32) throw new Error('Workspace supports up to 32 sessions.')
+      const session = sessions.create(target)
+      window?.webContents.send('sessions:event', { type: 'opened', session })
+    } catch (error) { void dialog.showMessageBox({ type: 'error', title: 'Open in Shumora', message: String(error) }) }
+  }
+}
 let database: ReturnType<typeof openDatabase> | undefined
-const bridge = new MeetingBridge(() => publishMeeting())
+let agentNotifications = true
+const bridge = new MeetingBridge(() => publishMeeting(), 180000, (id, generation, activity) => {
+  if (!sessions.setActivity(id, generation, activity)) return
+  if (!agentNotifications || !['done', 'error'].includes(activity) || !window || window.isFocused() || !Notification.isSupported()) return
+  const session = sessions.list().find(s => s.id === id)
+  if (!session) return
+  const notification = new Notification({ title: session.name, body: activity === 'done' ? 'Agent finished' : 'Agent encountered an error' })
+  notification.on('click', () => {
+    const current = sessions.list().find(s => s.id === id)
+    if (!current || !window || window.isDestroyed()) return
+    if (window.isMinimized()) window.restore()
+    window.show(); window.focus()
+    window.webContents.send('sessions:event', { type: 'opened', session: current })
+  })
+  notification.show()
+})
 const meetings = new MeetingManager(bridge, () => publishMeeting())
 function meetingSnapshot() {
   return { state: meetings.snapshot(), agents: Object.fromEntries(sessions.list().map(s => [s.id, s.status === 'running' ? bridge.status(s.id) : 'disconnected'])) }
@@ -54,17 +97,21 @@ const sessions = new SessionManager((cwd, id, generation) => {
   if (event.type === 'removed' || (event.type === 'state' && event.session.status !== 'running')) bridge.remove(event.type === 'removed' ? event.id : event.session.id)
   if (window && !window.isDestroyed()) window.webContents.send('sessions:event', event)
   if (event.type !== 'data') publishMeeting()
+  if (!restoringTerminals && terminalStatePath && (event.type === 'state' || event.type === 'removed')) {
+    try { saveTerminals(terminalStatePath, sessions.list()) } catch (error) { console.error('Could not save workspace terminals', error) }
+  }
 })
 
 let updates: UpdateManager
-const packages = new PackageService(fetchPackagePage, runPiPackage, () => { if (sessions.list().some(s => s.status === 'running')) throw new Error('Stop running Workspace sessions before installing a package.') }, operation => {
+const packages = new PackageService(fetchPackagePage, runPiPackage, () => {}, operation => {
   if (window && !window.isDestroyed()) window.webContents.send('packages:operation', operation)
-}, packageStatus)
+}, packageStatus, sessions)
 let plugins: PluginService
 let piPlugin: PluginService<'pi'>
 const router = new RouterService(routerHost)
 const catalog = new RouterCatalog()
-const git = new GitService((file) => shell.trashItem(file))
+const askPass = new AskPassService()
+const git = new GitService((file) => shell.trashItem(file), undefined, askPass)
 // Git calls take a session id; the working directory always comes from the main process.
 function sessionCwd(id: unknown) {
   const session = sessions.list().find((s) => s.id === id)
@@ -73,6 +120,13 @@ function sessionCwd(id: unknown) {
 }
 function registerIPC() {
   const handlers: Record<string, (...args: any[]) => unknown> = {
+    'agents:notifications': () => agentNotifications,
+    'agents:set-notifications': (enabled: unknown) => {
+      if (typeof enabled !== 'boolean') throw new Error('Invalid notification setting')
+      agentNotifications = enabled
+    },
+    'appearance:system-dark': () => nativeTheme.shouldUseDarkColors,
+    'diagnostics:run': () => collectDiagnostics(),
     'meetings:snapshot': () => meetingSnapshot(),
     'meetings:start': (input: MeetingInput) => {
       if (!input || !Array.isArray(input.participants)) throw new Error('Invalid meeting setup')
@@ -128,8 +182,13 @@ function registerIPC() {
     'updates:check': () => updates.check(),
     'updates:download': () => updates.download(),
     'updates:install': () => updates.install(),
-    'sessions:list': () => sessions.list(),
+    'sessions:list': () => {
+      rendererReady = true
+      setImmediate(flushFolders)
+      return sessions.list()
+    },
     'sessions:create': (cwd?: string) => {
+      if (packages.operation().status === 'running') throw new Error('Wait for the package operation to finish before starting sessions.')
       if (sessions.list().length >= 32) throw new Error('MVP supports up to 32 sessions per workspace')
       const target = cwd === undefined ? folder : cwd
       if (typeof target !== 'string' || !statSync(target).isDirectory()) throw new Error('Working directory is not a folder')
@@ -144,19 +203,27 @@ function registerIPC() {
       return true
     },
     'sessions:stop': (id: string) => sessions.stop(id),
-    'sessions:restart': (id: string) => sessions.restart(id),
+    'sessions:restart': (id: string) => {
+      if (packages.operation().status === 'running') throw new Error('Wait for the package operation to finish before starting sessions.')
+      return sessions.restart(id)
+    },
     'git:status': (id: string) => git.status(sessionCwd(id)),
     'git:diff': (id: string, file: string, area) => git.diff(sessionCwd(id), file, area),
-    'git:stage': (id: string, file: string) => git.stage(sessionCwd(id), file),
-    'git:unstage': (id: string, file: string) => git.unstage(sessionCwd(id), file),
+    'git:stage': (id: string, file: string | string[]) => git.stage(sessionCwd(id), file),
+    'git:unstage': (id: string, file: string | string[]) => git.unstage(sessionCwd(id), file),
     'git:stage-all': (id: string) => git.stageAll(sessionCwd(id)),
     'git:unstage-all': (id: string) => git.unstageAll(sessionCwd(id)),
     'git:discard': (id: string, file: string) => git.discard(sessionCwd(id), file),
     'git:commit': (id: string, message: string) => git.commit(sessionCwd(id), message),
+    'git:push': (id: string, options?: GitPushOptions) => git.push(sessionCwd(id), options),
+    'git:push-info': (id: string, branch?: string) => git.pushInfo(sessionCwd(id), branch),
     'git:commit-models': () => routerChatModels(),
     'git:generate-message': async (id: string, model: string) =>
       generateCommitMessage(model, await git.commitContext(sessionCwd(id))),
     'git:branches': (id: string) => git.branches(sessionCwd(id)),
+    'git:askpass-reply': (response: GitAskPassResponse) => {
+      askPass.submitReply(response)
+    },
     'git:switch': (id: string, branch: string, options: unknown) => {
       const o = (options && typeof options === 'object' ? options : {}) as Record<string, unknown>
       return git.switchBranch(sessionCwd(id), branch, {
@@ -188,6 +255,8 @@ function createWindow() {
     icon: join(__dirname, '../../resources/icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     webPreferences: { preload: join(__dirname, '../preload/index.js'), nodeIntegration: false, contextIsolation: true, sandbox: true }
   })
+  rendererReady = false
+  window.webContents.on('did-start-loading', () => { rendererReady = false })
   window.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const target = new URL(url)
@@ -203,7 +272,7 @@ function createWindow() {
     event.preventDefault()
     const choice = dialog.showMessageBoxSync(window!, {
       type: 'warning', title: 'Close Shumora?', message: 'Stop all running Pi sessions and close?',
-      detail: 'Hidden sessions are still running. Closing this app stops their processes. Conversation resume is not managed by this MVP.',
+      detail: 'Your terminal tabs, folders and layout are saved automatically. Closing stops running processes; reopening starts fresh Pi processes, not previous conversations.',
       buttons: ['Keep working', 'Stop sessions and close'], defaultId: 0, cancelId: 0
     })
     if (choice === 1) { closing = true; sessions.dispose(); window?.close() }
@@ -213,8 +282,18 @@ function createWindow() {
   else void window.loadFile(join(__dirname, '../renderer/index.html'))
 }
 
-app.whenReady().then(async () => {
+if (primaryInstance) app.whenReady().then(async () => {
+  nativeTheme.themeSource = 'system'
+  nativeTheme.on('updated', () => {
+    if (window && !window.isDestroyed()) window.webContents.send('appearance:system-theme', nativeTheme.shouldUseDarkColors)
+  })
   await bridge.listen()
+  askPass.setHandler(async (request) => {
+    if (!window || window.isDestroyed()) return { requestId: request.requestId, canceled: true }
+    window.webContents.send('git:askpass-request', request)
+    return { requestId: request.requestId }
+  })
+  await askPass.start()
   database = openDatabase(app.getPath('userData'))
   plugins = new PluginService(database, pluginHost, operation => {
     if (window && !window.isDestroyed()) window.webContents.send('plugins:operation', operation)
@@ -233,7 +312,21 @@ app.whenReady().then(async () => {
     closing = true
   }, unsupported)
   registerIPC()
-  sessions.create(folder)
+  const requestedFolder = openFolderArgument(process.argv)
+  folder = requestedFolder || folder
+  terminalStatePath = join(app.getPath('userData'), 'workspace-terminals.json')
+  const savedTerminals = loadTerminals(terminalStatePath)
+  restoringTerminals = true
+  try {
+    if (savedTerminals !== null) {
+      for (const terminal of savedTerminals) sessions.create(terminal.cwd, terminal)
+    } else if (!requestedFolder) sessions.create(folder)
+    if (requestedFolder) {
+      if (sessions.list().length < 32) sessions.create(requestedFolder)
+      else console.warn('Workspace is full; cannot open the requested folder.')
+    }
+  } finally { restoringTerminals = false }
+  try { saveTerminals(terminalStatePath, sessions.list()) } catch (error) { console.error('Could not save workspace terminals', error) }
   createWindow()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
@@ -244,4 +337,4 @@ app.on('before-quit', (event) => {
   void router.dispose().catch(() => {}).finally(() => { routerClosing = true; app.quit() })
 })
 let routerClosing = false
-app.on('will-quit', () => { meetings.stop(); bridge.dispose(); sessions.dispose(); database?.close(); database = undefined })
+app.on('will-quit', () => { meetings.stop(); bridge.dispose(); askPass.dispose(); sessions.dispose(); database?.close(); database = undefined })

@@ -33,7 +33,7 @@ export function Library({ onPluginStatus, initialPlugin = null }: { onPluginStat
   if (details) return <RouterDetails key={details} pi={details === 'pi'} onStatus={onPluginStatus} onBack={() => { setDetails(null); setTab('plugin') }} />
   if (selectedPackage) return <PackageDetails key={selectedPackage.name} item={selectedPackage} onBack={() => { setSelectedPackage(undefined); setPackageTarget(undefined) }} />
   return <main className="library-page flex min-w-0 flex-1 flex-col">
-    <header className="toolbar"><h1>{t("Library")}</h1></header>
+    <header className="toolbar"><h1>{t("Library")}</h1><LibraryUpdates onView={item => item.kind === 'package' ? setPackageTarget(item.name) : setDetails(item.id as 'pi' | '9router')} /></header>
     {packageError && <p className="plugin-error" role="alert">{t(packageError)}</p>}
     <Tabs.Root value={tab} onValueChange={({ value }) => setTab(value)} variant="line" fitted lazyMount unmountOnExit colorPalette="brand" className="library-tabs">
       <Tabs.List aria-label={t("Library categories")} className="library-tablist">
@@ -46,10 +46,9 @@ export function Library({ onPluginStatus, initialPlugin = null }: { onPluginStat
           query={query}
           onQueryChange={patch => setQuery(previous => ({ ...previous, ...patch }))}
           onSelect={setSelectedPackage}
-          banner={<LibraryUpdates scope="package" onView={item => setPackageTarget(item.name)} />}
         />
       </Tabs.Content>
-      <Tabs.Content value="plugin" className="library-content"><LibraryUpdates scope="plugin" onView={item => setDetails(item.id as 'pi' | '9router')} /><div className="plugin-library-grid"><RouterCard onOpen={() => setDetails('9router')} /><PiCard onOpen={() => setDetails('pi')} /></div></Tabs.Content>
+      <Tabs.Content value="plugin" className="library-content"><div className="plugin-library-grid"><RouterCard onOpen={() => setDetails('9router')} /><PiCard onOpen={() => setDetails('pi')} /></div></Tabs.Content>
     </Tabs.Root>
   </main>
 }

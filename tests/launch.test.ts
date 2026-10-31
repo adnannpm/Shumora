@@ -28,7 +28,27 @@ it('finds Windows cli.js under APPDATA when shim dir differs', () => {
   expect(resolveLaunch('win32', env, '', (p) => ok.includes(p))).toEqual({ file: ok[1], args: [ok[2]] })
 })
 
-import { enrichedPath } from '../src/main/launch'
+it('launches the official Windows managed installer with its launcher and bundled Node', () => {
+  const home = 'C:\\Users\\Alice Smith'
+  const local = `${home}\\AppData\\Local`
+  const bin = `${home}\\.pi\\agent\\bin`
+  const files = [bin, `${bin}\\pi.cmd`, `${bin}\\pi-launcher.js`, `${local}\\pi-node\\current`, `${local}\\pi-node\\current\\node.exe`]
+  const env = { USERPROFILE: home, LOCALAPPDATA: local }
+  expect(resolveLaunch('win32', env, '', p => files.includes(p))).toEqual({ file: files[4], args: [files[2]] })
+  expect(enrichedPath('win32', env, p => files.includes(p))).toContain(bin)
+})
+it('prefers the managed launcher over an unrelated global npm CLI', () => {
+  const bin = 'C:\\Users\\a\\.pi\\agent\\bin'
+  const files = [`${bin}\\pi.cmd`, `${bin}\\pi-launcher.js`, 'C:\\node\\node.exe', 'C:\\npm\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\cli.js']
+  expect(resolveLaunch('win32', { PI_EXECUTABLE: files[0], APPDATA: 'C:\\unused' }, 'C:\\node;C:\\npm', p => files.includes(p))).toEqual({ file: files[2], args: [files[1]] })
+})
+import { enrichedPath, windowsPiPackageCandidates } from '../src/main/launch'
+it('reads managed package metadata from the active release and rejects traversal versions', () => {
+  const bin = 'C:\\Users\\a\\.pi\\agent\\bin'
+  const marker = 'C:\\Users\\a\\.pi\\agent\\install\\current-version'
+  expect(windowsPiPackageCandidates({}, bin, p => { expect(p).toBe(marker); return '1.4.0\r\n' })).toContain('C:\\Users\\a\\.pi\\agent\\install\\releases\\1.4.0\\node_modules\\@earendil-works\\pi-coding-agent\\package.json')
+  for (const version of ['..', '../outside', 'C:\\outside']) expect(windowsPiPackageCandidates({}, bin, () => version).some(p => p.includes('releases'))).toBe(false)
+})
 it('enrichedPath appends existing fallback and shell dirs without duplicates', () => {
   const ok = ['/opt/homebrew/bin', '/x/nvm/bin', '/usr/bin']
   expect(enrichedPath('darwin', { HOME: '/Users/a', PATH: '/usr/bin:/bin' }, (p) => ok.includes(p), () => '/x/nvm/bin:/usr/bin')).toBe('/usr/bin:/bin:/x/nvm/bin:/opt/homebrew/bin')

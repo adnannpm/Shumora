@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { Session, SessionEvent, Snapshot } from '../shared/types'
+import type { AgentActivity, Session, SessionEvent, Snapshot } from '../shared/types'
 
 interface Disposable { dispose(): void }
 export interface PtyProcess {
@@ -21,14 +21,16 @@ export class SessionManager {
     return this.entries.get(id)!
   }
   private publish(e: Entry) { this.emit({ type: 'state', session: { ...e.session } }) }
-  create(cwd: string): Session {
+  create(cwd: string, saved?: { id: string; name: string }): Session {
     if (typeof cwd !== 'string' || !cwd) throw new Error('Invalid directory')
-    const e: Entry = { session: { id: randomUUID(), name: `Pi ${++this.count}`, cwd, status: 'exited', generation: 0 }, output: '', seq: 0, subscriptions: [] }
+    const name = `Pi ${++this.count}`
+    if (saved && this.entries.has(saved.id)) throw new Error('Duplicate session')
+    const e: Entry = { session: { id: saved?.id || randomUUID(), name: saved?.name || name, cwd, status: 'exited', generation: 0 }, output: '', seq: 0, subscriptions: [] }
     this.entries.set(e.session.id, e)
     return this.start(e)
   }
   private start(e: Entry): Session {
-    e.session = { ...e.session, generation: e.session.generation + 1, status: 'running', error: undefined, exitCode: undefined }
+    e.session = { ...e.session, generation: e.session.generation + 1, status: 'running', activity: 'disconnected', error: undefined, exitCode: undefined }
     e.output = ''; e.seq = 0
     const generation = e.session.generation
     try {
@@ -47,6 +49,13 @@ export class SessionManager {
       e.session.error = error instanceof Error ? error.message : String(error)
     }
     this.publish(e); return { ...e.session }
+  }
+  setActivity(id: string, generation: number, activity: AgentActivity) {
+    const e = this.entries.get(id)
+    if (!e || e.session.generation !== generation || e.session.status !== 'running' || e.session.activity === activity) return false
+    e.session.activity = activity
+    this.emit({ type: 'activity', id, generation, activity })
+    return true
   }
   rename(id: string, name: string): Session {
     const e = this.get(id)

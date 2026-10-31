@@ -1,6 +1,6 @@
 import { useLanguage } from './Language'
 import { useEffect, useReducer, useRef, useState, type CSSProperties } from 'react'
-import { Button, Dialog, Menu, Portal } from '@chakra-ui/react'
+import { Button, Dialog, Portal } from '@chakra-ui/react'
 import type { Session } from '../../shared/types'
 import { TerminalPane } from './TerminalPane'
 import { GitReviewButton } from './GitReview'
@@ -9,6 +9,7 @@ import { Settings } from './Settings'
 import { MeetingRoom } from './MeetingRoom'
 import { Library } from './Library'
 import { WorkspaceSetup } from './WorkspaceSetup'
+import { GitAskPassModal } from './GitAskPassModal'
 import { RouterDashboard } from './RouterDashboard'
 import type { RouterPlugin } from '../../shared/plugins'
 import { initialLayout, layoutReducer, layoutRects, type Layout } from './layout'
@@ -16,6 +17,12 @@ import { initialLayout, layoutReducer, layoutRects, type Layout } from './layout
 export default function App() {
   const { t } = useLanguage()
   const [sessions, setSessions] = useState<Session[]>([])
+  const [unread, setUnread] = useState<string[]>([])
+  useEffect(() => {
+    let enabled = true
+    try { enabled = window.localStorage.getItem('shumora.agent-notifications') !== 'false' } catch { /* Use default. */ }
+    void window.workspace?.setNotificationsEnabled?.(enabled).catch(() => {})
+  }, [])
   const [page, setPage] = useState<Page>('workspace')
   const [setupPlugin, setSetupPlugin] = useState<'pi' | '9router' | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -32,6 +39,16 @@ export default function App() {
     return () => { alive = false; window.removeEventListener('focus', check) }
   }, [])
   const [layout, dispatch] = useReducer(layoutReducer, initialLayout)
+  const [workspaceLoaded, setWorkspaceLoaded] = useState(false)
+  useEffect(() => {
+    if (!workspaceLoaded) return
+    try { window.localStorage.setItem('shumora.terminal-layout', JSON.stringify(layout)) } catch { /* Storage may be unavailable. */ }
+  }, [layout, workspaceLoaded])
+  const visibleState = useRef({ page, layout })
+  visibleState.current = { page, layout }
+  useEffect(() => {
+    if (page === 'workspace') setUnread(ids => ids.filter(id => !layout.groups.some(group => group.active === id)))
+  }, [page, layout])
   const [folder, setFolder] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -103,6 +120,20 @@ export default function App() {
     const pending: import('../../shared/types').SessionEvent[] = []
     function apply(event: import('../../shared/types').SessionEvent) {
       if (event.type === 'data') return
+      if (event.type === 'activity') {
+        setSessions(list => list.map(session => session.id === event.id && session.generation === event.generation ? { ...session, activity: event.activity } : session))
+        const view = visibleState.current
+        if (['done', 'error'].includes(event.activity) && (view.page !== 'workspace' || !view.layout.groups.some(group => group.active === event.id))) {
+          setUnread(ids => ids.includes(event.id) ? ids : [...ids, event.id])
+        }
+        return
+      }
+      if (event.type === 'opened') {
+        setSessions(list => list.some(s => s.id === event.session.id) ? list : [...list, event.session])
+        dispatch({ type: 'add', id: event.session.id, group: 0 })
+        setSetupPlugin(null); setPage('workspace')
+        return
+      }
       if (event.type === 'removed') {
         setSessions(list => list.filter(s => s.id !== event.id)); dispatch({ type: 'remove', id: event.id })
       } else setSessions(list => list.some(s => s.id === event.session.id) ? list.map(s => s.id === event.session.id ? event.session : s) : [...list, event.session])
@@ -110,8 +141,11 @@ export default function App() {
     const unsubscribe = window.workspace.onEvent(event => { if (!loaded) pending.push(event); else apply(event) })
     void Promise.all([window.workspace.list(), window.workspace.folder()]).then(([list, cwd]) => {
       if (disposed) return
-      setSessions(list); setFolder(cwd); dispatch({ type: 'init', ids: list.map(s => s.id) })
+      let saved: unknown
+      try { saved = JSON.parse(window.localStorage.getItem('shumora.terminal-layout') || 'null') } catch { /* Use the default layout. */ }
+      setSessions(list); setFolder(cwd); dispatch({ type: 'init', ids: list.map(s => s.id), saved })
       loaded = true; pending.forEach(apply)
+      setWorkspaceLoaded(true)
     }).catch(e => { if (!disposed) setError(String(e)) })
     return () => { disposed = true; unsubscribe() }
   }, [])
@@ -171,10 +205,16 @@ export default function App() {
         <h1>{t("Terminals")}</h1>
         <button className="folder-button workspace-folder" title={t("Active terminal folder. Click to open a new terminal in another folder.")} aria-label={t("New terminal in folder…")} disabled={busy} onClick={() => void add(layout.focused, undefined, true)}><span aria-hidden="true">▱</span><span title={activeSession?.cwd || folder}>{activeSession?.cwd || folder || t("Loading folder…")}</span></button>
         {focusedSession && <GitReviewButton key={focusedSession.id} sessionId={focusedSession.id} sessionName={focusedSession.name} sessions={sessions} visible={page === 'workspace'} />}
-        <div className="layout-switch" aria-label={t("Terminal layout")}>
-          <Button size="xs" variant="ghost" disabled={busy || !sessions.length || layout.groups.length >= 4} aria-label={needsPartner ? t("New session in split right") : t("Split right")} onClick={() => doSplit('right')}>{needsPartner ? t("+ Split right") : t("Split right")}</Button>
-          <Button size="xs" variant="ghost" disabled={busy || !sessions.length || layout.groups.length >= 4} aria-label={needsPartner ? t("New session in split down") : t("Split down")} onClick={() => doSplit('down')}>{needsPartner ? t("+ Split down") : t("Split down")}</Button>
-          {split && <Button size="xs" variant="ghost" onClick={() => dispatch({ type: 'merge' })}>{t("Merge groups")}</Button>}
+        <div className="layout-switch" role="group" aria-label={t("Terminal layout")}>
+          <button type="button" className="layout-icon-button" disabled={busy || !sessions.length || layout.groups.length >= 4} aria-label={needsPartner ? t("New session in split right") : t("Split right")} title={needsPartner ? t("New session in split right") : t("Split right")} onClick={() => doSplit('right')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M12 4v16" /></svg>
+          </button>
+          <button type="button" className="layout-icon-button" disabled={busy || !sessions.length || layout.groups.length >= 4} aria-label={needsPartner ? t("New session in split down") : t("Split down")} title={needsPartner ? t("New session in split down") : t("Split down")} onClick={() => doSplit('down')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M3 12h18" /></svg>
+          </button>
+          {split && <><span className="layout-switch-divider" aria-hidden="true" /><button type="button" className="layout-icon-button" aria-label={t("Merge groups")} title={t("Merge groups")} onClick={() => dispatch({ type: 'merge' })}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="m7 10 2 2-2 2m10-4-2 2 2 2M5 12h4m6 0h4" /></svg>
+          </button></>}
         </div>
       </header>
       {error && <div className="global-error" role="alert">{t(error)}<Button size="xs" variant="ghost" colorPalette="red" onClick={() => setError('')}>{t("Dismiss")}</Button></div>}
@@ -203,21 +243,14 @@ export default function App() {
                     if (event.key === 'Enter' || event.key === 'Escape') {
                       event.preventDefault(); finishRename(event.key === 'Enter', true)
                     }
-                  }} /> : <button role="tab" id={`tab-${id}`} aria-selected={group.active === id} aria-controls={`panel-${id}`} title={s.name} tabIndex={group.active === id ? 0 : -1} onClick={() => dispatch({ type: 'select', group: index, id })} onDoubleClick={() => {
+                  }} /> : <button role="tab" id={`tab-${id}`} aria-selected={group.active === id} aria-controls={`panel-${id}`} aria-label={s.name} title={s.name} tabIndex={group.active === id ? 0 : -1} onClick={() => dispatch({ type: 'select', group: index, id })} onDoubleClick={() => {
                   endSlide(); dispatch({ type: 'select', group: index, id }); renameDone.current = false; setRenaming({ id, name: s.name })
-                }}><span className={`status-dot ${s.status}`} aria-hidden="true" /><span className="session-tab-name">{s.name}</span></button>}
+                }}><span className={`status-dot ${s.status}`} aria-hidden="true" /><span className="session-tab-name">{s.name}</span>{s.status === 'running' && s.activity && <span className={`agent-tab-status agent-${s.activity}`}>{t(({ working: 'Working', waiting: 'Waiting for input', done: 'Done', error: 'Agent error', disconnected: 'Status unavailable' })[s.activity])}</span>}{unread.includes(id) && <span className="agent-unread" aria-label={t('Unread agent update')}>●</span>}</button>}
                 <button className="close-tab" aria-label={t("Close {name}", { name: s.name })} title={t("Close {name}", { name: s.name })} disabled={closing.includes(id)} onClick={() => { if (s.status === 'running') setCloseTarget(s); else void close(id) }}>×</button>
               </div>
             })}
           </div>
           <Button size="xs" variant="ghost" flexShrink="0" aria-label={t("New session in group {number}", { number: index + 1 })} title={t("New session")} disabled={busy} onClick={() => void add(index)}>＋</Button>
-          <Menu.Root positioning={{ placement: 'bottom-end' }}>
-            <Menu.Trigger asChild><Button size="xs" variant="ghost" flexShrink="0" aria-label={t("New session options in group {number}", { number: index + 1 })} disabled={busy}>▾</Button></Menu.Trigger>
-            <Portal><Menu.Positioner><Menu.Content>
-              <Menu.Item value="new" onClick={() => void add(index)}>{t("New terminal")}</Menu.Item>
-              <Menu.Item value="folder" onClick={() => void add(index, undefined, true)}>{t("New terminal in folder…")}</Menu.Item>
-            </Menu.Content></Menu.Positioner></Portal>
-          </Menu.Root>
           {split && <Button size="xs" variant="ghost" flexShrink="0" aria-label={t("Move active tab from group {number} to other group", { number: index + 1 })} title={t("Move active tab to other group")} disabled={busy} onClick={() => dispatch({ type: 'move', group: index })}>⇄</Button>}
         </div>)}
         {sessions.map(session => {
@@ -249,6 +282,7 @@ export default function App() {
     {page === 'library' && <Library initialPlugin={setupPlugin} onPluginStatus={pluginStatus} />}
     {page === '9router' && routerInstalled && <RouterDashboard />}
     <WorkspaceSetup active={page === 'workspace'} onSetup={id => { setSetupPlugin(id); setPage('library') }} />
+    <GitAskPassModal />
     <Dialog.Root role="alertdialog" open={closeTarget !== null} placement="center" size="sm" initialFocusEl={() => cancelClose.current} closeOnInteractOutside={false} onOpenChange={({ open }) => { if (!open && !closing.length) setCloseTarget(null) }}>
       <Portal>
         <Dialog.Backdrop />

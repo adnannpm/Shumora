@@ -18,10 +18,24 @@ it('switches and persists app theme, restores it on remount, and keeps terminal 
   expect(window.localStorage.getItem('shumora.theme')).toBe('dark')
   view.unmount(); render(<Provider><Settings /></Provider>)
   expect(screen.getByRole('radio', { name: 'Dark' }).getAttribute('aria-checked')).toBe('true')
-  fireEvent.click(screen.getByRole('button', { name: 'Terminal' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
   expect(screen.getByText('Always dark')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'About' }))
-  expect(screen.getByRole('heading', { name: 'About Shumora' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'About & Updates' }))
+  expect(screen.getByRole('heading', { name: 'About & Updates' })).toBeTruthy()
+})
+it('groups settings into three consistent pages with troubleshooting inside Workspace', () => {
+  const view = render(<Provider><Settings /></Provider>)
+  const nav = screen.getByRole('navigation', { name: 'Settings sections' })
+  expect([...nav.querySelectorAll('button')].map(button => button.textContent)).toEqual(['General', 'Workspace', 'About & Updates'])
+  const content = view.container.querySelector('.settings-content')!
+  for (const name of ['General', 'Workspace', 'About & Updates']) {
+    fireEvent.click(screen.getByRole('button', { name }))
+    expect(content.classList.contains('settings-content-wide')).toBe(true)
+    expect(content.querySelectorAll('h2')).toHaveLength(1)
+  }
+  fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
+  expect(screen.getByRole('button', { name: 'Run diagnostics' })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Troubleshooting' })).toBeTruthy()
 })
 function mockSystemTheme(dark: boolean) {
   const changes = new EventTarget()

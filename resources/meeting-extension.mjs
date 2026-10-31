@@ -5,7 +5,7 @@ export default function meetingExtension(pi, dependencies = {}) {
   const env = dependencies.env || process.env
   const port = Number(env.SHUMORA_MEETING_PORT), token = env.SHUMORA_MEETING_TOKEN
   if (!Number.isInteger(port) || port < 1 || port > 65535 || !token) return
-  let socket, context, pending, buffer = '', closed = false
+  let socket, context, pending, buffer = '', closed = false, agentFailed = false
   const send = record => { if (socket && !closed) socket.write(JSON.stringify(record) + '\n') }
   const state = () => send({ type: 'state', idle: !pending && !!context?.isIdle() })
   const restore = () => { if (pending) pi.setActiveTools(pending.tools); pending = undefined }
@@ -37,7 +37,7 @@ export default function meetingExtension(pi, dependencies = {}) {
       }
     })
   })
-  pi.on('agent_start', (_event, ctx) => { context = ctx; state() })
+  pi.on('agent_start', (_event, ctx) => { context = ctx; agentFailed = false; send({ type: 'activity', status: 'working' }); state() })
   pi.on('input', event => {
     if (!pending) return
     if (pending.accepting && event.source === 'extension' && event.text === pending.prompt) { pending.accepting = false; return }
@@ -46,8 +46,10 @@ export default function meetingExtension(pi, dependencies = {}) {
   pi.on('user_bash', () => pending ? { operations: [] } : undefined)
   pi.on('tool_call', () => pending ? { block: true, reason: 'Meeting discussion does not allow tools' } : undefined)
   pi.on('message_end', event => {
-    if (!pending || event.message.role !== 'assistant') return
+    if (event.message.role !== 'assistant') return
     const message = event.message
+    agentFailed = message.stopReason === 'error'
+    if (!pending) return
     if (message.stopReason === 'error' || message.stopReason === 'aborted') pending.error = message.errorMessage || 'Meeting agent failed'
     else {
       pending.error = ''
@@ -56,6 +58,7 @@ export default function meetingExtension(pi, dependencies = {}) {
   })
   pi.on('agent_settled', (event, ctx) => {
     context = ctx
+    send({ type: 'activity', status: agentFailed ? 'error' : event.aborted ? 'waiting' : 'done' })
     if (pending) {
       send({ type: 'result', id: pending.id, ...(event.aborted || pending.error || !pending.text.trim() ? { error: pending.error || (event.aborted ? 'Meeting turn cancelled' : 'Meeting agent returned no usable reply') } : { text: pending.text }) })
       restore()

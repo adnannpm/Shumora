@@ -6,6 +6,18 @@ import { Provider } from '../src/renderer/src/Provider'
 import { Library } from '../src/renderer/src/Library'
 beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }))
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+it('keeps combined updates in the Library header across category switches', async () => {
+  const updates = vi.fn().mockResolvedValue({ items: [{ kind: 'plugin', id: 'pi', name: 'Pi', installedVersion: '1.0.0', latestVersion: '2.0.0' }], errors: [] })
+  window.packages = { updates, catalog: async () => ({ items: [], page: 1, pages: 1 }) } as any
+  render(<Provider><Library /></Provider>)
+  const badge = await screen.findByRole('button', { name: 'Updates · 1' })
+  expect(badge.closest('header')).toBeTruthy()
+  fireEvent.click(screen.getByRole('tab', { name: 'Plugins' }))
+  await screen.findByRole('button', { name: 'Open Pi plugin' })
+  expect(screen.getByRole('button', { name: 'Updates · 1' })).toBe(badge)
+  expect(updates).toHaveBeenCalledTimes(1)
+  expect(updates).toHaveBeenCalledWith(undefined)
+})
 it('opens Pi details from Library without creating an integration menu', async () => {
   window.piPlugin = { status: async () => ({ id: 'pi', name: 'Pi', installed: false, latestVersion: '1.0.0', busy: false }), operation: async () => ({ status: 'idle', output: '' }), onOperation: () => () => {} } as any
   render(<Provider><Library /></Provider>)

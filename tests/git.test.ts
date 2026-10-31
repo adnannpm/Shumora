@@ -44,6 +44,7 @@ it('reports non-repositories without failing', async () => {
 
 it('separates staged and unstaged diffs, and discard keeps the staged version', async () => {
   const service = new GitService(async () => {})
+  expect((await service.status(dir)).lastCommit?.subject).toBe('feat: initial commit')
   file('a.ts', 'one\nSTAGED\n'); git('add', 'a.ts')
   file('a.ts', 'one\nSTAGED\nlater\n')
   const [change] = (await service.status(dir)).changes
@@ -115,6 +116,24 @@ it('reports commit hook failures', async () => {
   await expect(service.commit(dir, 'msg')).rejects.toThrow('lint failed')
 })
 
+it('pushes commits to configured remote and rejects detached HEAD', async () => {
+  const bareDir = mkdtempSync(path.join(tmpdir(), 'shumora-bare-'))
+  try {
+    execFileSync('git', ['init', '--bare', '-q', '-b', 'main'], { cwd: bareDir })
+    git('remote', 'add', 'origin', bareDir)
+    const service = new GitService(async () => {})
+    await service.push(dir)
+    const remoteLog = execFileSync('git', ['log', '--format=%s'], { cwd: bareDir, encoding: 'utf8' }).trim()
+    expect(remoteLog).toBe('feat: initial commit')
+
+    // Detached head rejection
+    git('checkout', '--detach', 'HEAD', '-q')
+    await expect(service.push(dir)).rejects.toThrow(/detached HEAD/)
+  } finally {
+    rmSync(bareDir, { recursive: true, force: true })
+  }
+})
+
 it('lists, creates and switches branches, stashing when asked', async () => {
   const service = new GitService(async () => {})
   git('branch', 'feature/x')
@@ -138,7 +157,9 @@ it('lists, creates and switches branches, stashing when asked', async () => {
   git('stash', 'pop', '-q')
   await service.switchBranch(dir, 'feature/x')
   expect(read('a.ts')).toBe('wip\n')
-})
+// Branch validation, status checks and stash operations spawn many real Git
+// processes; allow the same Windows CI budget as the staging integration test.
+}, 30_000)
 
 it('restores stashed work when the switch fails', async () => {
   const service = new GitService(async () => {})
@@ -161,4 +182,36 @@ it('flags binary and oversized diffs', async () => {
   const service = new GitService(async () => {})
   expect(await service.diff(dir, 'img.bin', 'unstaged')).toMatchObject({ binary: true, patch: '' })
   expect(await service.diff(dir, 'big.txt', 'unstaged')).toMatchObject({ tooLarge: true, patch: '' })
+})
+
+it('retrieves unpushed commits and push info for local branches', async () => {
+  const service = new GitService(async () => {})
+  file('commit1.txt', 'one\n'); git('add', 'commit1.txt'); git('commit', '-qm', 'feat: add first file')
+  file('commit2.txt', 'two\n'); git('add', 'commit2.txt'); git('commit', '-qm', 'fix: correct second file')
+
+  const info = await service.pushInfo(dir)
+  expect(info.branch).toBe('main')
+  expect(info.hasUpstream).toBe(false)
+  expect(info.commits.length).toBeGreaterThanOrEqual(2)
+  expect(info.commits[0].subject).toBe('fix: correct second file')
+  expect(info.commits[1].subject).toBe('feat: add first file')
+  expect(info.commits[0].hash).toBeTruthy()
+})
+
+it('stages and unstages multiple files in batch', async () => {
+  const service = new GitService(async () => {})
+  file('f1.txt', 'one\n')
+  file('f2.txt', 'two\n')
+  file('f3.txt', 'three\n')
+
+  await service.stage(dir, ['f1.txt', 'f2.txt'])
+  let status = await service.status(dir)
+  expect(status.changes.find((c) => c.path === 'f1.txt')?.staged).toBe(true)
+  expect(status.changes.find((c) => c.path === 'f2.txt')?.staged).toBe(true)
+  expect(status.changes.find((c) => c.path === 'f3.txt')?.staged).toBe(false)
+
+  await service.unstage(dir, ['f1.txt', 'f2.txt'])
+  status = await service.status(dir)
+  expect(status.changes.find((c) => c.path === 'f1.txt')?.staged).toBe(false)
+  expect(status.changes.find((c) => c.path === 'f2.txt')?.staged).toBe(false)
 })

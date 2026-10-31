@@ -1,5 +1,5 @@
 export interface MeetingParticipant { id: string; name: string; role: string }
-export interface MeetingInput { agenda: string; participants: MeetingParticipant[]; leader: string; language: 'en' | 'id' }
+export interface MeetingInput { agenda: string; participants: MeetingParticipant[]; leader: string; language: 'en' | 'id' | 'zh' }
 export interface MeetingMessage { author: string; text: string; kind: 'response' | 'direction' | 'summary' }
 export interface MeetingState {
   revision: number

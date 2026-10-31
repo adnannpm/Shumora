@@ -1,5 +1,15 @@
 import { expect, it } from 'vitest'
-import { initialLayout, layoutReducer as reduce, layoutRects } from '../src/renderer/src/layout'
+import { initialLayout, layoutReducer as reduce, layoutRects, restoreLayout } from '../src/renderer/src/layout'
+it('restores tab order, selected tabs, split ratios and focused pane', () => {
+  let state = reduce(initialLayout, { type: 'init', ids: ['a', 'b', 'c'] })
+  state = reduce(state, { type: 'split', orientation: 'down' })
+  state = reduce(state, { type: 'resize', path: '', ratio: 65 })
+  expect(restoreLayout(JSON.parse(JSON.stringify(state)), ['a', 'b', 'c'])).toEqual(state)
+  const reconciled = restoreLayout(state, ['b', 'c', 'd'])
+  expect(reconciled.groups.flatMap(g => g.ids).sort()).toEqual(['b', 'c', 'd'])
+  expect(restoreLayout({ ...state, tree: { first: 0 } }, ['a'])).toEqual({ ...initialLayout, groups: [{ ids: ['a'], active: 'a' }] })
+  expect(restoreLayout(state, [])).toEqual(initialLayout)
+})
 it('reorders tabs and moves them between groups without duplicating sessions', () => {
   let s = reduce(initialLayout, { type: 'init', ids: ['a', 'b', 'c'] })
   s = reduce(s, { type: 'drop', id: 'c', group: 0, before: 'a' })

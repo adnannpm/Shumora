@@ -1,4 +1,5 @@
 import { parse } from 'parse5'
+import type { SessionManager } from './sessions'
 import type { PackagePage, PackageQuery, PiPackage, PackageInstallation, PackageAction } from '../shared/packages'
 import type { PluginOperation } from '../shared/plugins'
 function nodes(node: any): any[] { return [node, ...(node.childNodes || []).flatMap(nodes)] }
@@ -40,7 +41,7 @@ export class PackageService {
   private approved = new Map<string, string>()
   private progress: PluginOperation = { status: 'idle', output: '' }
   private busy = false
-  constructor(private fetchPage: (url: string) => Promise<string>, private run: (args: string[], output: (text: string) => void) => Promise<void>, private guard: () => void = () => {}, private emit: (operation: PluginOperation) => void = () => {}, private detect?: (name: string) => PackageInstallation) {}
+  constructor(private fetchPage: (url: string) => Promise<string>, private run: (args: string[], output: (text: string) => void) => Promise<void>, private guard: () => void = () => {}, private emit: (operation: PluginOperation) => void = () => {}, private detect?: (name: string) => PackageInstallation, private sessions?: Pick<SessionManager, 'list' | 'stop' | 'restart'>) {}
   status(name: string): PackageInstallation {
     if (!validName(name)) throw new Error('Invalid package name')
     if (!this.detect) throw new Error('Package detection is unavailable')
@@ -101,13 +102,27 @@ export class PackageService {
       if (action === 'install' && current?.configured) throw new Error('Package is already configured. Use Update or Repair.')
       if (action !== 'install' && !current?.configured) throw new Error('Package is not configured in personal Pi settings')
       const args = action === 'uninstall' ? ['remove', current!.source!] : ['install', `npm:${name}@${version}`]
+      const active = this.sessions?.list().filter(session => session.status === 'running') || []
+      if (active.length) this.log(`[Shumora] Stopping ${active.length} Workspace session(s)…\n`)
+      for (const session of active) this.sessions!.stop(session.id)
       this.log(`$ pi ${args.join(' ')}\n`)
       await this.run(args, value => this.log(value))
       if (this.detect) {
         const result = this.detect(name)
         if (action === 'uninstall' ? result.configured : !result.installed || result.installedVersion !== version) throw new Error('Pi completed, but package state does not match the requested result. Check the personal Pi configuration.')
       }
-      this.progress.status = 'success'; this.log(`\n[Shumora] Package ${action} completed. Start a new session to load changes.\n`)
+      this.log(`\n[Shumora] Package ${action} completed.\n`)
+      const failures: string[] = []
+      for (const session of active) {
+        // A user may close a stopped tab while the package command is running.
+        if (!this.sessions!.list().some(value => value.id === session.id)) continue
+        try {
+          const restarted = this.sessions!.restart(session.id)
+          if (restarted.status !== 'running') throw new Error(restarted.error || 'Pi did not start')
+        } catch (error) { failures.push(`${session.name}: ${String(error)}`) }
+      }
+      if (failures.length) throw new Error(`Package changed, but some sessions could not restart: ${failures.join('; ')}`)
+      this.progress.status = 'success'; this.log('[Shumora] Previously running sessions restarted. Agent work and previous conversations are not resumed.\n')
     } catch (e) { this.progress.status = 'failed'; this.log(`\n[Shumora] ${String(e)}\n`); throw e }
     finally { this.busy = false }
     return this.operation()

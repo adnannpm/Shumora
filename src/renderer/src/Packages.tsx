@@ -29,7 +29,7 @@ export function Packages({ query, onQueryChange, onSelect, banner }: {
   return <section className="package-catalog">
     {banner}
     <div className="router-catalog-heading"><div><h2>{t("Pi Packages")}</h2><p>{t("Extensions, skills, themes and prompts from pi.dev/packages.")}</p></div><Button variant="outline" disabled={busy} onClick={() => setRefresh(value => value + 1)}>{t("Refresh")}</Button></div>
-    <form className="router-control-actions" onSubmit={e => { e.preventDefault(); onQueryChange({ search: draft, page: 1 }) }}>
+    <form className="router-control-actions package-filters" onSubmit={e => { e.preventDefault(); onQueryChange({ search: draft, page: 1 }) }}>
       <input aria-label={t("Search packages")} placeholder={t("Search Pi packages…")} value={draft} onChange={e => setDraft(e.target.value)} />
       <Button type="submit" variant="outline">{t("Search")}</Button>
       <select aria-label={t("Package type")} value={type} onChange={e => onQueryChange({ type: e.target.value, page: 1 })}><option value="">{t("All types")}</option>{['extension', 'skill', 'theme', 'prompt'].map(value => <option key={value}>{value}</option>)}</select>
@@ -37,7 +37,7 @@ export function Packages({ query, onQueryChange, onSelect, banner }: {
     </form>
     {error && <p className="plugin-error" role="alert">{t(error)}</p>}
     {busy ? <DataSkeleton label={t("Loading packages")} shape="providers" /> : <>
-      <div className="router-catalog-grid">
+      <div className="router-catalog-grid library-card-grid">
         {data?.items.map(item => <button key={item.name} className="package-catalog-card" aria-label={t("View {name}", { name: item.name })} onClick={() => onSelect(item)}>
           <PackagePreview key={`${item.name}-${item.thumbnail || ''}`} item={item} />
           <strong>{item.name}</strong>

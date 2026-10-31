@@ -26,12 +26,12 @@ export function PackageDetails({ item, onBack }: { item: PiPackage; onBack: () =
   const outputRef = useRef<HTMLPreElement>(null)
   const followOutput = useRef(true)
 
-  async function checkStatus() {
+  async function checkStatus(preserveError = false) {
     const current = ++statusRequest.current
     setChecking(true); setInstallation(undefined)
     try {
       const value = await window.packages.status(item.name)
-      if (statusRequest.current === current) { setInstallation(value); setError('') }
+      if (statusRequest.current === current) { setInstallation(value); if (!preserveError) setError('') }
     } catch {
       if (statusRequest.current === current) setError('Cannot verify the personal Pi package installation. Check Pi settings and try again.')
     } finally {
@@ -77,9 +77,9 @@ export function PackageDetails({ item, onBack }: { item: PiPackage; onBack: () =
     } catch {
       if (generation.current !== current) return
       setOperation(previous => ({ ...previous, status: 'failed' }))
-      setError('Package operation failed. Check the output below. Stop running Workspace sessions before changing packages.')
+      setError('Package operation failed. Check the output below. Sessions stopped for this operation remain stopped unless they were already restarted. You can restart them manually after resolving the error.')
     } finally {
-      if (generation.current === current) await checkStatus()
+      if (generation.current === current) await checkStatus(true)
     }
   }
   const running = operation.status === 'running'
@@ -127,8 +127,8 @@ export function PackageDetails({ item, onBack }: { item: PiPackage; onBack: () =
     <Dialog.Root open={confirm !== null} role="alertdialog" placement="center" onOpenChange={({ open }) => { if (!open) setConfirm(null) }}>
       <Portal><Dialog.Backdrop /><Dialog.Positioner><Dialog.Content className="library-dialog">
         <Dialog.Header><Dialog.Title>{confirm === 'uninstall' ? t("Uninstall") : confirm === 'update' ? t("Update") : t("Install")} {item.name}?</Dialog.Title></Dialog.Header>
-        <Dialog.Body>{confirm === 'uninstall' ? t("This removes the package from your personal Pi configuration and managed installation.") : t("This installs version {version} for your Pi sessions.", { version: item.version })} {t("Third-party extensions can execute code and access files with your user permissions. Review and trust the package before continuing. Stop running Workspace sessions first.")}</Dialog.Body>
-        <Dialog.Footer><Button variant="outline" onClick={() => setConfirm(null)}>{t("Cancel")}</Button><Button className={confirm === 'uninstall' ? "library-danger-action" : "library-primary-action"} colorPalette={confirm === 'uninstall' ? "red" : "brand"} onClick={() => void install()}>{t("Confirm")} {t(confirm === 'uninstall' ? 'uninstall' : confirm === 'update' ? 'update' : 'install')}</Button></Dialog.Footer>
+        <Dialog.Body>{confirm === 'uninstall' ? t("This removes the package from your personal Pi configuration and managed installation.") : t("This installs version {version} for your Pi sessions.", { version: item.version })} {t("Third-party extensions can execute code and access files with your user permissions. Review and trust the package before continuing.")}<p className="settings-note">{t("All running Workspace sessions will be stopped, including hidden terminals. Save your work first. After a successful package change, only those sessions will restart as new Pi processes. Agent work and previous conversations will not resume automatically. If the package change fails, sessions remain stopped.")}</p></Dialog.Body>
+        <Dialog.Footer><Button variant="outline" onClick={() => setConfirm(null)}>{t("Cancel")}</Button><Button className={confirm === 'uninstall' ? "library-danger-action" : "library-primary-action"} colorPalette={confirm === 'uninstall' ? "red" : "brand"} onClick={() => void install()}>{confirm === 'update' ? t("Stop sessions and update") : <>{t("Confirm")} {t(confirm === 'uninstall' ? 'uninstall' : 'install')}</>}</Button></Dialog.Footer>
       </Dialog.Content></Dialog.Positioner></Portal>
     </Dialog.Root>
   </main>

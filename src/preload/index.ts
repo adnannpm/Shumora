@@ -1,4 +1,17 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { AppearanceAPI } from '../shared/appearance'
+const appearance: AppearanceAPI = {
+  systemDark: () => ipcRenderer.invoke('appearance:system-dark'),
+  onSystemTheme: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, dark: boolean) => callback(dark)
+    ipcRenderer.on('appearance:system-theme', listener)
+    return () => ipcRenderer.removeListener('appearance:system-theme', listener)
+  }
+}
+contextBridge.exposeInMainWorld('appearance', appearance)
+import type { DiagnosticsAPI } from '../shared/diagnostics'
+const diagnostics: DiagnosticsAPI = { run: () => ipcRenderer.invoke('diagnostics:run') }
+contextBridge.exposeInMainWorld('diagnostics', diagnostics)
 import type { MeetingsAPI, MeetingSnapshot } from '../shared/meetings'
 const meetings: MeetingsAPI = {
   snapshot: () => ipcRenderer.invoke('meetings:snapshot'),
@@ -18,8 +31,10 @@ contextBridge.exposeInMainWorld('meetings', meetings)
 import type { PackageAPI } from '../shared/packages'
 import type { PluginsAPI, PluginOperation, PiPluginAPI } from '../shared/plugins'
 import type { UpdatesAPI, UpdateState } from '../shared/updates'
-import type { WorkspaceAPI, SessionEvent } from '../shared/types'
+import type { WorkspaceAPI, SessionEvent, GitAskPassRequest } from '../shared/types'
 const api: WorkspaceAPI = {
+  notificationsEnabled: () => ipcRenderer.invoke('agents:notifications'),
+  setNotificationsEnabled: enabled => ipcRenderer.invoke('agents:set-notifications', enabled),
   list: () => ipcRenderer.invoke('sessions:list'),
   create: (cwd) => ipcRenderer.invoke('sessions:create', cwd),
   snapshot: (id) => ipcRenderer.invoke('sessions:snapshot', id),
@@ -39,10 +54,18 @@ const api: WorkspaceAPI = {
   gitUnstageAll: (id) => ipcRenderer.invoke('git:unstage-all', id),
   gitDiscard: (id, path) => ipcRenderer.invoke('git:discard', id, path),
   gitCommit: (id, message) => ipcRenderer.invoke('git:commit', id, message),
+  gitPush: (id, options) => ipcRenderer.invoke('git:push', id, options),
+  gitPushInfo: (id, branch) => ipcRenderer.invoke('git:push-info', id, branch),
   gitCommitModels: () => ipcRenderer.invoke('git:commit-models'),
   gitGenerateMessage: (id, model) => ipcRenderer.invoke('git:generate-message', id, model),
   gitBranches: (id) => ipcRenderer.invoke('git:branches', id),
   gitSwitch: (id, branch, options) => ipcRenderer.invoke('git:switch', id, branch, options),
+  onGitAskPass: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, request: GitAskPassRequest) => callback(request)
+    ipcRenderer.on('git:askpass-request', listener)
+    return () => ipcRenderer.removeListener('git:askpass-request', listener)
+  },
+  gitAskPassReply: (response) => ipcRenderer.invoke('git:askpass-reply', response),
   onEvent: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, data: SessionEvent) => callback(data)
     ipcRenderer.on('sessions:event', listener)

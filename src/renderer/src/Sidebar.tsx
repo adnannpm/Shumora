@@ -3,10 +3,11 @@ import { Button } from '@chakra-ui/react'
 import shumoraLogo from './assets/shumora-logo.png'
 
 export type Page = 'workspace' | 'meeting' | '9router' | 'library' | 'settings'
-function NavIcon({ type }: { type: 'terminal' | 'router' | 'library' | 'settings' | 'collapse' }) {
+function NavIcon({ type }: { type: 'terminal' | 'council' | 'router' | 'library' | 'settings' | 'collapse' }) {
   const { t } = useLanguage()
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {type === 'terminal' ? <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="m7 9 3 3-3 3m6 0h4" /></>
+      : type === 'council' ? <><circle cx="9" cy="8" r="3" /><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65" /></>
       : type === 'router' ? <><rect x="8" y="3" width="8" height="6" rx="1" /><rect x="3" y="16" width="6" height="5" rx="1" /><rect x="15" y="16" width="6" height="5" rx="1" /><path d="M12 9v4M6 16v-3h12v3" /></>
       : type === 'library' ? <><path d="M4 4h4v16H4zM10 4h4v16h-4zM17 4l4 15-4 1-4-15" /></>
       : type === 'settings' ? <><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="3" fill="var(--sidebar)" /><circle cx="15" cy="17" r="3" fill="var(--sidebar)" /></>
@@ -20,7 +21,7 @@ export function Sidebar({ page, onPage, collapsed, onToggle, routerInstalled }: 
     <nav aria-label={t("Main navigation")} className="sidebar-navigation">
       <div className="sidebar-group" role="group" aria-label={t("Workspace")}><div className="sidebar-group-label" aria-hidden="true">{!collapsed && t("Workspace")}</div>
       <Button variant="ghost" aria-label={t("Terminals")} title={collapsed ? t("Terminals") : undefined} aria-current={page === 'workspace' ? "page" : undefined} onClick={() => onPage('workspace')}><NavIcon type="terminal" /><span className="sidebar-label" aria-hidden={collapsed}>{t("Terminals")}</span></Button>
-      <Button variant="ghost" aria-label={t("Council")} title={collapsed ? t("Council") : undefined} aria-current={page === 'meeting' ? "page" : undefined} onClick={() => onPage('meeting')}><NavIcon type="router" /><span className="sidebar-label" aria-hidden={collapsed}>{t("Council")}</span></Button>
+      <Button variant="ghost" aria-label={t("Council")} title={collapsed ? t("Council") : undefined} aria-current={page === 'meeting' ? "page" : undefined} onClick={() => onPage('meeting')}><NavIcon type="council" /><span className="sidebar-label" aria-hidden={collapsed}>{t("Council")}</span></Button>
       </div>
       {routerInstalled && <div className="sidebar-group" role="group" aria-label={t("Integrations")}><div className="sidebar-group-label" aria-hidden="true">{!collapsed && t("Integrations")}</div>
       <Button variant="ghost" aria-label={t("9router")} title={collapsed ? t("9router") : undefined} aria-current={page === '9router' ? "page" : undefined} onClick={() => onPage('9router')}><NavIcon type="router" /><span className="sidebar-label" aria-hidden={collapsed}>{t("9router")}</span></Button>
