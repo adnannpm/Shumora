@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events'
 import { afterEach, expect, it, vi } from 'vitest'
 
 const exec = vi.hoisted(() => ({ callback: undefined as any, child: undefined as any, shim: false, files: {} as Record<string, string> }))
-vi.mock('node:child_process', () => ({ execFile: vi.fn((_file, _args, _options, callback) => { exec.callback = callback; return exec.child }) }))
+vi.mock('node:child_process', () => ({ execFile: vi.fn((_file, _args, _options, callback) => { exec.callback = callback; if (_args.includes('--version') && !String(_file).endsWith('opencode') && !String(_file).endsWith('/node')) queueMicrotask(() => callback(null, '1.0.0\n', '')); if (_args.includes('root')) queueMicrotask(() => callback(new Error('No global installation'), '', '')); return exec.child }) }))
 vi.mock('node:fs', () => ({
   accessSync: (file: string) => {
     if (file in exec.files) return
@@ -11,9 +11,30 @@ vi.mock('node:fs', () => ({
   },
   constants: { F_OK: 0, X_OK: 1 }, existsSync: (file: string) => file in exec.files || exec.shim && /npm-cli\.js$/.test(file), readFileSync: (file: string) => { if (!(file in exec.files)) throw new Error('missing'); return exec.files[file] }, realpathSync: (file: string) => file
 }))
-import { pluginHost, piPluginHost } from '../src/main/plugin-host'
+import { pluginHost, piPluginHost, opencodePluginHost, detectNode } from '../src/main/plugin-host'
 import { execFile } from 'node:child_process'
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); exec.shim = false; exec.files = {}; vi.unstubAllEnvs() })
+
+it('recognizes standalone OpenCode by its version command without npm metadata', async () => {
+  vi.stubEnv('PATH', '/standalone')
+  exec.files['/standalone/opencode'] = ''
+  exec.child = { stdout: new EventEmitter(), stderr: new EventEmitter() }
+  const pending = opencodePluginHost.detect()
+  await vi.waitFor(() => expect(vi.mocked(execFile).mock.calls.some(call => String(call[0]).endsWith('opencode'))).toBe(true))
+  exec.callback(null, '1.18.34\n', '')
+  expect(await pending).toEqual({ installed: true, installedVersion: '1.18.34', executable: '/standalone/opencode', managed: false })
+})
+
+it('detects Node.js on PATH rather than reporting the embedded Electron runtime', async () => {
+  exec.files['/runtime/node'] = ''
+  vi.stubEnv('PATH', '/runtime')
+  exec.child = { stdout: new EventEmitter(), stderr: new EventEmitter() }
+  const pending = detectNode()
+  expect(vi.mocked(execFile).mock.calls[0][0]).toBe('/runtime/node')
+  expect(vi.mocked(execFile).mock.calls[0][1]).toEqual(['--version'])
+  exec.callback(null, 'v22.20.0\n', '')
+  expect(await pending).toEqual({ installed: true, installedVersion: '22.20.0', executable: '/runtime/node' })
+})
 
 it.each(['linux', 'darwin', 'win32'] as const)('streams stdout/stderr before completion on %s', async platform => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
@@ -24,7 +45,7 @@ it.each(['linux', 'darwin', 'win32'] as const)('streams stdout/stderr before com
   void pending.then(() => { settled = true }, () => { settled = true })
   exec.child.stdout.emit('data', 'downloading\n')
   exec.child.stderr.emit('data', 'npm WARN example\n')
-  expect(chunks).toEqual(['downloading\n', 'npm WARN example\n'])
+  expect(chunks).toEqual(['$ npm install --global 9router@0.5.109\n', 'downloading\n', 'npm WARN example\n'])
   expect(settled).toBe(false)
   exec.callback(new Error('npm exited 1'), '', 'EACCES')
   await expect(pending).rejects.toThrow('EACCES')
@@ -35,10 +56,11 @@ it('detects the active release of the official Windows Pi installer', async () =
   vi.stubEnv('PI_EXECUTABLE', `${bin}\\pi.cmd`)
   exec.files = {
     [`${bin}\\pi.cmd`]: '',
+    [`${bin}\\pi-launcher.js`]: '// versioned installer launcher',
     ['C:\\Users\\Alice Smith\\.pi\\agent\\install\\current-version']: '1.4.0\r\n',
     ['C:\\Users\\Alice Smith\\.pi\\agent\\install\\releases\\1.4.0\\node_modules\\@earendil-works\\pi-coding-agent\\package.json']: JSON.stringify({ name: '@earendil-works/pi-coding-agent', version: '1.4.0' })
   }
-  await expect(piPluginHost.detect()).resolves.toEqual({ installed: true, installedVersion: '1.4.0', executable: `${bin}\\pi.cmd` })
+  await expect(piPluginHost.detect()).resolves.toEqual({ installed: true, installedVersion: '1.4.0', executable: `${bin}\\pi.cmd`, managed: false, installationKind: 'pi-windows-installer' })
 })
 it('runs Windows npm.cmd through node and npm-cli.js without a shell', async () => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')

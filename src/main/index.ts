@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell, nativeTheme, Notification } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, nativeTheme, Notification } from 'electron'
 import { homedir } from 'node:os'
 import { openFolderArgument } from './open-folder'
 import { collectDiagnostics } from './diagnostics'
@@ -19,14 +19,14 @@ import { PackageService } from './packages'
 import { packageStatus, configuredPackageNames } from './package-status'
 import { checkLibraryUpdates } from './library-updates'
 import { fetchPackagePage } from './package-fetch'
-import { PluginService, piDefinition } from './plugins'
-import { pluginHost, piPluginHost, routerHost, runPiPackage } from './plugin-host'
+import { PluginService, piDefinition, opencodeDefinition, managerDefinitions } from './plugins'
+import { pluginHost, piPluginHost, routerHost, runPiPackage, opencodePluginHost, detectNode, managerPluginHosts } from './plugin-host'
 import { routerLogin, routerLogout, routerAuthStatus } from './router-auth'
 import { RouterCatalog } from './router-catalog'
 import { RouterService } from './router-service'
 import { routerKeys, routerCreateKey } from './router-keys'
 import { routerHealth } from './router-health'
-import type { PluginAction } from '../shared/plugins'
+import type { ManagerPluginId, PackageManager, PluginAction } from '../shared/plugins'
 import type { GitPushOptions, GitAskPassResponse } from '../shared/types'
 import { GitService } from './git'
 import { AskPassService } from './askpass-service'
@@ -108,6 +108,13 @@ const packages = new PackageService(fetchPackagePage, runPiPackage, () => {}, op
 }, packageStatus, sessions)
 let plugins: PluginService
 let piPlugin: PluginService<'pi'>
+let opencodePlugin: PluginService<'opencode'>
+const managerPlugins = new Map<ManagerPluginId, PluginService<ManagerPluginId>>()
+function managerPlugin(id: unknown) {
+  const service = managerPlugins.get(id as ManagerPluginId)
+  if (!service) throw new Error('Unknown package manager plugin')
+  return service
+}
 const router = new RouterService(routerHost)
 const catalog = new RouterCatalog()
 const askPass = new AskPassService()
@@ -120,6 +127,10 @@ function sessionCwd(id: unknown) {
 }
 function registerIPC() {
   const handlers: Record<string, (...args: any[]) => unknown> = {
+    'clipboard:write-text': (text: unknown) => {
+      if (typeof text !== 'string' || text.length > 1_000_000) throw new Error('Invalid clipboard text')
+      clipboard.writeText(text)
+    },
     'agents:notifications': () => agentNotifications,
     'agents:set-notifications': (enabled: unknown) => {
       if (typeof enabled !== 'boolean') throw new Error('Invalid notification setting')
@@ -143,7 +154,7 @@ function registerIPC() {
     'meetings:stop': () => meetings.stop(),
     'meetings:take-over': () => meetings.takeOver(),
     'meetings:direction': text => meetings.direction(text),
-    'packages:updates': scope => checkLibraryUpdates({ names: configuredPackageNames, status: packageStatus, latest: async name => (await packages.detail(name)).version, plugins: [{ id: 'pi', check: () => piPlugin.status(true) }, { id: '9router', check: () => plugins.status(true) }] }, scope),
+    'packages:updates': scope => checkLibraryUpdates({ names: configuredPackageNames, status: packageStatus, latest: async name => (await packages.detail(name)).version, plugins: [{ id: 'pi', check: () => piPlugin.status(true) }, { id: '9router', check: () => plugins.status(true) }, { id: 'opencode', check: () => opencodePlugin.status(true) }] }, scope),
     'packages:detail': name => packages.detail(name),
     'packages:status': name => packages.status(name),
     'packages:mutate': (action, name, version) => packages.mutate(action, name, version),
@@ -151,8 +162,20 @@ function registerIPC() {
     'packages:install': (name, version) => packages.install(name, version),
     'packages:operation': () => packages.operation(),
     'pi-plugin:status': (refresh) => { if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag'); return piPlugin.status(refresh) },
+    'node-plugin:status': () => detectNode(),
+    'manager-plugin:status': (id, refresh) => {
+      if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag')
+      return managerPlugin(id).status(refresh)
+    },
+    'manager-plugin:mutate': (id, action, version, manager) => managerPlugin(id).mutate(action, version, manager),
+    'opencode-plugin:status': refresh => {
+      if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag')
+      return opencodePlugin.status(refresh)
+    },
+    'opencode-plugin:operation': () => opencodePlugin.operation(),
+    'opencode-plugin:mutate': (action, version, manager) => opencodePlugin.mutate(action, version, manager),
     'pi-plugin:operation': () => piPlugin.operation(),
-    'pi-plugin:mutate': (action, version) => piPlugin.mutate(action, version),
+    'pi-plugin:mutate': (action, version, manager) => piPlugin.mutate(action, version, manager),
     'plugins:status': (refresh: boolean) => {
       if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag')
       return plugins.status(refresh)
@@ -177,7 +200,7 @@ function registerIPC() {
     'plugins:router-create-key': (name) => routerCreateKey(name),
     'plugins:health': () => routerHealth(),
     'plugins:operation': () => plugins.operation(),
-    'plugins:mutate': (action: PluginAction, version?: string) => plugins.mutate(action, version),
+    'plugins:mutate': (action: PluginAction, version?: string, manager?: PackageManager) => plugins.mutate(action, version, manager),
     'updates:status': () => updates.snapshot(),
     'updates:check': () => updates.check(),
     'updates:download': () => updates.download(),
@@ -310,6 +333,14 @@ if (primaryInstance) app.whenReady().then(async () => {
   piPlugin = new PluginService(database, piPluginHost, operation => {
     if (window && !window.isDestroyed()) window.webContents.send('pi-plugin:operation', operation)
   }, piDefinition, () => { if (sessions.list().some(s => s.status === 'running')) throw new Error('Stop all running Workspace sessions before changing Pi.') })
+  opencodePlugin = new PluginService(database, opencodePluginHost, operation => {
+    if (window && !window.isDestroyed()) window.webContents.send('opencode-plugin:operation', operation)
+  }, opencodeDefinition)
+  for (const id of ['pnpm', 'bun', 'yarn'] as const) {
+    managerPlugins.set(id, new PluginService<ManagerPluginId>(database, managerPluginHosts[id], operation => {
+      if (window && !window.isDestroyed()) window.webContents.send(`manager-plugin:${id}:operation`, operation)
+    }, managerDefinitions[id]))
+  }
   const unsupported = !app.isPackaged ? 'Updates can only be installed in a packaged Shumora application.'
     : process.platform === 'darwin' ? 'macOS automatic updates require a signed and notarized release. Install a release manually for now.'
     : process.platform === 'linux' && !process.env.APPIMAGE ? 'Linux automatic updates are supported only for AppImage installations.'
