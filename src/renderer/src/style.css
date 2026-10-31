@@ -466,6 +466,12 @@ h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.3px; }
 .git-review-actions .git-close-action { width: 32px; min-width: 32px; margin-left: 12px; padding: 0; color: var(--muted); }
 .git-action-icon { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .git-push-count { min-width: 18px; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 12%, transparent); font-size: 11px; line-height: 18px; font-variant-numeric: tabular-nums; }
+.git-last-commit { display: flex; align-items: center; gap: 6px; max-width: 320px; height: 32px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--sidebar); font-size: 11px; color: var(--muted); user-select: none; margin-right: 2px; }
+.git-last-commit-icon { font-size: 9px; color: var(--accent); flex-shrink: 0; }
+.git-last-commit-hash { font-family: "Cascadia Code", Consolas, monospace; font-weight: 600; color: var(--accent); flex-shrink: 0; }
+.git-last-commit-subject { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+@media (max-width: 900px) { .git-last-commit { max-width: 200px; } }
+@media (max-width: 720px) { .git-last-commit { display: none; } }
 @media (max-width: 680px) { .git-review-header { flex-wrap: wrap; gap: 10px; } .git-review-actions { margin-left: auto; } }
 .git-branch { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 8px; font-family: "Cascadia Code", Consolas, monospace; }
 .git-review-body { padding: 0 !important; display: flex; flex-direction: column; min-height: 0; }
@@ -479,9 +485,37 @@ h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.3px; }
 .git-section-empty { margin: 0; padding: 2px 8px 6px; color: var(--muted); font-size: 12px; }
 .git-badge { min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--line); color: var(--text); font-size: 10px; text-align: center; }
 .git-spacer { flex: 1; }
-.git-files button { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; padding: 5px 8px; border-radius: 6px; text-align: left; color: var(--text); overflow: hidden; }
-.git-files button:hover { background: var(--git-hover); }
-.git-files button.active { background: var(--selected); color: var(--selected-text); }
+.git-file-item { display: flex; align-items: center; gap: 6px; width: 100%; padding: 1px 6px; border-radius: 6px; }
+.git-file-item:hover { background: var(--git-hover); }
+.git-file-item.active { background: var(--selected); color: var(--selected-text); }
+.git-file-item .git-file-btn { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; padding: 4px 2px; border-radius: 4px; text-align: left; color: inherit; background: transparent !important; border: none !important; overflow: hidden; cursor: pointer; }
+.git-file-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: grid;
+  place-content: center;
+  margin: 0;
+  transition: all 0.15s ease;
+}
+.git-file-checkbox:hover:not(:disabled) { border-color: var(--accent); }
+.git-file-checkbox:checked { background: var(--accent); border-color: var(--accent); }
+.git-file-checkbox:checked::before {
+  content: "";
+  width: 8px;
+  height: 5px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+.git-file-checkbox:disabled { opacity: 0.35; cursor: not-allowed; }
+.git-file-checkbox:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .git-commit { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-top: 1px solid var(--line); min-width: 0; overflow: hidden; }
 .git-commit textarea, .git-commit select, .git-search { width: 100%; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit; font-size: 12px; }
 .git-commit textarea { padding: 6px 8px; resize: vertical; min-height: 64px; font-family: "Cascadia Code", Consolas, monospace; }
@@ -530,6 +564,48 @@ h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.3px; }
 .git-cell.removed { background: var(--git-del-bg); }
 .git-cell.added { background: var(--git-add-bg); }
 .git-cell.empty { background: var(--git-empty-bg); }
+
+.git-push-dialog { height: auto; max-height: 80vh; max-width: 520px; }
+.git-push-body { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px !important; }
+.git-push-field { display: flex; flex-direction: column; gap: 6px; }
+.git-push-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+.git-push-select-wrap { position: relative; }
+.git-push-select { width: 100%; height: 34px; border-radius: 6px; border: 1px solid var(--line); background: var(--sidebar); color: var(--text); padding: 0 10px; font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; }
+.git-push-select:focus-visible { outline: 2px solid var(--accent); }
+.git-push-remote-target { font-size: 12px; color: var(--muted); }
+.git-push-remote-target strong { color: var(--text); }
+.git-push-behind-alert { border-color: var(--git-mod); color: var(--text); }
+.git-push-commits-section { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: var(--sidebar); }
+.git-push-commits-header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 500; color: var(--text); }
+.git-unpushed-list { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.git-unpushed-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; background: var(--surface); font-size: 12px; }
+.git-commit-hash { font-family: "Cascadia Code", Consolas, monospace; font-size: 11px; color: var(--accent); flex-shrink: 0; }
+.git-commit-subject { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.git-commit-date { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.git-push-empty { margin: 0; padding: 8px 0; font-size: 12px; color: var(--muted); text-align: center; }
+.git-push-footer { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line); padding: 10px 16px !important; }
+
+/* Git AskPass Dialog */
+.git-askpass-dialog { max-width: 440px; background: var(--surface) !important; color: var(--text) !important; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.git-askpass-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); padding: 12px 16px !important; }
+.git-askpass-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0; }
+.git-askpass-icon { font-size: 16px; }
+.git-askpass-body { display: flex; flex-direction: column; gap: 12px; padding: 16px !important; }
+.git-askpass-target { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; background: var(--sidebar); border: 1px solid var(--line); font-size: 11px; overflow: hidden; }
+.git-askpass-target-label { font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+.git-askpass-target-path { font-family: "Cascadia Code", Consolas, monospace; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.git-askpass-desc { font-size: 12px; color: var(--muted); margin: 0; line-height: 1.4; }
+.git-askpass-error { font-size: 11px; color: var(--git-del); background: var(--git-del-bg); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--git-del); }
+.git-askpass-input-row { display: flex; align-items: center; gap: 6px; position: relative; }
+.git-askpass-input { width: 100%; height: 36px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--sidebar); color: var(--text); font-family: "Cascadia Code", Consolas, monospace; font-size: 13px; }
+.git-askpass-input:focus-visible { outline: 2px solid var(--accent); }
+.git-askpass-eye-btn { width: 36px; height: 36px; display: grid; place-content: center; border-radius: 6px; border: 1px solid var(--line); background: var(--sidebar); color: var(--muted); cursor: pointer; flex-shrink: 0; transition: all 0.15s ease; }
+.git-askpass-eye-btn:hover { color: var(--text); background: var(--selected); }
+.git-askpass-remember { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; }
+.git-askpass-remember:hover { color: var(--text); }
+.git-askpass-hint { font-size: 11px; color: var(--muted); background: var(--sidebar); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 0; line-height: 1.4; }
+.git-askpass-hint code { font-family: "Cascadia Code", Consolas, monospace; color: var(--accent); }
+.git-askpass-footer { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line); padding: 12px 16px !important; }
 
 /* Council uses the same shell, type scale and controls as Settings. */
 .meeting-page-host { flex: 1; min-width: 0; overflow: hidden; }

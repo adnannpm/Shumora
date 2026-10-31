@@ -9,6 +9,7 @@ import { Settings } from './Settings'
 import { MeetingRoom } from './MeetingRoom'
 import { Library } from './Library'
 import { WorkspaceSetup } from './WorkspaceSetup'
+import { GitAskPassModal } from './GitAskPassModal'
 import { RouterDashboard } from './RouterDashboard'
 import type { RouterPlugin } from '../../shared/plugins'
 import { initialLayout, layoutReducer, layoutRects, type Layout } from './layout'
@@ -281,6 +282,7 @@ export default function App() {
     {page === 'library' && <Library initialPlugin={setupPlugin} onPluginStatus={pluginStatus} />}
     {page === '9router' && routerInstalled && <RouterDashboard />}
     <WorkspaceSetup active={page === 'workspace'} onSetup={id => { setSetupPlugin(id); setPage('library') }} />
+    <GitAskPassModal />
     <Dialog.Root role="alertdialog" open={closeTarget !== null} placement="center" size="sm" initialFocusEl={() => cancelClose.current} closeOnInteractOutside={false} onOpenChange={({ open }) => { if (!open && !closing.length) setCloseTarget(null) }}>
       <Portal>
         <Dialog.Backdrop />

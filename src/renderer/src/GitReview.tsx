@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Dialog, Portal } from '@chakra-ui/react'
-import type { GitBranches, GitDiff, GitDiffArea, GitFileChange, GitRepoStatus, Session } from '../../shared/types'
+import type { GitBranches, GitCommitSummary, GitDiff, GitDiffArea, GitFileChange, GitPushInfo, GitRepoStatus, Session } from '../../shared/types'
 
 const POLL_MS = 4000
 const MODEL_KEY = 'shumora.commitModel'
@@ -94,9 +94,49 @@ function GitReviewDialog({ sessionId, status, error, refresh, onClose }: { sessi
   const [diff, setDiff] = useState<GitDiff>()
   const [actionError, setActionError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [pushing, setPushing] = useState(false)
+  const [pushOpen, setPushOpen] = useState(false)
   const [confirm, setConfirm] = useState<GitFileChange>()
+  const [checkedStaged, setCheckedStaged] = useState<Set<string>>(new Set())
+  const [checkedUnstaged, setCheckedUnstaged] = useState<Set<string>>(new Set())
   const request = useRef(0)
+
+  const validCheckedStaged = useMemo(() => {
+    const paths = new Set(staged.map((c) => c.path))
+    return new Set([...checkedStaged].filter((p) => paths.has(p)))
+  }, [staged, checkedStaged])
+
+  const validCheckedUnstaged = useMemo(() => {
+    const paths = new Set(unstaged.map((c) => c.path))
+    return new Set([...checkedUnstaged].filter((p) => paths.has(p)))
+  }, [unstaged, checkedUnstaged])
+
+  const toggleStaged = (path: string) => {
+    setCheckedStaged((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
+  const toggleAllStaged = () => {
+    if (validCheckedStaged.size === staged.length) setCheckedStaged(new Set())
+    else setCheckedStaged(new Set(staged.map((c) => c.path)))
+  }
+
+  const toggleUnstaged = (path: string) => {
+    setCheckedUnstaged((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
+  const toggleAllUnstaged = () => {
+    if (validCheckedUnstaged.size === unstaged.length) setCheckedUnstaged(new Set())
+    else setCheckedUnstaged(new Set(unstaged.map((c) => c.path)))
+  }
 
   // Keep the selection valid as files move between sections; fall back to the first available file.
   const valid = (s?: Selection) => !!s && (s.area === 'staged' ? staged : unstaged).some((c) => c.path === s.path)
@@ -119,10 +159,6 @@ function GitReviewDialog({ sessionId, status, error, refresh, onClose }: { sessi
     setBusy(true); setActionError('')
     try { await run(); await refresh() } catch (e) { setActionError(String(e)) } finally { setBusy(false); setConfirm(undefined) }
   }
-  async function doPush() {
-    setPushing(true); setActionError('')
-    try { await ws.gitPush(sessionId); await refresh() } catch (e) { setActionError(String(e)) } finally { setPushing(false) }
-  }
   const ws = window.workspace
 
   return <Dialog.Root open onOpenChange={({ open }) => { if (!open) onClose() }} placement="center" size="cover" scrollBehavior="inside">
@@ -130,10 +166,17 @@ function GitReviewDialog({ sessionId, status, error, refresh, onClose }: { sessi
       <Dialog.Header className="git-review-header">
         <Dialog.Title>Source control <span className="git-branch">⎇ {status.detached ? 'HEAD (detached)' : status.branch}{status.operation ? ` · ${status.operation} in progress` : ''}</span></Dialog.Title>
         <div className="git-review-actions">
-          <Button size="xs" variant="outline" className={`git-push-action ${status.ahead ? 'git-action-primary' : ''}`} disabled={busy || pushing || status.detached || !!status.operation} loading={pushing} onClick={() => void doPush()} title={status.ahead ? `git push (${status.ahead} commit${status.ahead > 1 ? 's' : ''} to ${status.upstream || 'remote'})` : 'git push'}>
+          {status.lastCommit && (
+            <div className="git-last-commit" title={`Latest commit: ${status.lastCommit.hash} · ${status.lastCommit.subject} (${status.lastCommit.date})`}>
+              <span className="git-last-commit-icon" aria-hidden="true">⦿</span>
+              <span className="git-last-commit-hash">{status.lastCommit.hash}</span>
+              <span className="git-last-commit-subject">{status.lastCommit.subject}</span>
+            </div>
+          )}
+          <Button size="xs" variant="outline" className={`git-push-action ${status.ahead ? 'git-action-primary' : ''}`} disabled={busy || status.detached || !!status.operation} onClick={() => setPushOpen(true)} title={status.ahead ? `git push (${status.ahead} commit${status.ahead > 1 ? 's' : ''} to ${status.upstream || 'remote'})` : 'git push'}>
             <svg className="git-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M5 15v5h14v-5" /></svg><span>git push</span>{!!status.ahead && <span className="git-push-count">{status.ahead}</span>}
           </Button>
-          <Button className="git-refresh-action" size="xs" variant="ghost" disabled={busy || pushing} onClick={() => void refresh()} title="Refresh changes"><svg className="git-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6 7a7 7 0 0 1 11-1l3 6M4 12l3 6a7 7 0 0 0 11-1" /></svg><span>Refresh</span></Button>
+          <Button className="git-refresh-action" size="xs" variant="ghost" disabled={busy} onClick={() => void refresh()} title="Refresh changes"><svg className="git-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6 7a7 7 0 0 1 11-1l3 6M4 12l3 6a7 7 0 0 0 11-1" /></svg><span>Refresh</span></Button>
           <Dialog.CloseTrigger asChild><Button className="git-close-action" size="xs" variant="ghost" aria-label="Close" title="Close"><svg className="git-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></Button></Dialog.CloseTrigger>
         </div>
       </Dialog.Header>
@@ -142,10 +185,66 @@ function GitReviewDialog({ sessionId, status, error, refresh, onClose }: { sessi
         <div className="git-layout">
           <div className="git-sidebar">
             <div className="git-files">
-              <FileSection title="Staged changes" area="staged" changes={staged} current={current} onSelect={setSelected}
-                action={staged.length ? <Button size="2xs" variant="ghost" disabled={busy} onClick={() => void act(() => ws.gitUnstageAll(sessionId))} title="git restore --staged . (Unstage all)">git restore --staged .</Button> : null} />
-              <FileSection title="Changes" area="unstaged" changes={unstaged} current={current} onSelect={setSelected}
-                action={unstaged.length ? <Button size="2xs" variant="ghost" disabled={busy} onClick={() => void act(() => ws.gitStageAll(sessionId))} title="git add . (Stage all)">git add .</Button> : null} />
+              <FileSection
+                title="Staged changes"
+                area="staged"
+                changes={staged}
+                current={current}
+                checked={validCheckedStaged}
+                onSelect={setSelected}
+                onToggle={toggleStaged}
+                onToggleAll={toggleAllStaged}
+                action={staged.length ? (
+                  <Button
+                    size="2xs"
+                    variant="ghost"
+                    className={validCheckedStaged.size ? 'git-action-primary' : ''}
+                    disabled={busy}
+                    onClick={() => {
+                      if (validCheckedStaged.size > 0) {
+                        const paths = Array.from(validCheckedStaged)
+                        setCheckedStaged(new Set())
+                        void act(() => ws.gitUnstage(sessionId, paths))
+                      } else {
+                        void act(() => ws.gitUnstageAll(sessionId))
+                      }
+                    }}
+                    title={validCheckedStaged.size ? `git restore --staged (${validCheckedStaged.size} selected)` : 'git restore --staged . (Unstage all)'}
+                  >
+                    {validCheckedStaged.size ? `git restore --staged (${validCheckedStaged.size})` : 'git restore --staged .'}
+                  </Button>
+                ) : null}
+              />
+              <FileSection
+                title="Changes"
+                area="unstaged"
+                changes={unstaged}
+                current={current}
+                checked={validCheckedUnstaged}
+                onSelect={setSelected}
+                onToggle={toggleUnstaged}
+                onToggleAll={toggleAllUnstaged}
+                action={unstaged.length ? (
+                  <Button
+                    size="2xs"
+                    variant="ghost"
+                    className={validCheckedUnstaged.size ? 'git-action-primary' : ''}
+                    disabled={busy}
+                    onClick={() => {
+                      if (validCheckedUnstaged.size > 0) {
+                        const paths = Array.from(validCheckedUnstaged)
+                        setCheckedUnstaged(new Set())
+                        void act(() => ws.gitStage(sessionId, paths))
+                      } else {
+                        void act(() => ws.gitStageAll(sessionId))
+                      }
+                    }}
+                    title={validCheckedUnstaged.size ? `git add (${validCheckedUnstaged.size} selected)` : 'git add . (Stage all)'}
+                  >
+                    {validCheckedUnstaged.size ? `git add (${validCheckedUnstaged.size})` : 'git add .'}
+                  </Button>
+                ) : null}
+              />
               {status.truncated && <p className="git-note">Showing the first {status.changes.length} files.</p>}
             </div>
             <CommitBox sessionId={sessionId} stagedCount={staged.length} blocked={status.changes.some((c) => c.status === 'conflicted')} refresh={refresh} />
@@ -153,14 +252,6 @@ function GitReviewDialog({ sessionId, status, error, refresh, onClose }: { sessi
           {!change || !current ? <div className="git-empty">Working tree clean. No changes to review.</div> : <section className="git-diff" aria-label={`Diff of ${current.path}`}>
             <div className="git-diff-toolbar">
               <span className="git-path" title={current.path}>{change.oldPath && current.area === 'staged' ? `${change.oldPath} → ` : ''}{current.path}</span>
-              <div>
-                {current.area === 'staged'
-                  ? <Button size="xs" variant="outline" disabled={busy} onClick={() => void act(() => ws.gitUnstage(sessionId, change.path))} title={`git restore --staged ${change.path}`}>git restore --staged</Button>
-                  : <>
-                    <Button size="xs" variant="outline" className="git-action-danger" disabled={busy || change.status === 'conflicted'} onClick={() => setConfirm(change)} title={`git restore ${change.path}`}>git restore</Button>
-                    <Button size="xs" className="git-action-primary" disabled={busy} onClick={() => void act(() => ws.gitStage(sessionId, change.path))} title={change.status === 'conflicted' ? `git add ${change.path} (resolve)` : `git add ${change.path}`}>{change.status === 'conflicted' ? 'git add (resolve)' : 'git add'}</Button>
-                  </>}
-              </div>
             </div>
             <DiffView diff={diff?.path === current.path && diff.area === current.area ? diff : undefined} area={current.area} conflicted={change.status === 'conflicted'} />
           </section>}
@@ -180,22 +271,74 @@ function GitReviewDialog({ sessionId, status, error, refresh, onClose }: { sessi
         </Dialog.Footer>
       </Dialog.Content></Dialog.Positioner></Portal>
     </Dialog.Root>
+    {pushOpen && <PushDialog sessionId={sessionId} status={status} refresh={refresh} onClose={() => setPushOpen(false)} />}
   </Dialog.Root>
 }
 
-function FileSection({ title, area, changes, current, onSelect, action }: { title: string; area: GitDiffArea; changes: GitFileChange[]; current?: Selection; onSelect: (s: Selection) => void; action: React.ReactNode }) {
+function FileSection({
+  title,
+  area,
+  changes,
+  current,
+  checked,
+  onSelect,
+  onToggle,
+  onToggleAll,
+  action
+}: {
+  title: string
+  area: GitDiffArea
+  changes: GitFileChange[]
+  current?: Selection
+  checked: Set<string>
+  onSelect: (s: Selection) => void
+  onToggle: (path: string) => void
+  onToggleAll: () => void
+  action: React.ReactNode
+}) {
+  const allChecked = changes.length > 0 && checked.size === changes.length
   return <section className="git-section" aria-label={title}>
-    <header><span>{title}</span><span className="git-badge">{changes.length}</span><span className="git-spacer" />{action}</header>
+    <header>
+      <input
+        type="checkbox"
+        className="git-file-checkbox"
+        aria-label={`Select all in ${title}`}
+        checked={allChecked}
+        disabled={!changes.length}
+        onChange={onToggleAll}
+        title={allChecked ? 'Deselect all' : 'Select all'}
+      />
+      <span>{title}</span>
+      <span className="git-badge">{changes.length}</span>
+      <span className="git-spacer" />
+      {action}
+    </header>
     {!changes.length ? <p className="git-section-empty">{area === 'staged' ? 'Nothing staged yet.' : 'No unstaged changes.'}</p> : <ul>
       {changes.map((c) => {
         const kind = (area === 'staged' ? c.indexStatus : c.worktreeStatus) ?? c.status
         const s = area === 'staged' ? c.stagedStats : c.unstagedStats
         const active = current?.path === c.path && current.area === area
-        return <li key={c.path}><button type="button" className={active ? 'active' : ''} aria-current={active || undefined} onClick={() => onSelect({ path: c.path, area })} title={c.oldPath ? `${c.oldPath} → ${c.path}` : c.path}>
-          <span className={`git-mark ${kind}`} title={kind}>{MARK[kind]}</span>
-          <span className="git-path">{c.path}</span>
-          {s?.insertions !== undefined && <span className="git-stat"><span className="git-plus">+{s.insertions}</span> <span className="git-minus">−{s.deletions}</span></span>}
-        </button></li>
+        const isChecked = checked.has(c.path)
+        return <li key={c.path} className={`git-file-item ${active ? 'active' : ''}`}>
+          <input
+            type="checkbox"
+            className="git-file-checkbox"
+            aria-label={`Select ${c.path} in ${title}`}
+            checked={isChecked}
+            onChange={(e) => { e.stopPropagation(); onToggle(c.path) }}
+          />
+          <button
+            type="button"
+            className="git-file-btn"
+            aria-current={active || undefined}
+            onClick={() => onSelect({ path: c.path, area })}
+            title={c.oldPath ? `${c.oldPath} → ${c.path}` : c.path}
+          >
+            <span className={`git-mark ${kind}`} title={kind}>{MARK[kind]}</span>
+            <span className="git-path">{c.path}</span>
+            {s?.insertions !== undefined && <span className="git-stat"><span className="git-plus">+{s.insertions}</span> <span className="git-minus">−{s.deletions}</span></span>}
+          </button>
+        </li>
       })}
     </ul>}
   </section>
@@ -317,6 +460,96 @@ function BranchDialog({ sessionId, status, others, self, refresh, onClose }: { s
 function BranchGroup({ title, children }: { title: string; children: React.ReactNode[] }) {
   if (!children.length) return null
   return <div role="group" aria-label={`${title} branches`}><p className="git-group-title">{title}</p>{children}</div>
+}
+
+export function PushDialog({ sessionId, status, refresh, onClose }: { sessionId: string; status: GitRepoStatus; refresh: () => Promise<void>; onClose: () => void }) {
+  const [branches, setBranches] = useState<GitBranches>()
+  const [selectedBranch, setSelectedBranch] = useState(status.branch || '')
+  const [info, setInfo] = useState<GitPushInfo>()
+  const [loading, setLoading] = useState(true)
+  const [pushing, setPushing] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    window.workspace.gitBranches(sessionId).then(setBranches).catch((e) => setError(String(e)))
+  }, [sessionId])
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    setError('')
+    window.workspace.gitPushInfo(sessionId, selectedBranch || undefined)
+      .then((data) => { if (alive) { setInfo(data); setLoading(false) } })
+      .catch((e) => { if (alive) { setError(String(e)); setLoading(false) } })
+    return () => { alive = false }
+  }, [sessionId, selectedBranch])
+
+  async function doPush() {
+    setPushing(true)
+    setError('')
+    try {
+      await window.workspace.gitPush(sessionId, { branch: selectedBranch, setUpstream: !info?.hasUpstream })
+      onClose()
+      void refresh()
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setPushing(false)
+    }
+  }
+
+  const localBranches = branches?.local ?? (status.branch ? [{ name: status.branch, current: true }] : [])
+  const commitCount = info?.commits.length ?? 0
+  const canPush = !loading && !pushing && (commitCount > 0 || !info?.hasUpstream)
+
+  return <Dialog.Root open onOpenChange={({ open }) => { if (!open && !pushing) onClose() }} placement="center" size="md" scrollBehavior="inside">
+    <Portal><Dialog.Backdrop /><Dialog.Positioner><Dialog.Content className="git-review git-push-dialog">
+      <Dialog.Header className="git-review-header">
+        <Dialog.Title>Git push</Dialog.Title>
+        <Dialog.CloseTrigger asChild><Button size="xs" variant="ghost" disabled={pushing} aria-label="Close" title="Close">✕</Button></Dialog.CloseTrigger>
+      </Dialog.Header>
+      <Dialog.Body className="git-push-body">
+        {error && <div className="terminal-error git-pre" role="alert">{error}</div>}
+        <div className="git-push-field">
+          <label className="git-push-label" htmlFor="git-push-branch-select">Target branch</label>
+          <div className="git-push-select-wrap">
+            <select id="git-push-branch-select" className="git-push-select" aria-label="Target branch" value={selectedBranch} disabled={loading || pushing || !localBranches.length} onChange={(e) => setSelectedBranch(e.target.value)}>
+              {localBranches.map((b) => <option key={b.name} value={b.name}>{b.name}{b.current ? ' (current)' : ''}</option>)}
+            </select>
+          </div>
+        </div>
+        {info && <div className="git-push-remote-target">
+          <span className="git-push-target-text">
+            {info.hasUpstream
+              ? <>Pushing to upstream <strong>{info.upstream}</strong></>
+              : <>Publishing as new branch to <strong>{info.remote || 'origin'}/{selectedBranch}</strong></>}
+          </span>
+        </div>}
+        {info && info.behind > 0 && <div className="git-warning git-push-behind-alert" role="alert">
+          ⚠️ Remote has <strong>{info.behind}</strong> commit{info.behind > 1 ? 's' : ''} that you do not have locally. Push may be rejected; pull changes first.
+        </div>}
+        <div className="git-push-commits-section">
+          <div className="git-push-commits-header">
+            <span>Commits to push</span>
+            <span className="git-badge">{loading ? '…' : commitCount}</span>
+          </div>
+          {loading ? <p className="git-note">Loading commits…</p> : commitCount === 0 ? <p className="git-push-empty">No unpushed commits. Branch is up to date.</p> : <ul className="git-unpushed-list" role="list">
+            {info?.commits.map((c) => <li key={c.hash} className="git-unpushed-item">
+              <span className="git-commit-hash">{c.hash}</span>
+              <span className="git-commit-subject" title={c.subject}>{c.subject}</span>
+              <span className="git-commit-date">{c.date}</span>
+            </li>)}
+          </ul>}
+        </div>
+      </Dialog.Body>
+      <Dialog.Footer className="git-push-footer">
+        <Button size="sm" variant="outline" disabled={pushing} onClick={onClose}>Cancel</Button>
+        <Button size="sm" className="git-action-primary" loading={pushing} disabled={!canPush} onClick={() => void doPush()}>
+          {pushing ? 'Pushing to remote…' : commitCount > 0 ? `Push ${commitCount} commit${commitCount > 1 ? 's' : ''}` : 'Push'}
+        </Button>
+      </Dialog.Footer>
+    </Dialog.Content></Dialog.Positioner></Portal>
+  </Dialog.Root>
 }
 
 function DiffView({ diff, area, conflicted }: { diff?: GitDiff; area: GitDiffArea; conflicted: boolean }) {
