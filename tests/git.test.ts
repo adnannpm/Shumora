@@ -157,7 +157,9 @@ it('lists, creates and switches branches, stashing when asked', async () => {
   git('stash', 'pop', '-q')
   await service.switchBranch(dir, 'feature/x')
   expect(read('a.ts')).toBe('wip\n')
-})
+// Branch validation, status checks and stash operations spawn many real Git
+// processes; allow the same Windows CI budget as the staging integration test.
+}, 30_000)
 
 it('restores stashed work when the switch fails', async () => {
   const service = new GitService(async () => {})
