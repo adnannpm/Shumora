@@ -1,9 +1,23 @@
-export interface PluginMetadata<Id extends '9router' | 'pi' = '9router'> {
+declare global { interface Window { appClipboard?: { writeText(text: string): Promise<void> } } }
+export type ManagerPluginId = 'pnpm' | 'bun' | 'yarn'
+export type PluginId = '9router' | 'pi' | 'opencode' | ManagerPluginId
+export interface ManagerPluginsAPI {
+  status(id: ManagerPluginId, refresh?: boolean): Promise<PluginMetadata<ManagerPluginId>>
+  mutate(id: ManagerPluginId, action: PluginAction, version?: string, manager?: PackageManager): Promise<PluginMetadata<ManagerPluginId>>
+  onOperation(id: ManagerPluginId, callback: (operation: PluginOperation) => void): () => void
+}
+declare global { interface Window { managerPlugins: ManagerPluginsAPI } }
+export type PackageManager = 'npm' | 'pnpm' | 'bun' | 'yarn'
+export interface PluginMetadata<Id extends PluginId = '9router'> {
   id: Id
   name: string
   description: string
   repository: string
   installed: boolean
+  managed?: boolean
+  installationKind?: 'package-manager' | 'pi-windows-installer' | 'external'
+  packageManager?: PackageManager
+  availableManagers?: PackageManager[]
   installedVersion?: string
   executable?: string
   latestVersion?: string
@@ -17,11 +31,19 @@ export type RouterPlugin = PluginMetadata<'9router'>
 export type PiPlugin = PluginMetadata<'pi'>
 export interface PiPluginAPI {
   status(refresh?: boolean): Promise<PiPlugin>
-  mutate(action: PluginAction, version?: string): Promise<PiPlugin>
+  mutate(action: PluginAction, version?: string, manager?: PackageManager): Promise<PiPlugin>
   operation(): Promise<PluginOperation>
   onOperation(callback: (operation: PluginOperation) => void): () => void
 }
-declare global { interface Window { piPlugin: PiPluginAPI } }
+export interface OpenCodePluginAPI {
+  status(refresh?: boolean): Promise<PluginMetadata<'opencode'>>
+  mutate(action: PluginAction, version?: string, manager?: PackageManager): Promise<PluginMetadata<'opencode'>>
+  operation(): Promise<PluginOperation>
+  onOperation(callback: (operation: PluginOperation) => void): () => void
+}
+export interface NodeInstallation { installed: boolean; installedVersion?: string; executable?: string }
+export interface NodePluginAPI { status(): Promise<NodeInstallation> }
+declare global { interface Window { piPlugin: PiPluginAPI; opencodePlugin: OpenCodePluginAPI; nodePlugin: NodePluginAPI } }
 export type PluginAction = 'install' | 'update' | 'uninstall'
 export interface PluginOperation {
   status: 'idle' | 'running' | 'success' | 'failed'
@@ -57,6 +79,6 @@ export interface PluginsAPI {
   operation(): Promise<PluginOperation>
   onOperation(callback: (operation: PluginOperation) => void): () => void
   status(refresh?: boolean): Promise<RouterPlugin>
-  mutate(action: PluginAction, version?: string): Promise<RouterPlugin>
+  mutate(action: PluginAction, version?: string, manager?: PackageManager): Promise<RouterPlugin>
 }
 declare global { interface Window { plugins: PluginsAPI } }

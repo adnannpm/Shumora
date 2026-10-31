@@ -1,3 +1,5 @@
+import { ToolCacheSettings } from './ToolCacheSettings'
+import { AppCheckbox } from './AppCheckbox'
 import { isLanguage, useLanguage } from './Language'
 import { useEffect, useState } from 'react'
 import { Button } from '@chakra-ui/react'
@@ -9,8 +11,8 @@ import { CouncilRolesSettings } from './CouncilRoles'
 
 const themes = ['light', 'dark', 'auto'] as const
 const themeLabels = { light: 'Light', dark: 'Dark', auto: 'Auto' }
-type Section = 'general' | 'workspace' | 'about'
-const sections = { general: 'General', workspace: 'Workspace', about: 'About & Updates' } as const
+type Section = 'general' | 'workspace' | 'storage' | 'about'
+const sections = { general: 'General', workspace: 'Workspace', storage: 'Storage', about: 'About & Updates' } as const
 export function Settings() {
   const { t, language, setLanguage } = useLanguage()
   const [section, setSection] = useState<Section>('general')
@@ -59,10 +61,11 @@ export function Settings() {
         {section === 'workspace' && <>
           <h2>{t('Workspace')}</h2><p>{t('Terminal behavior and tools for troubleshooting Pi.')}</p>
           <section className="settings-section"><h3>{t('Terminal')}</h3><dl className="settings-details"><div><dt>{t('Terminal appearance')}</dt><dd>{t('Always dark')}</dd></div><div><dt>{t('Runtime')}</dt><dd>{t('Installed Pi Coding Agent')}</dd></div><div><dt>{t('Session behavior')}</dt><dd>{t('Hidden sessions keep running')}</dd></div></dl><p className="settings-note">{t('Font and terminal palette controls are not available yet.')}</p></section>
-          <section className="settings-section"><div className="settings-row"><div><h3>{t('Agent notifications')}</h3><p>{t('Notify when an agent finishes or fails while Shumora is in the background.')}</p></div><input type="checkbox" aria-label={t('Agent notifications')} checked={notifications} onChange={event => void changeNotifications(event.target.checked)} /></div>{notificationError && <p role="alert">{t('Could not save notification preference.')}</p>}</section>
+          <section className="settings-section"><div className="settings-row"><div><h3>{t('Agent notifications')}</h3><p>{t('Notify when an agent finishes or fails while Shumora is in the background.')}</p></div><AppCheckbox aria-label={t('Agent notifications')} checked={notifications} onCheckedChange={checked => void changeNotifications(checked)} /></div>{notificationError && <p role="alert">{t('Could not save notification preference.')}</p>}</section>
           <CouncilRolesSettings />
           <section className="settings-section"><Diagnostics embedded /></section>
         </>}
+        {section === 'storage' && <ToolCacheSettings />}
         {section === 'about' && <>
           <h2>{t('About & Updates')}</h2><p>{t('A desktop workspace for independent Pi Coding Agent sessions.')}</p>
           <section className="settings-section"><Updates embedded /></section>

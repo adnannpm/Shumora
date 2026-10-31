@@ -50,6 +50,7 @@ export class RouterCatalog {
   async custom(input: RouterCustomInput): Promise<string> {
     const base = new URL(text(input.baseUrl, 'base URL', 2000))
     if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password || base.search || base.hash) throw new Error('Use an HTTP(S) base URL without credentials or query parameters')
+    if (base.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(base.hostname)) throw new Error('Remote providers require HTTPS. HTTP is allowed only for loopback endpoints.')
     if (!['openai-compatible', 'anthropic-compatible'].includes(input.type) || !['chat', 'responses'].includes(input.apiType)) throw new Error('Invalid endpoint type')
     const data = await request('provider-nodes', 'POST', { name: text(input.name, 'name'), prefix: id(input.prefix), baseUrl: base.toString().replace(/\/$/, ''), type: input.type, apiType: input.apiType })
     return id(data.node?.id)

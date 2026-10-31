@@ -21,7 +21,7 @@ try {
     assert.equal(styles.height, '10px', 'horizontal scrollbar should match vertical')
     assert.notEqual(styles.color, 'rgba(0, 0, 0, 0)', 'thumb must remain visible at rest')
     assert.equal(styles.radius, '8px', 'thumb should have a rounded edge')
-    assert.equal(styles.terminal, '0px', 'native terminal scrollbar must remain hidden')
+    assert.equal(styles.terminal, '10px', 'terminal viewport must not suppress native scrollbar chrome')
     colors.push(styles.color)
     await page.locator('.settings-content').focus()
     await page.keyboard.press('End')
@@ -32,7 +32,36 @@ try {
     await page.emulateMedia({ forcedColors: 'none' })
   }
   assert.notEqual(colors[0], colors[1], 'thumb should adapt to the application theme')
-  console.log('PASS: shared horizontal/vertical scrollbars, light/dark tokens, keyboard scrolling, high contrast and hidden terminal scrollbar.')
+  // Use the real terminal, not a mocked viewport, to exercise wheel and drag scrolling.
+  const xtermCss = await readFile(new URL('../node_modules/@xterm/xterm/css/xterm.css', import.meta.url), 'utf8')
+  await page.setContent('<style></style><div class="terminal-host" style="width:640px;height:240px"></div>')
+  await page.locator('style').evaluate((el, css) => { el.textContent = css }, `${xtermCss}\n${css}`)
+  await page.addScriptTag({ path: new URL('../node_modules/@xterm/xterm/lib/xterm.js', import.meta.url).pathname })
+  await page.evaluate(async () => {
+    window.term = new window.Terminal({ cols: 60, rows: 10, scrollback: 5000 })
+    window.term.open(document.querySelector('.terminal-host'))
+    await new Promise(resolve => window.term.write(Array.from({ length: 150 }, (_, i) => `Line ${i}\r\n`).join(''), resolve))
+  })
+  const scrollbar = page.locator('.xterm-scrollable-element > .scrollbar.vertical')
+  await page.locator('.xterm-screen').hover()
+  await page.waitForFunction(() => {
+    const el = document.querySelector('.scrollbar.vertical')
+    const style = getComputedStyle(el)
+    return style.visibility !== 'hidden' && style.pointerEvents !== 'none' && Number(style.opacity) > 0
+  }, undefined, { timeout: 3000 })
+  const bottom = await page.evaluate(() => window.term.buffer.active.viewportY)
+  await page.mouse.wheel(0, -240)
+  await page.waitForFunction(bottom => window.term.buffer.active.viewportY < bottom, bottom)
+  await page.evaluate(() => window.term.scrollToBottom())
+  await page.waitForFunction(bottom => window.term.buffer.active.viewportY === bottom, bottom)
+  const slider = await scrollbar.locator('.slider').boundingBox()
+  assert.ok(slider, 'terminal scrollbar slider must be present')
+  await page.mouse.move(slider.x + slider.width / 2, slider.y + slider.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(slider.x + slider.width / 2, slider.y - 100, { steps: 10 })
+  await page.mouse.up()
+  await page.waitForFunction(bottom => window.term.buffer.active.viewportY < bottom, bottom)
+  console.log('PASS: shared scrollbars and real xterm wheel/scrollbar drag scrolling.')
 } finally {
   await browser.close()
 }

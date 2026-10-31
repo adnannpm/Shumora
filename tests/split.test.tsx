@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, render, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { Session } from '../src/shared/types'
 const mounts = vi.hoisted(() => ({ count: 0 }))
@@ -10,6 +10,10 @@ vi.mock('../src/renderer/src/TerminalPane', () => ({ TerminalPane: ({ session, v
 } }))
 import App from '../src/renderer/src/App'
 import { Provider } from '../src/renderer/src/Provider'
+beforeEach(() => {
+  window.piPlugin = { status: async () => ({ installed: true }) } as any
+  window.plugins = { status: async () => ({ installed: true }) } as any
+})
 afterEach(cleanup)
 it('preserves terminal mounts when splitting, moving tabs and merging groups', async () => {
   const list: Session[] = [1, 2, 3].map(n => ({ id: String(n), name: `Pi ${n}`, cwd: '/tmp', status: 'running', generation: 1 }))

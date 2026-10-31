@@ -2,6 +2,7 @@
 import React from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { Provider } from '../src/renderer/src/Provider'
 import { MeetingRoom } from '../src/renderer/src/MeetingRoom'
 import type { MeetingSnapshot } from '../src/shared/meetings'
 afterEach(() => { cleanup(); delete window.meetings })
@@ -16,7 +17,7 @@ function setup() {
   const api = { snapshot: vi.fn(async () => snapshot), start: vi.fn(async () => {}), pause: vi.fn(async () => {}), resume: vi.fn(async () => {}), stop: vi.fn(async () => {}), takeOver: vi.fn(async () => {}), direction: vi.fn(async () => {}), onChange: (fn: typeof listener) => { listener = fn; return () => {} } }
   window.meetings = api
   const update = (patch: Partial<MeetingSnapshot['state']>) => act(() => { snapshot = { ...snapshot, state: { ...snapshot.state, revision: snapshot.state.revision + 1, ...patch } }; listener(snapshot) })
-  const view = render(<MeetingRoom sessions={sessions} />)
+  const view = render(<Provider><MeetingRoom sessions={sessions} /></Provider>)
   return { api, update, view }
 }
 it('presents Council setup with a topic workspace and a separate member panel', async () => {
@@ -30,7 +31,7 @@ it('presents Council setup with a topic workspace and a separate member panel', 
   await waitFor(() => expect((screen.getByLabelText('Invite Design') as HTMLInputElement).disabled).toBe(false))
   expect((screen.getByRole('button', { name: /Start Council/ }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByLabelText('Invite Design'))
-  expect(screen.getByText('1/8')).toBeTruthy()
+  await waitFor(() => expect(screen.getByText('1/8')).toBeTruthy())
 })
 it('shows the live member roles, current speaker and distinct summary', async () => {
   const { update } = setup()
@@ -71,7 +72,7 @@ it('starts an automatic meeting with one action and renders real replies without
   fireEvent.change(screen.getByLabelText('Discussion topic'), { target: { value: 'Launch plan' } })
   fireEvent.click(screen.getByLabelText('Invite Design'))
   fireEvent.click(screen.getByLabelText('Invite Engineering'))
-  expect(screen.getByRole('combobox', { name: 'Division for Design' })).toBeTruthy()
+  await screen.findByRole('combobox', { name: 'Division for Design' })
   fireEvent.change(screen.getByRole('combobox', { name: 'Division for Design' }), { target: { value: 'frontend' } })
   fireEvent.click(screen.getByRole('button', { name: 'Start Council' }))
   await waitFor(() => expect(api.start).toHaveBeenCalledWith(expect.objectContaining({ agenda: 'Launch plan', leader: 'user', participants: expect.arrayContaining([expect.objectContaining({ id: 'a', role: 'Frontend' }), expect.objectContaining({ id: 'b', role: '' })]) })))
@@ -138,7 +139,7 @@ it('keeps the reading position on new replies and offers an explicit jump to new
   expect(screen.queryByRole('button', { name: /new messages/ })).toBeNull()
 })
 it('shows missing bridge guidance instead of offering fake automated meetings', () => {
-  render(<MeetingRoom sessions={sessions} />)
+  render(<Provider><MeetingRoom sessions={sessions} /></Provider>)
   expect(screen.getByText('Restart Shumora to enable Council.')).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'Start Council' })).toBeNull()
 })

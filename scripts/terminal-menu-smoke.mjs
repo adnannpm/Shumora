@@ -1,0 +1,42 @@
+import { chromium } from '@playwright/test'
+import assert from 'node:assert/strict'
+import { mkdir } from 'node:fs/promises'
+const out='/tmp/terminal-menu-audit'; await mkdir(out,{recursive:true})
+const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || undefined,headless:true})
+try {
+const page=await browser.newPage({viewport:{width:1100,height:760}})
+await page.addInitScript(()=>{
+ localStorage.setItem('shumora.theme','light')
+ const sessions=[1,2].map(n=>({id:String(n),name:'Pi '+n,cwd:'/project/'+n,status:'running',generation:1}))
+ window.workspace={gitStatus:async()=>({isRepo:false,changes:[]}),list:async()=>sessions,folder:async()=>'/project',onEvent:()=>()=>{},snapshot:async id=>({session:sessions.find(s=>s.id===id),seq:0,output:'Terminal ready\r\n'}),resize:async()=>{},input:async()=>{},setNotificationsEnabled:async()=>{}}
+})
+await page.goto(process.env.APP_URL || 'http://localhost:5173')
+const got=page.getByRole('button',{name:'Got it',exact:true}); if(await got.count()) await got.click()
+await page.getByRole('tab',{name:'Pi 2',exact:true}).waitFor()
+await page.getByRole('tab',{name:'Pi 1',exact:true}).click()
+await page.waitForTimeout(120)
+await page.getByRole('tab',{name:'Pi 2',exact:true}).click({button:'right'})
+await page.waitForTimeout(120)
+assert.equal(await page.getByRole('menuitem',{name:'Rename',exact:true}).evaluate(el=>el===document.activeElement),true,'Inactive terminal must not steal menu focus')
+await page.screenshot({path:out+'/light-menu.png'})
+await page.keyboard.press('ArrowDown')
+assert.equal(await page.getByRole('menuitem',{name:'Duplicate',exact:true}).evaluate(el=>el===document.activeElement),true)
+await page.keyboard.press('Escape')
+await page.getByRole('tab',{name:'Pi 2',exact:true}).click({button:'right'})
+await page.getByRole('menuitem',{name:'Rename',exact:true}).click()
+console.log('rename focus immediate:',await page.evaluate(()=>({active:document.activeElement?.tagName,role:document.activeElement?.getAttribute('role')})))
+await page.waitForTimeout(120)
+assert.equal(await page.getByRole('textbox',{name:'Rename terminal'}).evaluate(el=>el===document.activeElement),true)
+await page.keyboard.press('Escape')
+await page.getByRole('tab',{name:'Pi 2',exact:true}).click({button:'right'})
+await page.keyboard.press('Tab')
+assert.equal(await page.getByRole('button',{name:'Close Pi 2',exact:true}).evaluate(el=>el===document.activeElement),true)
+await page.setViewportSize({width:640,height:600})
+await page.getByRole('tab',{name:'Pi 2',exact:true}).click({button:'right'})
+await page.screenshot({path:out+'/light-narrow.png'})
+await page.evaluate(()=>{document.documentElement.classList.add('dark');document.documentElement.dataset.theme='dark'})
+await page.setViewportSize({width:1100,height:760})
+await page.getByRole('tab',{name:'Pi 2',exact:true}).click({button:'right'})
+await page.screenshot({path:out+'/dark-menu.png'})
+console.log('PASS: xterm menu focus, arrow navigation, rename focus and Tab return. Screenshots:',out)
+} finally {await browser.close()}

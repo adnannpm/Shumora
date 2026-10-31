@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import type { Session } from '../src/shared/types'
 const terminals = vi.hoisted(() => [] as Array<{ input: (data: string) => void; options: Record<string, unknown>; addons: Array<{ dispose?: () => void }>; disposed: boolean }>)
 const imageAddons = vi.hoisted(() => [] as Array<{ options: Record<string, unknown>; dispose: ReturnType<typeof vi.fn> }>)
@@ -25,6 +25,26 @@ vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }))
 import { TerminalPane } from '../src/renderer/src/TerminalPane'
 import { Provider } from '../src/renderer/src/Provider'
 afterEach(() => { cleanup(); terminals.length = 0; imageAddons.length = 0; vi.unstubAllGlobals() })
+it.each(['[pi-9router-ext] Press any key to continue', 'Continue? [y/n]', '\r\nPi ready'])('removes the text-free spinner on initial output: %s', async output => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  const session: Session = { id: 'one', name: 'Pi 1', cwd: '/tmp', status: 'running', generation: 1 }
+  let listener: (event: any) => void = () => {}
+  window.workspace = { snapshot: async () => ({ session, output: '', seq: 0 }), onEvent: (callback: typeof listener) => { listener = callback; return () => {} } } as any
+  render(<Provider><TerminalPane session={session} visible={true} focused={false} onFocus={() => {}} /></Provider>)
+  expect(screen.getByRole('progressbar').textContent).toBe('')
+  await act(async () => {})
+  act(() => listener({ type: 'data', id: 'one', generation: 1, seq: 1, data: output }))
+  expect(screen.queryByRole('progressbar')).toBeNull()
+})
+it('does not show loading over restored output or an exited session', async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  const session: Session = { id: 'one', name: 'Pi 1', cwd: '/tmp', status: 'running', generation: 1 }
+  window.workspace = { snapshot: async () => ({ session, output: 'Press any key to continue', seq: 1 }), onEvent: () => () => {} } as any
+  const view = render(<Provider><TerminalPane session={session} visible={false} focused={false} onFocus={() => {}} /></Provider>)
+  await waitFor(() => expect(screen.queryByRole('progressbar')).toBeNull())
+  view.rerender(<Provider><TerminalPane session={{ ...session, status: 'exited' }} visible={false} focused={false} onFocus={() => {}} /></Provider>)
+  expect(screen.queryByRole('progressbar')).toBeNull()
+})
 it('blocks input for stopped/failed sessions without recreating the terminal, and enables it after restart', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   const session: Session = { id: 'one', name: 'Pi 1', cwd: '/tmp', status: 'running', generation: 1 }

@@ -25,6 +25,7 @@ export function PackageDetails({ item, onBack }: { item: PiPackage; onBack: () =
   const statusRequest = useRef(0)
   const outputRef = useRef<HTMLPreElement>(null)
   const followOutput = useRef(true)
+  const revealOutput = useRef(false)
 
   async function checkStatus(preserveError = false) {
     const current = ++statusRequest.current
@@ -56,6 +57,11 @@ export function PackageDetails({ item, onBack }: { item: PiPackage; onBack: () =
   useEffect(() => {
     if (logsOpen && followOutput.current && outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight
   }, [operation.output, logsOpen])
+  function revealInstallationOutput() {
+    if (!revealOutput.current) return
+    revealOutput.current = false
+    requestAnimationFrame(() => outputRef.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }))
+  }
   async function copyLog() {
     try { await navigator.clipboard.writeText(operation.output); setNotice('Output copied') }
     catch { setNotice('Could not copy output') }
@@ -69,6 +75,8 @@ export function PackageDetails({ item, onBack }: { item: PiPackage; onBack: () =
     const action = confirm
     const current = generation.current
     ownsOperation.current = true
+    revealOutput.current = true
+    setLogsOpen(true)
     followOutput.current = true
     setConfirm(null); setError(''); setOperation({ status: 'running', output: 'Starting Pi package installation…\n' })
     try {
@@ -124,7 +132,7 @@ export function PackageDetails({ item, onBack }: { item: PiPackage; onBack: () =
         </>}
       </div>
     </footer>
-    <Dialog.Root open={confirm !== null} role="alertdialog" placement="center" onOpenChange={({ open }) => { if (!open) setConfirm(null) }}>
+    <Dialog.Root onExitComplete={revealInstallationOutput} open={confirm !== null} role="alertdialog" placement="center" onOpenChange={({ open }) => { if (!open) setConfirm(null) }}>
       <Portal><Dialog.Backdrop /><Dialog.Positioner><Dialog.Content className="library-dialog">
         <Dialog.Header><Dialog.Title>{confirm === 'uninstall' ? t("Uninstall") : confirm === 'update' ? t("Update") : t("Install")} {item.name}?</Dialog.Title></Dialog.Header>
         <Dialog.Body>{confirm === 'uninstall' ? t("This removes the package from your personal Pi configuration and managed installation.") : t("This installs version {version} for your Pi sessions.", { version: item.version })} {t("Third-party extensions can execute code and access files with your user permissions. Review and trust the package before continuing.")}<p className="settings-note">{t("All running Workspace sessions will be stopped, including hidden terminals. Save your work first. After a successful package change, only those sessions will restart as new Pi processes. Agent work and previous conversations will not resume automatically. If the package change fails, sessions remain stopped.")}</p></Dialog.Body>

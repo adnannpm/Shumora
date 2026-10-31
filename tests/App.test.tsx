@@ -3,7 +3,7 @@ import React from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Session, WorkspaceAPI } from '../src/shared/types'
-vi.mock('../src/renderer/src/TerminalPane', () => ({ TerminalPane: ({ session, visible, onFocus }: { session: Session; visible: boolean; onFocus: () => void }) => <div data-testid={session.id} data-visible={visible} onClick={onFocus}>{session.error}</div> }))
+vi.mock('../src/renderer/src/TerminalPane', () => ({ TerminalPane: ({ session, visible, focused, autoFocusBlocked, onFocus }: { session: Session; visible: boolean; focused: boolean; autoFocusBlocked: boolean; onFocus: () => void }) => <div data-testid={session.id} data-visible={visible} data-focused={focused && !autoFocusBlocked} onClick={onFocus}>{session.error}</div> }))
 import App from '../src/renderer/src/App'
 import { Provider } from '../src/renderer/src/Provider'
 beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }))
@@ -18,9 +18,19 @@ function setup(count = 1, approved = true) {
     rename: vi.fn(async (id, name) => { const session = { ...sessions.find(s => s.id === id)!, name }; sessions = sessions.map(s => s.id === id ? session : s); return session }),
     close: vi.fn(async () => approved), folder: async () => '/tmp', chooseFolder: vi.fn(async () => '/project'), onEvent: vi.fn(() => () => {}), snapshot: vi.fn(), input: vi.fn(), resize: vi.fn(), stop: vi.fn(), restart: vi.fn()
   }
+  window.piPlugin = { status: async () => ({ installed: true }) } as any
   window.plugins = { status: async () => ({ id: '9router', installed: true }) } as any
   window.workspace = api; render(<Provider><App /></Provider>); return api
 }
+it('creates sessions directly without a setup modal when Pi is installed', async () => {
+  const api = setup()
+  await screen.findByRole('tab', { name: 'Pi 1' })
+  fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
+  await screen.findByRole('tab', { name: 'Pi 2' })
+  expect(api.create).toHaveBeenCalledTimes(1)
+  expect(screen.queryByRole('heading', { name: 'Set up your Terminals' })).toBeNull()
+})
+
 it('focuses an Explorer-opened terminal and switches back from Settings', async () => {
   const api = setup()
   await screen.findByRole('tab', { name: 'Pi 1' })
@@ -59,6 +69,8 @@ it('slides tabs horizontally without browser dragging or restarting Pi', async (
   fireEvent.pointerDown(tabs[2], { clientX: 250, button: 0 })
   fireEvent.pointerMove(tabs[2], { clientX: 20, clientY: 500 })
   fireEvent.pointerUp(tabs[2], { clientX: 20 })
+  fireEvent.click(screen.getByRole('tab', { name: 'Pi 3' }))
+  expect(screen.queryByRole('menu')).toBeNull()
   expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Pi 3', 'Pi 1', 'Pi 2'])
   expect(api.create).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled(); expect(api.restart).not.toHaveBeenCalled()
 })
@@ -163,6 +175,88 @@ it('explicitly creates a split partner when only one tab exists', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'New terminal in folder…' }))
   await screen.findByRole('tab', { name: 'Pi 3' })
   expect(api.create).toHaveBeenLastCalledWith('/project')
+})
+it('opens only rename and duplicate on right click and renames the selected tab', async () => {
+  const api = setup(2)
+  fireEvent.contextMenu(await screen.findByRole('tab', { name: 'Pi 1' }))
+  expect(screen.getByRole('tab', { name: 'Pi 1' }).getAttribute('aria-selected')).toBe('true')
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Rename', 'Duplicate'])
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
+  expect(screen.queryByRole('menu')).toBeNull()
+  const input = screen.getByRole('textbox', { name: 'Rename terminal' })
+  fireEvent.change(input, { target: { value: 'Backend' } })
+  fireEvent.keyDown(input, { key: 'Enter' })
+  await screen.findByRole('tab', { name: 'Backend' })
+  expect(api.rename).toHaveBeenCalledWith('1', 'Backend')
+  expect(api.restart).not.toHaveBeenCalled()
+})
+it('duplicates into the source group and folder without copying or restarting its process', async () => {
+  const api = setup()
+  await screen.findByRole('tab', { name: 'Pi 1' })
+  fireEvent.click(screen.getByRole('button', { name: 'New terminal in folder…' }))
+  await screen.findByRole('tab', { name: 'Pi 2' })
+  fireEvent.click(screen.getByRole('button', { name: 'Split right' }))
+  fireEvent.contextMenu(screen.getByRole('tab', { name: 'Pi 2' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate' }))
+  const duplicate = await screen.findByRole('tab', { name: 'Pi 3' })
+  expect(api.create).toHaveBeenLastCalledWith('/project')
+  expect(duplicate.closest('[role="tablist"]')).toBe(screen.getByRole('tab', { name: 'Pi 2' }).closest('[role="tablist"]'))
+  expect(duplicate.getAttribute('aria-selected')).toBe('true')
+  expect(screen.queryByRole('menu')).toBeNull()
+  expect(api.restart).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled()
+})
+it('dismisses the tab menu outside and with Escape, supports keyboard navigation and ignores left click', async () => {
+  setup()
+  const tab = await screen.findByRole('tab', { name: 'Pi 1' })
+  fireEvent.click(tab)
+  expect(screen.queryByRole('menu')).toBeNull()
+  fireEvent.contextMenu(tab)
+  expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' }))
+  fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+  expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Duplicate' }))
+  fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+  expect(screen.queryByRole('menu')).toBeNull()
+  expect(document.activeElement).toBe(tab)
+  fireEvent.contextMenu(tab)
+  fireEvent.pointerDown(document.body)
+  expect(screen.queryByRole('menu')).toBeNull()
+  fireEvent.contextMenu(tab)
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+  expect(screen.queryByRole('menu')).toBeNull()
+})
+it('shows a text-free spinner immediately while creating a session', async () => {
+  const api = setup()
+  await screen.findByRole('tab', { name: 'Pi 1' })
+  let complete!: (session: Session) => void
+  vi.mocked(api.create).mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
+  fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
+  await waitFor(() => expect(screen.getByLabelText('Loading terminal', { selector: '[role="progressbar"]', exact: true }).textContent).toBe(''))
+  await act(async () => complete({ id: 'new', name: 'New terminal', cwd: '/tmp', status: 'running', generation: 1 }))
+  await screen.findByRole('tab', { name: 'New terminal' })
+  expect(screen.queryByRole('progressbar')).toBeNull()
+})
+it('suspends terminal autofocus while the context menu or rename editor is open', async () => {
+  setup(2)
+  fireEvent.contextMenu(await screen.findByRole('tab', { name: 'Pi 2' }))
+  expect(screen.getByTestId('2').getAttribute('data-focused')).toBe('false')
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }))
+  expect(screen.getByTestId('2').getAttribute('data-focused')).toBe('false')
+  fireEvent.keyDown(screen.getByRole('textbox', { name: 'Rename terminal' }), { key: 'Escape' })
+  expect(screen.getByTestId('2').getAttribute('data-focused')).toBe('true')
+})
+it('exits the menu with Tab near its source and dismisses it on resize or source removal', async () => {
+  const api = setup(2)
+  const tab = await screen.findByRole('tab', { name: 'Pi 2' })
+  fireEvent.contextMenu(tab)
+  fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Rename' }), { key: 'Tab' })
+  expect(screen.queryByRole('menu')).toBeNull()
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close Pi 2' }))
+  fireEvent.contextMenu(tab)
+  fireEvent(window, new Event('resize'))
+  expect(screen.queryByRole('menu')).toBeNull()
+  fireEvent.contextMenu(tab)
+  act(() => vi.mocked(api.onEvent).mock.calls[0][0]({ type: 'removed', id: '2' }))
+  expect(screen.queryByRole('menu')).toBeNull()
 })
 it('renames a tab inline on Enter without restarting its process', async () => {
   const api = setup(2)
