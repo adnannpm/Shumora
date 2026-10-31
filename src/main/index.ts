@@ -1,5 +1,6 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, nativeTheme, Notification } from 'electron'
 import { homedir } from 'node:os'
+import { ToolCache } from './tool-cache'
 import { openFolderArgument } from './open-folder'
 import { collectDiagnostics } from './diagnostics'
 import { join } from 'node:path'
@@ -126,7 +127,13 @@ function sessionCwd(id: unknown) {
   return session.cwd
 }
 function registerIPC() {
+  const toolCache = new ToolCache(homedir(), process.env.XDG_CACHE_HOME || join(homedir(), '.cache'))
   const handlers: Record<string, (...args: any[]) => unknown> = {
+    'tool-cache:scan': () => toolCache.scan(),
+    'tool-cache:clear': () => {
+      if (sessions.list().some(session => session.status === 'running') || plugins.operation().status === 'running' || piPlugin.operation().status === 'running' || opencodePlugin.operation().status === 'running') throw new Error('Stop running terminals and installation operations before cleaning cache.')
+      return toolCache.clear()
+    },
     'clipboard:write-text': (text: unknown) => {
       if (typeof text !== 'string' || text.length > 1_000_000) throw new Error('Invalid clipboard text')
       clipboard.writeText(text)

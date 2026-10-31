@@ -23,10 +23,10 @@ it('switches and persists app theme, restores it on remount, and keeps terminal 
   fireEvent.click(screen.getByRole('button', { name: 'About & Updates' }))
   expect(screen.getByRole('heading', { name: 'About & Updates' })).toBeTruthy()
 })
-it('groups settings into three consistent pages with troubleshooting inside Workspace', () => {
+it('groups settings into consistent pages including Storage with troubleshooting inside Workspace', () => {
   const view = render(<Provider><Settings /></Provider>)
   const nav = screen.getByRole('navigation', { name: 'Settings sections' })
-  expect([...nav.querySelectorAll('button')].map(button => button.textContent)).toEqual(['General', 'Workspace', 'About & Updates'])
+  expect([...nav.querySelectorAll('button')].map(button => button.textContent)).toEqual(['General', 'Workspace', 'Storage', 'About & Updates'])
   const content = view.container.querySelector('.settings-content')!
   for (const name of ['General', 'Workspace', 'About & Updates']) {
     fireEvent.click(screen.getByRole('button', { name }))
