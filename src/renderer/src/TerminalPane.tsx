@@ -15,12 +15,14 @@ export function TerminalPane({ session, visible, focused, autoFocusBlocked = fal
   const terminal = useRef<Terminal | null>(null)
   const fit = useRef<(() => void) | null>(null)
   const [error, setError] = useState('')
+  const [waitingForOutput, setWaitingForOutput] = useState(true)
   const running = useRef(session.status === 'running')
   useEffect(() => {
     running.current = session.status === 'running'
     if (terminal.current) terminal.current.options.disableStdin = !running.current
   }, [session.status])
   useEffect(() => {
+    setWaitingForOutput(true); setError('')
     const term = new Terminal({ disableStdin: !running.current, cursorBlink: true, fontSize: 14, fontFamily: '"Cascadia Code", "DejaVu Sans Mono", Consolas, monospace', scrollback: 5000, allowProposedApi: false, theme: terminalTheme })
     const addon = new FitAddon(); term.loadAddon(addon); term.open(host.current!)
     // Each session owns its image cache; keep memory bounded across split/hidden tabs.
@@ -31,6 +33,7 @@ export function TerminalPane({ session, visible, focused, autoFocusBlocked = fal
     function apply(event: Extract<SessionEvent, { type: 'data' }>) {
       if (event.seq <= seq) return
       seq = event.seq; term.write(event.data)
+      if (event.data.length) setWaitingForOutput(false)
     }
     const unsubscribe = window.workspace.onEvent((event) => {
       if (event.type !== 'data' || event.id !== session.id || event.generation !== session.generation) return
@@ -40,6 +43,7 @@ export function TerminalPane({ session, visible, focused, autoFocusBlocked = fal
     void window.workspace.snapshot(session.id).then((snapshot) => {
       if (disposed || snapshot.session.generation !== session.generation) return
       term.write(snapshot.output); seq = snapshot.seq; ready = true
+      if (snapshot.output.length) setWaitingForOutput(false)
       pending.forEach(apply); pending.length = 0
     }).catch((e) => { if (!disposed) setError(String(e)) })
     const report = (e: unknown) => { if (!disposed) setError(String(e)) }
@@ -71,5 +75,6 @@ export function TerminalPane({ session, visible, focused, autoFocusBlocked = fal
     {(session.error || error) && <div className="terminal-error" role="alert"><strong>{t("Session needs attention")}</strong><p>{session.error || error}</p></div>}
     {session.status === 'exited' && <div className="exit-note">{t("Process exited")}{session.exitCode !== undefined ? ` (code ${session.exitCode})` : ''}{t(". Restart to begin a new Pi process; this does not resume the previous conversation.")}</div>}
     <div className="terminal-host" ref={host} />
+    {waitingForOutput && session.status === 'running' && !session.error && !error && <div className="terminal-startup-loading"><span className="terminal-loading-spinner" role="progressbar" aria-label={t('Loading terminal')} /></div>}
   </section>
 }

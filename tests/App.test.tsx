@@ -18,9 +18,19 @@ function setup(count = 1, approved = true) {
     rename: vi.fn(async (id, name) => { const session = { ...sessions.find(s => s.id === id)!, name }; sessions = sessions.map(s => s.id === id ? session : s); return session }),
     close: vi.fn(async () => approved), folder: async () => '/tmp', chooseFolder: vi.fn(async () => '/project'), onEvent: vi.fn(() => () => {}), snapshot: vi.fn(), input: vi.fn(), resize: vi.fn(), stop: vi.fn(), restart: vi.fn()
   }
+  window.piPlugin = { status: async () => ({ installed: true }) } as any
   window.plugins = { status: async () => ({ id: '9router', installed: true }) } as any
   window.workspace = api; render(<Provider><App /></Provider>); return api
 }
+it('creates sessions directly without a setup modal when Pi is installed', async () => {
+  const api = setup()
+  await screen.findByRole('tab', { name: 'Pi 1' })
+  fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
+  await screen.findByRole('tab', { name: 'Pi 2' })
+  expect(api.create).toHaveBeenCalledTimes(1)
+  expect(screen.queryByRole('heading', { name: 'Set up your Terminals' })).toBeNull()
+})
+
 it('focuses an Explorer-opened terminal and switches back from Settings', async () => {
   const api = setup()
   await screen.findByRole('tab', { name: 'Pi 1' })
@@ -213,6 +223,17 @@ it('dismisses the tab menu outside and with Escape, supports keyboard navigation
   fireEvent.contextMenu(tab)
   fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
   expect(screen.queryByRole('menu')).toBeNull()
+})
+it('shows a text-free spinner immediately while creating a session', async () => {
+  const api = setup()
+  await screen.findByRole('tab', { name: 'Pi 1' })
+  let complete!: (session: Session) => void
+  vi.mocked(api.create).mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
+  fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
+  await waitFor(() => expect(screen.getByLabelText('Loading terminal', { selector: '[role="progressbar"]', exact: true }).textContent).toBe(''))
+  await act(async () => complete({ id: 'new', name: 'New terminal', cwd: '/tmp', status: 'running', generation: 1 }))
+  await screen.findByRole('tab', { name: 'New terminal' })
+  expect(screen.queryByRole('progressbar')).toBeNull()
 })
 it('suspends terminal autofocus while the context menu or rename editor is open', async () => {
   setup(2)

@@ -24,7 +24,7 @@ export default function App() {
     void window.workspace?.setNotificationsEnabled?.(enabled).catch(() => {})
   }, [])
   const [page, setPage] = useState<Page>('workspace')
-  const [setupPlugin, setSetupPlugin] = useState<'pi' | '9router' | null>(null)
+  const [setupPlugin, setSetupPlugin] = useState<'pi' | 'opencode' | '9router' | 'node' | 'pnpm' | 'bun' | 'yarn' | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [routerInstalled, setRouterInstalled] = useState(false)
   function pluginStatus(plugin: RouterPlugin) {
@@ -52,6 +52,7 @@ export default function App() {
   const [folder, setFolder] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [creatingGroup, setCreatingGroup] = useState<number | null>(null)
   const [closing, setClosing] = useState<string[]>([])
   const [closeTarget, setCloseTarget] = useState<Session | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
@@ -182,17 +183,22 @@ export default function App() {
   function groupFolder(group: number) {
     return sessions.find(s => s.id === layout.groups[group]?.active)?.cwd || folder
   }
-  async function add(group = layout.focused, orientation?: Layout['orientation'], chooseFolder = false) {
+  function requestSession(group = layout.focused, orientation?: Layout['orientation'], chooseFolder = false) {
+    void add(group, orientation, chooseFolder)
+  }
+  async function add(group = layout.focused, orientation?: Layout['orientation'], chooseFolder = false, selectedFolder?: string, reportToModal = false) {
     if (busy) return
     setBusy(true); setError('')
     try {
-      const cwd = chooseFolder ? await window.workspace.chooseFolder(groupFolder(group)) : groupFolder(group)
+      const cwd = selectedFolder ?? (chooseFolder ? await window.workspace.chooseFolder(groupFolder(group)) : groupFolder(group))
       if (cwd === null) return
+      setCreatingGroup(group)
       const session = await window.workspace.create(cwd)
+      if (session.status === 'error') throw new Error(session.error || 'Could not start the Pi session')
       setSessions(list => list.some(s => s.id === session.id) ? list.map(s => s.id === session.id ? session : s) : [...list, session])
       if (orientation) { dispatch({ type: 'split', orientation, group, newId: session.id }) }
       else dispatch({ type: 'add', id: session.id, group })
-    } catch (e) { setError(String(e)) } finally { setBusy(false) }
+    } catch (e) { if (reportToModal) throw e; setError(String(e)) } finally { setBusy(false); setCreatingGroup(null) }
   }
   async function close(id: string) {
     if (closing.includes(id)) return
@@ -206,7 +212,7 @@ export default function App() {
   }
   function doSplit(orientation: Layout['orientation']) {
     if (layout.groups.length >= 4) return
-    if (layout.groups[layout.focused].ids.length === 1) { void add(layout.focused, orientation); return }
+    if (layout.groups[layout.focused].ids.length === 1) { requestSession(layout.focused, orientation); return }
     dispatch({ type: 'split', orientation })
   }
   const { panes, separators } = layoutRects(layout.tree)
@@ -232,7 +238,7 @@ export default function App() {
     <main className="flex min-w-0 flex-1 flex-col" style={{ display: page === 'workspace' ? 'flex' : 'none' }}>
       <header className="toolbar">       
         <h1>{t("Terminals")}</h1>
-        <button className="folder-button workspace-folder" title={t("Active terminal folder. Click to open a new terminal in another folder.")} aria-label={t("New terminal in folder…")} disabled={busy} onClick={() => void add(layout.focused, undefined, true)}><span aria-hidden="true">▱</span><span title={activeSession?.cwd || folder}>{activeSession?.cwd || folder || t("Loading folder…")}</span></button>
+        <button className="folder-button workspace-folder" title={t("Active terminal folder. Click to open a new terminal in another folder.")} aria-label={t("New terminal in folder…")} disabled={busy} onClick={() => requestSession(layout.focused, undefined, true)}><span aria-hidden="true">▱</span><span title={activeSession?.cwd || folder}>{activeSession?.cwd || folder || t("Loading folder…")}</span></button>
         {focusedSession && <GitReviewButton key={focusedSession.id} sessionId={focusedSession.id} sessionName={focusedSession.name} sessions={sessions} visible={page === 'workspace'} />}
         <div className="layout-switch" role="group" aria-label={t("Terminal layout")}>
           <button type="button" className="layout-icon-button" disabled={busy || !sessions.length || layout.groups.length >= 4} aria-label={needsPartner ? t("New session in split right") : t("Split right")} title={needsPartner ? t("New session in split right") : t("Split right")} onClick={() => doSplit('right')}>
@@ -248,6 +254,7 @@ export default function App() {
       </header>
       {error && <div className="global-error" role="alert">{t(error)}<Button size="xs" variant="ghost" colorPalette="red" onClick={() => setError('')}>{t("Dismiss")}</Button></div>}
       <div className="tab-workspace" ref={area}>
+        {creatingGroup !== null && <div className="terminal-create-loading" style={position(creatingGroup, 1)}><span className="terminal-loading-spinner" role="progressbar" aria-label={t('Loading terminal')} /></div>}
         {layout.groups.map((group, index) => <div key={`group-${index}`} className={`tab-group-bar ${layout.focused === index ? 'active-group' : ''}`} style={position(index, 1)} onPointerDown={() => dispatch({ type: 'focus', group: index })}>
           <div className="session-tablist" role="tablist" aria-label={t("Session group {number}", { number: index + 1 })} onKeyDown={event => {
             if ((event.target as HTMLElement).tagName === 'INPUT') return
@@ -286,7 +293,7 @@ export default function App() {
               </div>
             })}
           </div>
-          <Button size="xs" variant="ghost" flexShrink="0" aria-label={t("New session in group {number}", { number: index + 1 })} title={t("New session")} disabled={busy} onClick={() => void add(index)}>＋</Button>
+          <Button size="xs" variant="ghost" flexShrink="0" aria-label={t("New session in group {number}", { number: index + 1 })} title={t("New session")} disabled={busy} onClick={() => requestSession(index)}>＋</Button>
           {split && <Button size="xs" variant="ghost" flexShrink="0" aria-label={t("Move active tab from group {number} to other group", { number: index + 1 })} title={t("Move active tab to other group")} disabled={busy} onClick={() => dispatch({ type: 'move', group: index })}>⇄</Button>}
         </div>)}
         {sessions.map(session => {
@@ -307,7 +314,7 @@ export default function App() {
             if (![less, more, 'Home', 'End'].includes(event.key)) return
             event.preventDefault(); dispatch({ type: 'resize', path: separator.path, ratio: event.key === 'Home' ? 25 : event.key === 'End' ? 75 : separator.ratio + (event.key === more ? 5 : -5) })
           }} />)}
-        {!sessions.length && <div className="empty-state" style={position(0, 2)}><div><h2>{t("No open sessions")}</h2><p>{t("Create a Pi session to start working.")}</p><Button colorPalette="brand" size="sm" disabled={busy} onClick={() => void add(0)}>{t("New session")}</Button></div></div>}
+        {!sessions.length && <div className="empty-state" style={position(0, 2)}><div><h2>{t("No open sessions")}</h2><p>{t("Create a Pi session to start working.")}</p><Button colorPalette="brand" size="sm" disabled={busy} onClick={() => requestSession(0)}>{t("New session")}</Button></div></div>}
       </div>
       <footer className="statusbar"><span>{sessions.filter(s => s.status === 'running').length} {t("processes running")}</span><span>{split ? t("{count} groups", { count: layout.groups.length }) : t("Single group")} {t("· Hidden sessions keep running")}</span></footer>
     </main>
@@ -317,7 +324,7 @@ export default function App() {
     {page === 'settings' && <Settings />}
     {page === 'library' && <Library initialPlugin={setupPlugin} onPluginStatus={pluginStatus} />}
     {page === '9router' && routerInstalled && <RouterDashboard />}
-    <WorkspaceSetup active={page === 'workspace'} onSetup={id => { setSetupPlugin(id); setPage('library') }} />
+    <WorkspaceSetup startupOnly active={page === 'workspace'} onContinue={async () => {}} onSetup={id => { setSetupPlugin(id); setPage('library') }} />
     <GitAskPassModal />
     {tabMenu && <Portal><div ref={tabMenuElement} className="terminal-tab-menu" role="menu" aria-labelledby={`tab-${tabMenu.id}`} style={{ left: tabMenu.x, top: tabMenu.y }} onKeyDown={event => {
       const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
