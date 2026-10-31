@@ -1,3 +1,4 @@
+import { AppCheckbox } from './AppCheckbox'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Dialog, Portal } from '@chakra-ui/react'
 import type { GitBranches, GitCommitSummary, GitDiff, GitDiffArea, GitFileChange, GitPushInfo, GitRepoStatus, Session } from '../../shared/types'
@@ -299,13 +300,11 @@ function FileSection({
   const allChecked = changes.length > 0 && checked.size === changes.length
   return <section className="git-section" aria-label={title}>
     <header>
-      <input
-        type="checkbox"
-        className="git-file-checkbox"
+      <AppCheckbox
         aria-label={`Select all in ${title}`}
         checked={allChecked}
         disabled={!changes.length}
-        onChange={onToggleAll}
+        onCheckedChange={onToggleAll}
         title={allChecked ? 'Deselect all' : 'Select all'}
       />
       <span>{title}</span>
@@ -320,12 +319,10 @@ function FileSection({
         const active = current?.path === c.path && current.area === area
         const isChecked = checked.has(c.path)
         return <li key={c.path} className={`git-file-item ${active ? 'active' : ''}`}>
-          <input
-            type="checkbox"
-            className="git-file-checkbox"
+          <AppCheckbox
             aria-label={`Select ${c.path} in ${title}`}
             checked={isChecked}
-            onChange={(e) => { e.stopPropagation(); onToggle(c.path) }}
+            onCheckedChange={() => onToggle(c.path)}
           />
           <button
             type="button"

@@ -1,3 +1,4 @@
+import { AppCheckbox } from './AppCheckbox'
 import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, Portal } from '@chakra-ui/react'
 import type { GitAskPassRequest } from '../../shared/types'
@@ -157,15 +158,9 @@ export function GitAskPassModal() {
                 </div>
 
                 {!request.isUsername && (
-                  <label className="git-askpass-remember">
-                    <input
-                      type="checkbox"
-                      className="git-file-checkbox"
-                      checked={remember}
-                      onChange={(e) => setRemember(e.target.checked)}
-                    />
-                    <span>Remember for this session (stored in memory)</span>
-                  </label>
+                  <AppCheckbox className="git-askpass-remember" checked={remember} onCheckedChange={setRemember}>
+                    Remember for this session (stored in memory)
+                  </AppCheckbox>
                 )}
 
                 {!request.isUsername && (

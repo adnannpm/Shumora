@@ -1,3 +1,4 @@
+import { AppCheckbox } from './AppCheckbox'
 import { useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import { useLanguage } from './Language'
@@ -83,7 +84,7 @@ export function MeetingRoom({ sessions }: { sessions: Session[]; active?: boolea
           const status = snapshot?.agents[session.id] || 'disconnected'
           const ready = status === 'ready' && session.status === 'running'
           return <div className={`meeting-invite ${invited.includes(session.id) ? 'selected' : ''}`} key={session.id}>
-            <label><input type="checkbox" aria-label={t('Invite {name}', { name: session.name })} checked={invited.includes(session.id)} disabled={!ready || busy || (!invited.includes(session.id) && invited.length >= 8)} onChange={e => { setInvited(ids => e.target.checked ? [...ids, session.id] : ids.filter(id => id !== session.id)); if (leader === session.id) setLeader('user') }} /><span className="council-member-info"><strong>{session.name}</strong><small className={ready ? 'council-ready' : ''}>{t(ready ? 'Ready for Council' : status === 'busy' ? 'Working — wait until idle' : 'Not connected')}</small></span></label>
+            <AppCheckbox aria-label={t('Invite {name}', { name: session.name })} checked={invited.includes(session.id)} disabled={!ready || busy || (!invited.includes(session.id) && invited.length >= 8)} onCheckedChange={checked => { setInvited(ids => checked ? [...ids, session.id] : ids.filter(id => id !== session.id)); if (leader === session.id) setLeader('user') }}><span className="council-member-info"><strong>{session.name}</strong><small className={ready ? 'council-ready' : ''}>{t(ready ? 'Ready for Council' : status === 'busy' ? 'Working — wait until idle' : 'Not connected')}</small></span></AppCheckbox>
             {invited.includes(session.id) && <select aria-label={t('Division for {name}', { name: session.name })} value={availableRoles.some(role => role.id === roles[session.id]) ? roles[session.id] : ''} disabled={busy} onChange={e => setRoles({ ...roles, [session.id]: e.target.value })}><option value="">{t('Select division')}</option>{availableRoles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select>}
           </div>
         })}</div>
