@@ -8,11 +8,10 @@ it('uses a readable dark terminal palette with all ANSI colors defined', () => {
     expect(terminalTheme[color as keyof typeof terminalTheme]).toMatch(/^#[0-9a-f]{6}$/)
   }
 })
-it('hides only xterm scrollbar chrome without disabling terminal scrolling', () => {
+it('preserves xterm scrollbar visibility and interaction', () => {
   const css = readFileSync('src/renderer/src/style.css', 'utf8')
-  expect(css).toContain('.terminal-host .xterm .xterm-scrollable-element > .scrollbar')
-  expect(css).toContain('visibility: hidden')
-  expect(css).toContain('scrollbar-width: none')
+  expect(css).not.toMatch(/\.terminal-host[^{}]*\.scrollbar\s*\{[^}]*visibility:\s*hidden/)
+  expect(css).not.toMatch(/\.terminal-host[^{}]*\.xterm-viewport[^{}]*\{[^}]*(?:scrollbar-width:\s*none|width:\s*0)/)
 })
 it('uses application theme colors for 9router button and tab hover states', () => {
   const css = readFileSync('src/renderer/src/style.css', 'utf8')

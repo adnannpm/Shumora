@@ -31,7 +31,7 @@
   --selected-text: #b5cdff;
 }
 * { box-sizing: border-box; }
-/* Shared app chrome; xterm's hidden scrollbar overrides remain below. */
+/* Shared app chrome; xterm renders its own scrollbar. */
 :root { --scroll-thumb: color-mix(in srgb, var(--muted) 45%, transparent); --scroll-thumb-hover: color-mix(in srgb, var(--muted) 70%, transparent); }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-track, *::-webkit-scrollbar-corner { background: transparent; }
@@ -393,10 +393,7 @@ h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.3px; }
 /* FitAddon subtracts xterm padding, not parent padding. Keep the host unpadded
    so the reported PTY rows always fit inside the visible content box. */
 .terminal-host .xterm { height: 100%; padding: 0; }
-/* Hide extra scrollbar chrome, preserving wheel handling and scrollback. */
-.terminal-host .xterm .xterm-scrollable-element > .scrollbar { visibility: hidden !important; pointer-events: none; }
-.terminal-host .xterm .xterm-viewport { scrollbar-width: none; }
-.terminal-host .xterm .xterm-viewport::-webkit-scrollbar { width: 0; height: 0; }
+/* Preserve xterm's built-in scrollbar visibility and pointer/wheel handling. */
 .group-separator { background: transparent; touch-action: none; z-index: 2; }
 .group-separator::before { content: ''; position: absolute; border-radius: 999px; background: color-mix(in srgb, var(--line) 55%, transparent); transition: background-color 180ms ease, box-shadow 180ms ease; pointer-events: none; }
 .separator-right { cursor: col-resize; }
