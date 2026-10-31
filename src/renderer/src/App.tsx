@@ -55,6 +55,35 @@ export default function App() {
   const [closing, setClosing] = useState<string[]>([])
   const [closeTarget, setCloseTarget] = useState<Session | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
+  const [tabMenu, setTabMenu] = useState<{ id: string; group: number; x: number; y: number } | null>(null)
+  const tabMenuElement = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!tabMenu) return
+    const menu = tabMenuElement.current!
+    const rect = menu.getBoundingClientRect()
+    menu.style.left = `${Math.max(8, Math.min(tabMenu.x, window.innerWidth - rect.width - 8))}px`
+    menu.style.top = `${Math.max(8, Math.min(tabMenu.y, window.innerHeight - rect.height - 8))}px`
+    menu.querySelector<HTMLButtonElement>('button')?.focus()
+    function dismiss(event: Event) {
+      const target = event.target as HTMLElement
+      if (!menu.contains(target) && !target.closest('[role="tab"]')) setTabMenu(null)
+    }
+    const dismissOnBlur = () => setTabMenu(null)
+    document.addEventListener('pointerdown', dismiss)
+    document.addEventListener('click', dismiss)
+    window.addEventListener('blur', dismissOnBlur)
+    window.addEventListener('resize', dismissOnBlur)
+    return () => {
+      document.removeEventListener('pointerdown', dismiss)
+      document.removeEventListener('click', dismiss)
+      window.removeEventListener('blur', dismissOnBlur)
+      window.removeEventListener('resize', dismissOnBlur)
+    }
+  }, [tabMenu])
+  useEffect(() => { setTabMenu(null) }, [page, layout.tree])
+  useEffect(() => {
+    if (tabMenu && !sessions.some(session => session.id === tabMenu.id)) setTabMenu(null)
+  }, [sessions, tabMenu])
   const renameDone = useRef(false)
   function finishRename(save: boolean, focusTab = false) {
     if (!renaming || renameDone.current) return
@@ -231,6 +260,7 @@ export default function App() {
             {group.ids.map(id => { const s = sessions.find(s => s.id === id); if (!s) return null
               return <div className={`session-tab ${group.active === id ? 'selected' : ''} ${sliding?.id === id ? 'sliding' : ''}`} key={id} data-session-id={id} style={sliding?.id === id ? { transform: `translateX(${sliding.offset}px)` } : undefined} onDragStart={event => event.preventDefault()} onPointerDown={event => {
                 if (event.button !== 0 || (event.target as HTMLElement).closest('.close-tab, input')) return
+                setTabMenu(null)
                 slide.current = { id, group: index, startX: event.clientX, pointer: event.pointerId, moved: false, element: event.currentTarget }
               }} onPointerMove={slideTab} onPointerUp={event => { if (slide.current?.pointer === event.pointerId) { dispatch({ type: 'select', group: index, id }); endSlide() } }} onPointerCancel={endSlide} onLostPointerCapture={endSlide}>
                 {renaming?.id === id ? <input className="tab-rename-input" aria-label={t("Rename terminal")} value={renaming.name} maxLength={120} autoFocus
@@ -243,8 +273,14 @@ export default function App() {
                     if (event.key === 'Enter' || event.key === 'Escape') {
                       event.preventDefault(); finishRename(event.key === 'Enter', true)
                     }
-                  }} /> : <button role="tab" id={`tab-${id}`} aria-selected={group.active === id} aria-controls={`panel-${id}`} aria-label={s.name} title={s.name} tabIndex={group.active === id ? 0 : -1} onClick={() => dispatch({ type: 'select', group: index, id })} onDoubleClick={() => {
-                  endSlide(); dispatch({ type: 'select', group: index, id }); renameDone.current = false; setRenaming({ id, name: s.name })
+                  }} /> : <button role="tab" id={`tab-${id}`} aria-selected={group.active === id} aria-controls={`panel-${id}`} aria-label={s.name} title={s.name} tabIndex={group.active === id ? 0 : -1} aria-haspopup="menu" aria-expanded={tabMenu?.id === id} onClick={() => {
+                  setTabMenu(null); dispatch({ type: 'select', group: index, id })
+                }} onContextMenu={event => {
+                  event.preventDefault()
+                  endSlide(); dispatch({ type: 'select', group: index, id })
+                  setTabMenu({ id, group: index, x: event.clientX, y: event.clientY })
+                }} onDoubleClick={() => {
+                  setTabMenu(null); endSlide(); dispatch({ type: 'select', group: index, id }); renameDone.current = false; setRenaming({ id, name: s.name })
                 }}><span className={`status-dot ${s.status}`} aria-hidden="true" /><span className="session-tab-name">{s.name}</span>{s.status === 'running' && s.activity && <span className={`agent-tab-status agent-${s.activity}`}>{t(({ working: 'Working', waiting: 'Waiting for input', done: 'Done', error: 'Agent error', disconnected: 'Status unavailable' })[s.activity])}</span>}{unread.includes(id) && <span className="agent-unread" aria-label={t('Unread agent update')}>●</span>}</button>}
                 <button className="close-tab" aria-label={t("Close {name}", { name: s.name })} title={t("Close {name}", { name: s.name })} disabled={closing.includes(id)} onClick={() => { if (s.status === 'running') setCloseTarget(s); else void close(id) }}>×</button>
               </div>
@@ -257,7 +293,7 @@ export default function App() {
           const index = layout.groups.findIndex(g => g.ids.includes(session.id))
           const visible = index >= 0 && layout.groups[index].active === session.id
           return <div key={session.id} id={`panel-${session.id}`} role="tabpanel" aria-labelledby={`tab-${session.id}`} className="session-panel" style={{ ...position(Math.max(0, index), 2), display: visible ? 'flex' : 'none' }}>
-            <TerminalPane session={session} visible={visible && page === 'workspace'} focused={visible && page === 'workspace' && layout.focused === index} onFocus={() => dispatch({ type: 'focus', group: index })} />
+            <TerminalPane session={session} visible={visible && page === 'workspace'} focused={visible && page === 'workspace' && layout.focused === index} autoFocusBlocked={tabMenu !== null || renaming !== null} onFocus={() => dispatch({ type: 'focus', group: index })} />
           </div>
         })}
         {separators.map(separator => <div key={separator.path} className={`group-separator separator-${separator.orientation}`} role="separator" tabIndex={0} aria-label={t("Resize terminal groups")} aria-orientation={separator.orientation === 'right' ? "vertical" : "horizontal"} aria-valuemin={25} aria-valuemax={75} aria-valuenow={separator.ratio} style={{ position: 'absolute', left: separator.orientation === 'right' ? `calc(${separator.left}% - 3px)` : `${separator.left}%`, top: separator.orientation === 'down' ? `calc(${separator.top}% - 3px)` : `${separator.top}%`, width: separator.orientation === 'right' ? 6 : `${separator.width}%`, height: separator.orientation === 'down' ? 6 : `${separator.height}%` }}
@@ -283,6 +319,27 @@ export default function App() {
     {page === '9router' && routerInstalled && <RouterDashboard />}
     <WorkspaceSetup active={page === 'workspace'} onSetup={id => { setSetupPlugin(id); setPage('library') }} />
     <GitAskPassModal />
+    {tabMenu && <Portal><div ref={tabMenuElement} className="terminal-tab-menu" role="menu" aria-labelledby={`tab-${tabMenu.id}`} style={{ left: tabMenu.x, top: tabMenu.y }} onKeyDown={event => {
+      const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
+      const current = items.indexOf(document.activeElement as HTMLButtonElement)
+      if (event.key === 'Escape' || event.key === 'Tab') {
+        event.preventDefault()
+        const tab = document.getElementById(`tab-${tabMenu.id}`)
+        if (event.key === 'Escape' || event.shiftKey) tab?.focus()
+        else tab?.parentElement?.querySelector<HTMLButtonElement>('.close-tab')?.focus()
+        setTabMenu(null)
+      } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+        event.preventDefault()
+        items[event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (current + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus()
+      }
+    }}>
+      <button type="button" role="menuitem" onClick={() => {
+        const session = sessions.find(s => s.id === tabMenu.id)
+        setTabMenu(null)
+        if (session) { renameDone.current = false; setRenaming({ id: session.id, name: session.name }) }
+      }}>{t('Rename')}</button>
+      <button type="button" role="menuitem" disabled={busy} onClick={() => { const group = tabMenu.group; setTabMenu(null); void add(group) }}>{t('Duplicate')}</button>
+    </div></Portal>}
     <Dialog.Root role="alertdialog" open={closeTarget !== null} placement="center" size="sm" initialFocusEl={() => cancelClose.current} closeOnInteractOutside={false} onOpenChange={({ open }) => { if (!open && !closing.length) setCloseTarget(null) }}>
       <Portal>
         <Dialog.Backdrop />

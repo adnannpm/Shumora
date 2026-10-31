@@ -1,5 +1,6 @@
 // Application-owned copy only. Terminal output, user content and remote metadata stay untouched.
 export const indonesian: Record<string, string> = {
+  'Rename': 'Ganti nama', 'Duplicate': 'Duplikat',
   "Council": "Council",
   'New discussion': 'Diskusi baru',
   'Choose a topic and at least two agents to begin.': 'Tentukan topik dan pilih minimal dua agen untuk memulai.',

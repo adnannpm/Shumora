@@ -1,5 +1,6 @@
 // Simplified Chinese UI copy. User content, package metadata and terminal output stay untouched.
 export const chinese: Record<string, string> = {
+  'Rename': '重命名', 'Duplicate': '复制',
   'Two rounds of discussion, then a summary. Uses each participant’s configured model and credits. Tools are blocked during meeting turns; no tasks are executed.': '进行两轮讨论后生成总结。使用各参与者配置的模型和额度。会议发言期间工具已禁用，不会执行任务。',
   'Pause waits for the current response. Stop cancels the current meeting turn. Leaving this page does not interrupt the meeting.': '暂停会等待当前回复完成。停止会取消当前会议发言。离开此页面不会中断会议。',
   'Controlled relay preview: AI replies appear in the live terminal. Publish a reply below to share it with the next speaker. AI moderation suggests the discussion flow; sending stays under your control.': '受控转发预览：AI 回复显示在实时终端中。在下方发布回复以分享给下一位发言者。AI 主持人提供讨论流程建议，发送操作仍由你控制。',

@@ -7,8 +7,10 @@ import { ImageAddon } from '@xterm/addon-image'
 import { terminalTheme } from './theme'
 import type { Session, SessionEvent } from '../../shared/types'
 
-export function TerminalPane({ session, visible, focused, onFocus }: { session: Session; visible: boolean; focused: boolean; onFocus: () => void }) {
+export function TerminalPane({ session, visible, focused, autoFocusBlocked = false, onFocus }: { session: Session; visible: boolean; focused: boolean; autoFocusBlocked?: boolean; onFocus: () => void }) {
   const { t } = useLanguage()
+  const focusBlocked = useRef(autoFocusBlocked)
+  focusBlocked.current = autoFocusBlocked
   const host = useRef<HTMLDivElement>(null)
   const terminal = useRef<Terminal | null>(null)
   const fit = useRef<(() => void) | null>(null)
@@ -57,7 +59,7 @@ export function TerminalPane({ session, visible, focused, onFocus }: { session: 
   }, [session.id, session.generation])
   useEffect(() => {
     if (!visible) return
-    const frame = requestAnimationFrame(() => { fit.current?.(); if (focused) terminal.current?.focus() })
+    const frame = requestAnimationFrame(() => { fit.current?.(); if (focused && !focusBlocked.current) terminal.current?.focus() })
     return () => cancelAnimationFrame(frame)
   }, [visible, focused])
   async function action(kind: 'stop' | 'restart') {
