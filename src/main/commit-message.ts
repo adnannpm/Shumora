@@ -44,6 +44,12 @@ export function cleanMessage(text: string) {
 
 export async function generateCommitMessage(model: string, context: CommitContext, deps: ChatDeps = defaults): Promise<string> {
   if (typeof model !== 'string' || !MODEL.test(model)) throw new Error('Choose a model for commit messages')
+  // Defense in depth, not a guarantee: users must still review what they send.
+  const fileLines = context.patch.split('\n').filter(line => /^(diff --git |\+\+\+ |--- )/.test(line)).join('\n') + '\n' + context.stat
+  const sensitiveFile = /(?:^|[\s/"\\])(?:\.env(?:\.[\w.-]+)?|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?|[^\s/"\\]+\.(?:pem|p12|pfx|key)|credentials(?:\.json)?)(?=[\s"|]|$)/im
+  const outgoing = [context.patch, context.stat, ...context.recent].join('\n')
+  const secret = /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----|\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|sk-[A-Za-z0-9_-]{20,})\b|\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password|passwd)\b["']?\s*[:=]\s*["']?[^\s"'`,;]{8,}/i
+  if (sensitiveFile.test(fileLines) || secret.test(outgoing)) throw new Error('Potential secret or sensitive file detected. Remove sensitive content from staged changes before generating a commit message.')
   const key = await deps.key()
   if (!key) throw new Error('Create an API key on the 9router page so Shumora can generate commit messages.')
   let response: Response

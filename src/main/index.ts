@@ -218,8 +218,17 @@ function registerIPC() {
     'git:push': (id: string, options?: GitPushOptions) => git.push(sessionCwd(id), options),
     'git:push-info': (id: string, branch?: string) => git.pushInfo(sessionCwd(id), branch),
     'git:commit-models': () => routerChatModels(),
-    'git:generate-message': async (id: string, model: string) =>
-      generateCommitMessage(model, await git.commitContext(sessionCwd(id))),
+    'git:generate-message': async (id: string, model: string) => {
+      const cwd = sessionCwd(id)
+      const choice = await dialog.showMessageBox(window!, {
+        type: 'warning', title: 'Send staged changes to AI?',
+        message: 'Generate a commit message with the selected AI provider?',
+        detail: 'Staged code, file names and recent commit subjects will be sent through 9router and may leave this device. Review staged changes for secrets and confidential code. Automatic secret checks cannot detect everything.',
+        buttons: ['Cancel', 'Send to AI'], defaultId: 0, cancelId: 0
+      })
+      if (choice.response !== 1) throw new Error('Commit message generation canceled. No staged changes were sent.')
+      return generateCommitMessage(model, await git.commitContext(cwd))
+    },
     'git:branches': (id: string) => git.branches(sessionCwd(id)),
     'git:askpass-reply': (response: GitAskPassResponse) => {
       askPass.submitReply(response)
