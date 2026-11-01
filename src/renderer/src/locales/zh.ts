@@ -1,5 +1,14 @@
 // Simplified Chinese UI copy. User content, package metadata and terminal output stay untouched.
 export const chinese: Record<string, string> = {
+  "No matching plugins.": "没有匹配的插件。",
+  "Package managers": "包管理器",
+  "Runtimes": "运行时",
+  "Gateways": "网关",
+  "AI agents": "AI 代理",
+  "All categories": "所有类别",
+  "Plugin category": "插件类别",
+  "Search plugins…": "搜索插件…",
+  "Search plugins": "搜索插件",
   "Resets in {hours}h {minutes}m": "{hours} 小时 {minutes} 分钟后重置",
   "Reset time reached — refresh to check": "已到重置时间 — 请刷新查看",
   "Reset time not provided": "未提供重置时间",

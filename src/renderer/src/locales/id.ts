@@ -1,5 +1,14 @@
 // Application-owned copy only. Terminal output, user content and remote metadata stay untouched.
 export const indonesian: Record<string, string> = {
+  "No matching plugins.": "Tidak ada plugin yang cocok.",
+  "Package managers": "Package Manager",
+  "Runtimes": "Runtime",
+  "Gateways": "Gateway",
+  "AI agents": "Agent AI",
+  "All categories": "Semua kategori",
+  "Plugin category": "Kategori plugin",
+  "Search plugins…": "Cari plugin…",
+  "Search plugins": "Cari plugin",
   "Resets in {hours}h {minutes}m": "Reset dalam {hours}j {minutes}m",
   "Reset time reached — refresh to check": "Waktu reset tercapai — segarkan untuk memeriksa",
   "Reset time not provided": "Waktu reset tidak disediakan",
