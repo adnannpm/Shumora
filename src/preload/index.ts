@@ -1,4 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { TerminalAgent, TerminalAgentAPI } from '../shared/terminal-agent'
+const terminalAgent: TerminalAgentAPI = {
+  status: () => ipcRenderer.invoke('terminal-agent:status'),
+  select: (agent: TerminalAgent) => ipcRenderer.invoke('terminal-agent:select', agent)
+}
+contextBridge.exposeInMainWorld('terminalAgent', terminalAgent)
 import type { ToolCacheAPI } from '../shared/tool-cache'
 const toolCache: ToolCacheAPI = { scan: () => ipcRenderer.invoke('tool-cache:scan'), clear: () => ipcRenderer.invoke('tool-cache:clear') }
 contextBridge.exposeInMainWorld('toolCache', toolCache)

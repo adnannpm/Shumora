@@ -121,6 +121,15 @@ export const managerPluginHosts = {
   bun: createPluginHost('bun', 'bun', 'oven-sh/bun'),
   yarn: createPluginHost('yarn', 'yarn', 'yarnpkg/yarn')
 } satisfies Record<ManagerPluginId, PluginHost>
+export function resolveOpenCodeLaunch(): { file: string; args: string[] } {
+  const file = executable('opencode')
+  if (!file) throw new Error('OpenCode is not installed or is not available on PATH.')
+  if (process.platform !== 'win32' || /\.exe$/i.test(file)) return { file, args: [] }
+  const node = executable('node')
+  const cli = path.win32.join(path.win32.dirname(file), 'node_modules', 'opencode-ai', 'bin', 'opencode')
+  if (!node || !existsSync(cli)) throw new Error('Cannot safely start this OpenCode Windows installation. Use a native OpenCode executable or an npm installation.')
+  return { file: node, args: [cli] }
+}
 export async function detectNode() {
   const file = executable('node')
   if (!file || (process.platform === 'win32' && !/\.exe$/i.test(file))) return { installed: false }

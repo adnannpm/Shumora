@@ -1,6 +1,7 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, nativeTheme, Notification } from 'electron'
 import { homedir } from 'node:os'
 import { ToolCache } from './tool-cache'
+import { TerminalAgentSettings } from './terminal-agent'
 import { openFolderArgument } from './open-folder'
 import { collectDiagnostics } from './diagnostics'
 import { join } from 'node:path'
@@ -21,7 +22,7 @@ import { packageStatus, configuredPackageNames } from './package-status'
 import { checkLibraryUpdates } from './library-updates'
 import { fetchPackagePage } from './package-fetch'
 import { PluginService, piDefinition, opencodeDefinition, managerDefinitions } from './plugins'
-import { pluginHost, piPluginHost, routerHost, runPiPackage, opencodePluginHost, detectNode, managerPluginHosts } from './plugin-host'
+import { pluginHost, piPluginHost, routerHost, runPiPackage, opencodePluginHost, resolveOpenCodeLaunch, detectNode, managerPluginHosts } from './plugin-host'
 import { routerLogin, routerLogout, routerAuthStatus } from './router-auth'
 import { RouterCatalog } from './router-catalog'
 import { RouterService } from './router-service'
@@ -85,10 +86,13 @@ function meetingSnapshot() {
 function publishMeeting() {
   if (window && !window.isDestroyed()) window.webContents.send('meetings:change', meetingSnapshot())
 }
+let terminalAgent: TerminalAgentSettings | undefined
 const sessions = new SessionManager((cwd, id, generation) => {
   if (!statSync(cwd).isDirectory()) throw new Error('Working directory is not a folder')
-  const launch = resolveLaunch(process.platform, process.env, process.env.PATH || process.env.Path || '')
+  const openCode = terminalAgent?.active() === 'opencode'
+  const launch = openCode ? resolveOpenCodeLaunch() : resolveLaunch(process.platform, process.env, process.env.PATH || process.env.Path || '')
   const env = Object.fromEntries(Object.entries(process.env).filter(([key, value]) => value !== undefined && key !== 'ELECTRON_RUN_AS_NODE')) as Record<string, string>
+  if (openCode) return pty.spawn(launch.file, launch.args, { name: 'xterm-256color', cols: 100, rows: 30, cwd, env: { ...env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } })
   const token = bridge.register(id, generation)
   const extension = meetingExtensionPath(app.isPackaged, process.resourcesPath, __dirname)
   try {
@@ -129,6 +133,8 @@ function sessionCwd(id: unknown) {
 function registerIPC() {
   const toolCache = new ToolCache(homedir(), process.env.XDG_CACHE_HOME || join(homedir(), '.cache'))
   const handlers: Record<string, (...args: any[]) => unknown> = {
+    'terminal-agent:status': () => terminalAgent!.status(),
+    'terminal-agent:select': agent => terminalAgent!.select(agent),
     'tool-cache:scan': () => toolCache.scan(),
     'tool-cache:clear': () => {
       if (sessions.list().some(session => session.status === 'running') || plugins.operation().status === 'running' || piPlugin.operation().status === 'running' || opencodePlugin.operation().status === 'running') throw new Error('Stop running terminals and installation operations before cleaning cache.')
@@ -334,15 +340,18 @@ if (primaryInstance) app.whenReady().then(async () => {
   })
   await askPass.start()
   database = openDatabase(app.getPath('userData'))
+  terminalAgent = new TerminalAgentSettings(database, async agent => {
+    try { return (await (agent === 'pi' ? piPluginHost : opencodePluginHost).detect()).installed } catch { return false }
+  })
   plugins = new PluginService(database, pluginHost, operation => {
     if (window && !window.isDestroyed()) window.webContents.send('plugins:operation', operation)
   })
   piPlugin = new PluginService(database, piPluginHost, operation => {
     if (window && !window.isDestroyed()) window.webContents.send('pi-plugin:operation', operation)
-  }, piDefinition, () => { if (sessions.list().some(s => s.status === 'running')) throw new Error('Stop all running Workspace sessions before changing Pi.') })
+  }, piDefinition, () => { if (terminalAgent?.active() === 'pi' && sessions.list().some(s => s.status === 'running')) throw new Error('Stop all running Workspace sessions before changing Pi.') })
   opencodePlugin = new PluginService(database, opencodePluginHost, operation => {
     if (window && !window.isDestroyed()) window.webContents.send('opencode-plugin:operation', operation)
-  }, opencodeDefinition)
+  }, opencodeDefinition, () => { if (terminalAgent?.active() === 'opencode' && sessions.list().some(s => s.status === 'running')) throw new Error('Stop all running Workspace sessions before changing OpenCode.') })
   for (const id of ['pnpm', 'bun', 'yarn'] as const) {
     managerPlugins.set(id, new PluginService<ManagerPluginId>(database, managerPluginHosts[id], operation => {
       if (window && !window.isDestroyed()) window.webContents.send(`manager-plugin:${id}:operation`, operation)
