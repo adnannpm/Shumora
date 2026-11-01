@@ -33,6 +33,16 @@ it('explains missing keys, provider errors and invalid models', async () => {
   await expect(generateCommitMessage('bad model', context, { fetch: fetch as any, key: async () => 'k' })).rejects.toThrow(/Choose a model/)
 })
 
+it('blocks sensitive file names and recognizable secrets before accessing keys or sending data', async () => {
+  const fetch = vi.fn()
+  const key = vi.fn(async () => 'key')
+  for (const patch of ['diff --git a/.env.local b/.env.local\n+HELLO=world', 'diff --git a/id_rsa b/id_rsa', '+-----BEGIN OPENSSH PRIVATE KEY-----', '+api_key = "super-secret-value"', '+const token = "ghp_abcdefghijklmnopqrstuvwxyz1234567890"']) {
+    await expect(generateCommitMessage('kr/auto', { ...context, patch }, { fetch, key })).rejects.toThrow(/sensitive|secret/i)
+  }
+  expect(fetch).not.toHaveBeenCalled()
+  expect(key).not.toHaveBeenCalled()
+})
+
 it('lists models and reports an offline router', async () => {
   expect(await routerChatModels({ fetch: (async () => json(200, { data: [{ id: 'kr/auto' }, { id: 'bad id' }] })) as any })).toEqual(['kr/auto'])
   await expect(routerChatModels({ fetch: (async () => { throw new Error('ECONNREFUSED') }) as any })).rejects.toThrow(/not running/)

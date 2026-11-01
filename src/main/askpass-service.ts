@@ -1,6 +1,6 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http'
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
 import type { GitAskPassRequest, GitAskPassResponse } from '../shared/types'
@@ -16,9 +16,10 @@ export class AskPassService {
   private pending = new Map<string, (res: GitAskPassResponse) => void>()
   private scriptPath = ''
   private jsPath = ''
+  private helperDir = ''
   private handler?: AskPassHandler
 
-  constructor(private appDataDir: string = path.join(tmpdir(), 'shumora-askpass')) {}
+  constructor(private appDataDir: string = tmpdir()) {}
 
   setHandler(handler: AskPassHandler) {
     this.handler = handler
@@ -80,22 +81,29 @@ export class AskPassService {
       resolver({ requestId: '', canceled: true })
     }
     this.pending.clear()
+    this.clearCache()
+    if (this.helperDir) rmSync(this.helperDir, { recursive: true, force: true })
+    this.helperDir = ''; this.scriptPath = ''; this.jsPath = ''; this.port = 0
   }
 
   private extractKey(prompt: string): string {
-    const sshMatch = /passphrase for (?:key )?['"]?([^'":]+)['"]?/i.exec(prompt)
-    if (sshMatch && sshMatch[1]) return sshMatch[1].trim()
-    const httpMatch = /(?:Password|Username) for ['"]?([^'":]+)['"]?/i.exec(prompt)
-    if (httpMatch && httpMatch[1]) return httpMatch[1].trim()
-    return prompt.trim()
+    const sshMatch = /^Enter passphrase for (?:key )?(['"])(.+)\1:\s*$/i.exec(prompt)
+    if (sshMatch && path.isAbsolute(sshMatch[2])) return `ssh:${sshMatch[2]}`
+    const httpMatch = /^(Password|Username) for (['"])(https?:\/\/[^\s]+)\2:\s*$/i.exec(prompt)
+    if (httpMatch) {
+      try {
+        const url = new URL(httpMatch[3])
+        if (url.password || url.search || url.hash) return ''
+        return JSON.stringify([httpMatch[1].toLowerCase(), url.origin, url.username, url.pathname])
+      } catch { /* Unknown prompts must never share remembered credentials. */ }
+    }
+    return ''
   }
 
   private ensureScripts() {
-    if (!existsSync(this.appDataDir)) {
-      mkdirSync(this.appDataDir, { recursive: true })
-    }
-
-    this.jsPath = path.join(this.appDataDir, 'askpass.cjs')
+    // A fresh private directory avoids predictable paths and pre-planted symlinks.
+    this.helperDir = mkdtempSync(path.join(this.appDataDir, 'shumora-askpass-'))
+    this.jsPath = path.join(this.helperDir, 'askpass.cjs')
     const jsContent = `'use strict';
 const http = require('node:http');
 const prompt = process.argv[2] || '';
@@ -138,19 +146,16 @@ req.setTimeout(120000, () => { req.destroy(); process.exit(1); });
 req.write(body);
 req.end();
 `
-    writeFileSync(this.jsPath, jsContent, 'utf8')
+    writeFileSync(this.jsPath, jsContent, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
 
     if (process.platform === 'win32') {
-      this.scriptPath = path.join(this.appDataDir, 'askpass.bat')
+      this.scriptPath = path.join(this.helperDir, 'askpass.bat')
       const batContent = `@echo off\r\nset ELECTRON_RUN_AS_NODE=1\r\n"%SHUMORA_EXECPATH%" "%SHUMORA_ASKPASS_JS%" %*\r\n`
-      writeFileSync(this.scriptPath, batContent, 'utf8')
+      writeFileSync(this.scriptPath, batContent, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
     } else {
-      this.scriptPath = path.join(this.appDataDir, 'askpass.sh')
+      this.scriptPath = path.join(this.helperDir, 'askpass.sh')
       const shContent = `#!/bin/sh\nexport ELECTRON_RUN_AS_NODE=1\nexec "$SHUMORA_EXECPATH" "$SHUMORA_ASKPASS_JS" "$@"\n`
-      writeFileSync(this.scriptPath, shContent, 'utf8')
-      try {
-        chmodSync(this.scriptPath, 0o755)
-      } catch {}
+      writeFileSync(this.scriptPath, shContent, { encoding: 'utf8', mode: 0o700, flag: 'wx' })
     }
   }
 
@@ -209,7 +214,7 @@ req.end();
           this.pending.set(requestId, resolve)
         })
 
-        void this.handler({ requestId, prompt, key, isUsername })
+        void this.handler({ requestId, prompt, key: key || prompt, isUsername })
 
         const reply = await promise
         if (reply.skip || (reply.canceled && reply.remember)) {

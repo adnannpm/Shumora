@@ -1,4 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { TerminalAgent, TerminalAgentAPI } from '../shared/terminal-agent'
+const terminalAgent: TerminalAgentAPI = {
+  status: () => ipcRenderer.invoke('terminal-agent:status'),
+  select: (agent: TerminalAgent) => ipcRenderer.invoke('terminal-agent:select', agent)
+}
+contextBridge.exposeInMainWorld('terminalAgent', terminalAgent)
+import type { ToolCacheAPI } from '../shared/tool-cache'
+const toolCache: ToolCacheAPI = { scan: () => ipcRenderer.invoke('tool-cache:scan'), clear: () => ipcRenderer.invoke('tool-cache:clear') }
+contextBridge.exposeInMainWorld('toolCache', toolCache)
+contextBridge.exposeInMainWorld('appClipboard', { writeText: (text: string) => ipcRenderer.invoke('clipboard:write-text', text) })
 import type { AppearanceAPI } from '../shared/appearance'
 const appearance: AppearanceAPI = {
   systemDark: () => ipcRenderer.invoke('appearance:system-dark'),
@@ -29,7 +39,7 @@ const meetings: MeetingsAPI = {
 }
 contextBridge.exposeInMainWorld('meetings', meetings)
 import type { PackageAPI } from '../shared/packages'
-import type { PluginsAPI, PluginOperation, PiPluginAPI } from '../shared/plugins'
+import type { PluginsAPI, PluginOperation, PiPluginAPI, OpenCodePluginAPI, NodePluginAPI } from '../shared/plugins'
 import type { UpdatesAPI, UpdateState } from '../shared/updates'
 import type { WorkspaceAPI, SessionEvent, GitAskPassRequest } from '../shared/types'
 const api: WorkspaceAPI = {
@@ -97,6 +107,7 @@ const plugins: PluginsAPI = {
   routerCustomProvider: input => ipcRenderer.invoke('plugins:router-custom-provider', input),
   routerModelEnabled: (provider, model, enabled) => ipcRenderer.invoke('plugins:router-model-enabled', provider, model, enabled),
   routerProviders: () => ipcRenderer.invoke('plugins:router-providers'),
+  routerQuota: connectionId => ipcRenderer.invoke('plugins:router-quota', connectionId),
   routerModels: () => ipcRenderer.invoke('plugins:router-models'),
   routerAddProvider: input => ipcRenderer.invoke('plugins:router-add-provider', input),
   routerToggleProvider: (id, active) => ipcRenderer.invoke('plugins:router-toggle-provider', id, active),
@@ -115,12 +126,12 @@ const plugins: PluginsAPI = {
     return () => ipcRenderer.removeListener('plugins:operation', listener)
   },
   status: (refresh) => ipcRenderer.invoke('plugins:status', refresh),
-  mutate: (action, version) => ipcRenderer.invoke('plugins:mutate', action, version)
+  mutate: (action, version, manager) => ipcRenderer.invoke('plugins:mutate', action, version, manager)
 }
 contextBridge.exposeInMainWorld('plugins', plugins)
 const piPlugin: PiPluginAPI = {
   status: refresh => ipcRenderer.invoke('pi-plugin:status', refresh),
-  mutate: (action, version) => ipcRenderer.invoke('pi-plugin:mutate', action, version),
+  mutate: (action, version, manager) => ipcRenderer.invoke('pi-plugin:mutate', action, version, manager),
   operation: () => ipcRenderer.invoke('pi-plugin:operation'),
   onOperation: callback => {
     const listener = (_event: Electron.IpcRendererEvent, operation: PluginOperation) => callback(operation)
@@ -129,6 +140,31 @@ const piPlugin: PiPluginAPI = {
   }
 }
 contextBridge.exposeInMainWorld('piPlugin', piPlugin)
+const opencodePlugin: OpenCodePluginAPI = {
+  status: refresh => ipcRenderer.invoke('opencode-plugin:status', refresh),
+  mutate: (action, version, manager) => ipcRenderer.invoke('opencode-plugin:mutate', action, version, manager),
+  operation: () => ipcRenderer.invoke('opencode-plugin:operation'),
+  onOperation: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, operation: PluginOperation) => callback(operation)
+    ipcRenderer.on('opencode-plugin:operation', listener)
+    return () => ipcRenderer.removeListener('opencode-plugin:operation', listener)
+  }
+}
+contextBridge.exposeInMainWorld('opencodePlugin', opencodePlugin)
+const managerPlugins: import('../shared/plugins').ManagerPluginsAPI = {
+  status: (id, refresh) => ipcRenderer.invoke('manager-plugin:status', id, refresh),
+  mutate: (id, action, version, manager) => ipcRenderer.invoke('manager-plugin:mutate', id, action, version, manager),
+  onOperation: (id, callback) => {
+    if (!['pnpm', 'bun', 'yarn'].includes(id)) throw new Error('Unknown package manager plugin')
+    const channel = `manager-plugin:${id}:operation`
+    const listener = (_event: Electron.IpcRendererEvent, operation: PluginOperation) => callback(operation)
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
+  }
+}
+contextBridge.exposeInMainWorld('managerPlugins', managerPlugins)
+const nodePlugin: NodePluginAPI = { status: () => ipcRenderer.invoke('node-plugin:status') }
+contextBridge.exposeInMainWorld('nodePlugin', nodePlugin)
 const updates: UpdatesAPI = {
   status: () => ipcRenderer.invoke('updates:status'),
   check: () => ipcRenderer.invoke('updates:check'),

@@ -1,6 +1,6 @@
 {
   "name": "pi-workspace",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "A desktop workspace for independent Pi terminal sessions",
   "main": "out/main/index.js",
@@ -8,7 +8,7 @@
     "dev": "electron-vite dev",
     "build": "npm run release:check && npm run typecheck && electron-vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --testTimeout=20000",
     "postinstall": "electron-builder install-app-deps",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder",

@@ -7,18 +7,22 @@ import { ImageAddon } from '@xterm/addon-image'
 import { terminalTheme } from './theme'
 import type { Session, SessionEvent } from '../../shared/types'
 
-export function TerminalPane({ session, visible, focused, onFocus }: { session: Session; visible: boolean; focused: boolean; onFocus: () => void }) {
+export function TerminalPane({ session, visible, focused, autoFocusBlocked = false, onFocus }: { session: Session; visible: boolean; focused: boolean; autoFocusBlocked?: boolean; onFocus: () => void }) {
   const { t } = useLanguage()
+  const focusBlocked = useRef(autoFocusBlocked)
+  focusBlocked.current = autoFocusBlocked
   const host = useRef<HTMLDivElement>(null)
   const terminal = useRef<Terminal | null>(null)
   const fit = useRef<(() => void) | null>(null)
   const [error, setError] = useState('')
+  const [waitingForOutput, setWaitingForOutput] = useState(true)
   const running = useRef(session.status === 'running')
   useEffect(() => {
     running.current = session.status === 'running'
     if (terminal.current) terminal.current.options.disableStdin = !running.current
   }, [session.status])
   useEffect(() => {
+    setWaitingForOutput(true); setError('')
     const term = new Terminal({ disableStdin: !running.current, cursorBlink: true, fontSize: 14, fontFamily: '"Cascadia Code", "DejaVu Sans Mono", Consolas, monospace', scrollback: 5000, allowProposedApi: false, theme: terminalTheme })
     const addon = new FitAddon(); term.loadAddon(addon); term.open(host.current!)
     // Each session owns its image cache; keep memory bounded across split/hidden tabs.
@@ -29,6 +33,7 @@ export function TerminalPane({ session, visible, focused, onFocus }: { session: 
     function apply(event: Extract<SessionEvent, { type: 'data' }>) {
       if (event.seq <= seq) return
       seq = event.seq; term.write(event.data)
+      if (event.data.length) setWaitingForOutput(false)
     }
     const unsubscribe = window.workspace.onEvent((event) => {
       if (event.type !== 'data' || event.id !== session.id || event.generation !== session.generation) return
@@ -38,6 +43,7 @@ export function TerminalPane({ session, visible, focused, onFocus }: { session: 
     void window.workspace.snapshot(session.id).then((snapshot) => {
       if (disposed || snapshot.session.generation !== session.generation) return
       term.write(snapshot.output); seq = snapshot.seq; ready = true
+      if (snapshot.output.length) setWaitingForOutput(false)
       pending.forEach(apply); pending.length = 0
     }).catch((e) => { if (!disposed) setError(String(e)) })
     const report = (e: unknown) => { if (!disposed) setError(String(e)) }
@@ -57,7 +63,7 @@ export function TerminalPane({ session, visible, focused, onFocus }: { session: 
   }, [session.id, session.generation])
   useEffect(() => {
     if (!visible) return
-    const frame = requestAnimationFrame(() => { fit.current?.(); if (focused) terminal.current?.focus() })
+    const frame = requestAnimationFrame(() => { fit.current?.(); if (focused && !focusBlocked.current) terminal.current?.focus() })
     return () => cancelAnimationFrame(frame)
   }, [visible, focused])
   async function action(kind: 'stop' | 'restart') {
@@ -69,5 +75,6 @@ export function TerminalPane({ session, visible, focused, onFocus }: { session: 
     {(session.error || error) && <div className="terminal-error" role="alert"><strong>{t("Session needs attention")}</strong><p>{session.error || error}</p></div>}
     {session.status === 'exited' && <div className="exit-note">{t("Process exited")}{session.exitCode !== undefined ? ` (code ${session.exitCode})` : ''}{t(". Restart to begin a new Pi process; this does not resume the previous conversation.")}</div>}
     <div className="terminal-host" ref={host} />
+    {waitingForOutput && session.status === 'running' && !session.error && !error && <div className="terminal-startup-loading"><span className="terminal-loading-spinner" role="progressbar" aria-label={t('Loading terminal')} /></div>}
   </section>
 }

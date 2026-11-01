@@ -23,10 +23,10 @@ it('switches and persists app theme, restores it on remount, and keeps terminal 
   fireEvent.click(screen.getByRole('button', { name: 'About & Updates' }))
   expect(screen.getByRole('heading', { name: 'About & Updates' })).toBeTruthy()
 })
-it('groups settings into three consistent pages with troubleshooting inside Workspace', () => {
+it('groups settings into consistent pages including Storage with troubleshooting inside Workspace', () => {
   const view = render(<Provider><Settings /></Provider>)
   const nav = screen.getByRole('navigation', { name: 'Settings sections' })
-  expect([...nav.querySelectorAll('button')].map(button => button.textContent)).toEqual(['General', 'Workspace', 'About & Updates'])
+  expect([...nav.querySelectorAll('button')].map(button => button.textContent)).toEqual(['General', 'Workspace', 'Storage', 'About & Updates'])
   const content = view.container.querySelector('.settings-content')!
   for (const name of ['General', 'Workspace', 'About & Updates']) {
     fireEvent.click(screen.getByRole('button', { name }))
@@ -34,8 +34,21 @@ it('groups settings into three consistent pages with troubleshooting inside Work
     expect(content.querySelectorAll('h2')).toHaveLength(1)
   }
   fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
-  expect(screen.getByRole('button', { name: 'Run diagnostics' })).toBeTruthy()
-  expect(screen.getByRole('heading', { name: 'Troubleshooting' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Check now' })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Check terminal' })).toBeTruthy()
+})
+it('links to the GitHub repository and official website from About', () => {
+  render(<Provider><Settings /></Provider>)
+  fireEvent.click(screen.getByRole('button', { name: 'About & Updates' }))
+  const repo = screen.getByRole('link', { name: 'Repository' })
+  const website = screen.getByRole('link', { name: 'Website' })
+  expect(repo.getAttribute('href')).toBe('https://github.com/adnannpm/Shumora')
+  expect(website.getAttribute('href')).toBe('https://www.shumora.my.id/')
+  for (const link of [repo, website]) {
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toContain('noopener')
+    expect(link.querySelector('svg[aria-hidden="true"]')).toBeTruthy()
+  }
 })
 function mockSystemTheme(dark: boolean) {
   const changes = new EventTarget()

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <rect width="640" height="360" rx="18" fill="#10151e"/>
+  <circle cx="580" cy="28" r="170" fill="#54b8d4" opacity=".07"/>
+  <rect x="32" y="30" width="576" height="300" rx="12" fill="#171e29" stroke="#344052"/>
+  <path d="M32 70h576" stroke="#344052"/>
+  <g fill="#68788d"><circle cx="52" cy="50" r="5"/><circle cx="70" cy="50" r="5"/><circle cx="88" cy="50" r="5"/></g>
+  <text x="320" y="55" text-anchor="middle" fill="#a2afc1" font-family="monospace" font-size="13">Yarn / terminal</text>
+  <rect x="62" y="102" width="76" height="76" rx="16" fill="#54b8d4" opacity=".12"/>
+  <text x="100" y="153" text-anchor="middle" fill="#54b8d4" font-family="monospace" font-weight="bold" font-size="38">Y</text>
+  <text x="158" y="139" fill="#eef2f8" font-family="sans-serif" font-weight="bold" font-size="34">Yarn</text>
+  <text x="158" y="165" fill="#54b8d4" font-family="monospace" font-size="12" letter-spacing="1">PACKAGE MANAGER</text>
+  <text x="64" y="230" fill="#54b8d4" font-family="monospace" font-size="21">$ yarn --version</text>
+  <text x="64" y="268" fill="#a2afc1" font-family="monospace" font-size="18">&gt; Manage your dependencies.</text>
+  <rect x="64" y="290" width="10" height="18" fill="#54b8d4"/>
+</svg>

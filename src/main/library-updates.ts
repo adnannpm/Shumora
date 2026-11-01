@@ -4,7 +4,7 @@ interface UpdateHost {
   names(): string[]
   status(name: string): PackageInstallation
   latest(name: string): Promise<string>
-  plugins: { id: 'pi' | '9router'; check(): Promise<{ installed: boolean; installedVersion?: string; latestVersion?: string; error?: string }> }[]
+  plugins: { id: 'pi' | '9router' | 'opencode'; check(): Promise<{ installed: boolean; installedVersion?: string; latestVersion?: string; error?: string }> }[]
 }
 export async function checkLibraryUpdates(host: UpdateHost, scope?: 'package' | 'plugin'): Promise<LibraryUpdates> {
   if (scope !== undefined && scope !== 'package' && scope !== 'plugin') throw new Error('Invalid update scope')
@@ -29,7 +29,7 @@ export async function checkLibraryUpdates(host: UpdateHost, scope?: 'package' | 
       if (status.error) throw new Error('Unverified plugin')
       if (!status.installed) return
       if (!status.installedVersion || !status.latestVersion || !valid(status.installedVersion) || !valid(status.latestVersion)) throw new Error('Unverified version')
-      if (gt(status.latestVersion, status.installedVersion)) result.items.push({ kind: 'plugin', id: plugin.id, name: plugin.id === 'pi' ? 'Pi' : '9router', installedVersion: status.installedVersion, latestVersion: status.latestVersion })
+      if (gt(status.latestVersion, status.installedVersion)) result.items.push({ kind: 'plugin', id: plugin.id, name: plugin.id === 'pi' ? 'Pi' : plugin.id === 'opencode' ? 'OpenCode' : '9router', installedVersion: status.installedVersion, latestVersion: status.latestVersion })
     } catch { result.errors.push(`Could not check plugin ${plugin.id}`) }
   }))
   return result

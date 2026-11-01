@@ -29,7 +29,8 @@ it('submits provider credentials only on explicit form submission', async () => 
   const add = vi.fn().mockResolvedValue(undefined)
   window.plugins = { routerProviders: async () => [], routerAddProvider: add } as any
   render(<Provider><RouterProviders /></Provider>)
-  fireEvent.change(screen.getByLabelText('Connection name'), { target: { value: 'Personal' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Add provider' }))
+  fireEvent.change(await screen.findByLabelText('Connection name'), { target: { value: 'Personal' } })
   fireEvent.change(screen.getByLabelText('Provider API key'), { target: { value: 'private-key' } })
   await screen.findByText('No provider connections yet.')
   expect(add).not.toHaveBeenCalled()
@@ -42,17 +43,37 @@ it('opens official OAuth login and submits custom endpoint configuration', async
   window.plugins = { routerProviders: async () => [], routerOpenOAuth: oauth, routerCustomProvider: custom } as any
   render(<Provider><RouterProviders /></Provider>)
   await screen.findByText('No provider connections yet.')
+  fireEvent.click(screen.getByRole('button', { name: 'Add provider' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'OAuth accounts' }))
   fireEvent.click(screen.getByRole('button', { name: 'Connect OAuth account in browser' }))
   expect(oauth).toHaveBeenCalledOnce()
-  await screen.findByText(/In the browser, select your provider/)
+  await within(screen.getByRole('dialog')).findByText(/In the browser, select your provider/)
+  fireEvent.click(screen.getByRole('button', { name: 'Custom endpoint' }))
   fireEvent.change(screen.getByLabelText('Endpoint name'), { target: { value: 'Local' } })
   fireEvent.change(screen.getByLabelText('Model prefix'), { target: { value: 'local' } })
   fireEvent.change(screen.getByLabelText('Base URL'), { target: { value: 'http://localhost:11434/v1' } })
   fireEvent.click(screen.getByRole('button', { name: 'Create endpoint' }))
   expect(custom).toHaveBeenCalledWith({ name: 'Local', prefix: 'local', baseUrl: 'http://localhost:11434/v1', type: 'openai-compatible', apiType: 'chat' })
-  await screen.findByText(/Endpoint created/)
+  await within(screen.getByRole('dialog')).findByText(/Endpoint created/)
   expect((screen.getByLabelText('Provider ID') as HTMLInputElement).value).toBe('openai-compatible-local')
 })
+it('combines provider search and status filters with an explicit empty state', async () => {
+  window.plugins = { routerProviders: async () => [
+    { id: 'a', provider: 'openai', name: 'Work', active: true, status: 'valid' },
+    { id: 'b', provider: 'anthropic', name: 'Personal', active: false, status: 'unknown' }
+  ] } as any
+  render(<Provider><RouterProviders /></Provider>)
+  await screen.findByText('Work')
+  expect(screen.queryByLabelText('Provider API key')).toBeNull()
+  fireEvent.change(screen.getByRole('combobox', { name: 'Connection status' }), { target: { value: 'disabled' } })
+  expect(screen.queryByText('Work')).toBeNull()
+  expect(screen.getByText('Personal')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('Search providers'), { target: { value: 'openai' } })
+  expect(screen.getByText('No matching connections.')).toBeTruthy()
+  fireEvent.change(screen.getByRole('combobox', { name: 'Connection status' }), { target: { value: '' } })
+  expect(screen.getByText('Work')).toBeTruthy()
+})
+
 it('edits connection names without replacing credentials implicitly', async () => {
   const edit = vi.fn().mockResolvedValue(undefined)
   window.plugins = { routerProviders: async () => [{ id: 'a', provider: 'openai', name: 'Work', active: true }], routerEditProvider: edit } as any
@@ -68,12 +89,38 @@ it('explains dashboard authentication failures instead of blaming aliases', asyn
   render(<Provider><RouterModels /></Provider>)
   expect((await screen.findByRole('alert')).textContent).toContain('requires dashboard login')
 })
+it('paginates the entire model catalog and resets pagination when searching or filtering', async () => {
+  window.plugins = { routerModels: async () => Array.from({ length: 106 }, (_, i) => ({
+    id: `provider/model-${i + 1}`, name: `Model ${i + 1}`, provider: i === 105 ? 'anthropic' : 'openai', alias: `alias-${i + 1}`, enabled: true, providerAlias: 'provider', modelId: `model-${i + 1}`
+  })) } as any
+  render(<Provider><RouterModels /></Provider>)
+  await screen.findByRole('table', { name: 'Models' })
+  expect(screen.getAllByRole('row')).toHaveLength(26)
+  expect(screen.queryByText('Model 26', { exact: true })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+  expect(screen.getByText('Model 26', { exact: true })).toBeTruthy()
+  expect(screen.queryByText('Model 1', { exact: true })).toBeNull()
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search models' }), { target: { value: 'alias-106' } })
+  expect(screen.getByText('Model 106', { exact: true })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Previous' })).toHaveProperty('disabled', true)
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search models' }), { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+  fireEvent.change(screen.getByRole('combobox', { name: 'Filter by provider' }), { target: { value: 'anthropic' } })
+  expect(screen.getByText('Model 106', { exact: true })).toBeTruthy()
+  expect(screen.getAllByRole('row')).toHaveLength(2)
+  expect(screen.getByRole('button', { name: 'Next' })).toHaveProperty('disabled', true)
+})
+
 it('filters real models and edits aliases', async () => {
   const alias = vi.fn()
   const enabled = vi.fn().mockResolvedValue(undefined)
   window.plugins = { routerModelEnabled: enabled, routerModels: async () => [{ id: 'openai/gpt-4.1', name: 'GPT 4.1', provider: 'openai', alias: 'gpt-4.1', enabled: true, providerAlias: 'openai', modelId: 'gpt-4.1' }], routerModelAlias: alias } as any
   render(<Provider><RouterModels /></Provider>)
   await screen.findByText('GPT 4.1')
+  const card = screen.getByRole('row', { name: /GPT 4.1/ })
+  expect(within(card).getByText('Enabled', { exact: true })).toBeTruthy()
+  expect(screen.getByRole('columnheader', { name: 'Routing alias' })).toBeTruthy()
+  expect(screen.getByRole('status', { name: 'Model results' }).textContent).toContain('1')
   await waitFor(() => expect((screen.getByRole('button', { name: 'Disable GPT 4.1' }) as HTMLButtonElement).disabled).toBe(false))
   fireEvent.change(screen.getByRole('textbox', { name: 'Alias for GPT 4.1' }), { target: { value: 'coding' } })
   fireEvent.click(screen.getByRole('button', { name: 'Save alias for GPT 4.1' }))
@@ -81,6 +128,7 @@ it('filters real models and edits aliases', async () => {
   await waitFor(() => expect((screen.getByRole('button', { name: 'Disable GPT 4.1' }) as HTMLButtonElement).disabled).toBe(false))
   fireEvent.click(screen.getByRole('button', { name: 'Disable GPT 4.1' }))
   expect(enabled).toHaveBeenCalledWith('openai', 'gpt-4.1', false)
-  fireEvent.change(screen.getByRole('textbox', { name: 'Search models' }), { target: { value: 'missing' } })
+  await screen.findByRole('row', { name: /GPT 4.1/ })
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search models' }), { target: { value: 'missing' } })
   expect(screen.queryByText('GPT 4.1')).toBeNull()
 })
