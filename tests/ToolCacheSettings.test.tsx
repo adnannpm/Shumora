@@ -9,7 +9,7 @@ it('shows measured cache size, confirms cleanup and displays actual freed bytes'
  const entry = {id:'pi',name:'Pi',bytes:2048,files:2,supported:true,failed:false}
  window.toolCache={scan:vi.fn(async()=>({entries:[entry],totalBytes:2048})),clear:vi.fn(async()=>({entries:[{...entry,bytes:0,files:0}],totalBytes:0,freedBytes:2048}))}
  render(<Provider><ToolCacheSettings/></Provider>)
- await screen.findByText('2.0 KB')
+ expect(await screen.findAllByText('2.0 KB')).toHaveLength(2)
  fireEvent.click(screen.getByRole('button',{name:'Clear cache'}))
  await screen.findByRole('dialog')
  expect(window.toolCache.clear).not.toHaveBeenCalled()

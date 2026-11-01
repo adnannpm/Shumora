@@ -89,12 +89,25 @@ button:disabled { opacity: .55; cursor: default; }
 .storage-settings .chakra-button:hover:not(:disabled):not([data-disabled]), .storage-dialog .chakra-button:hover:not(:disabled):not([data-disabled]) { background: var(--selected); color: var(--selected-text); }
 .storage-settings .chakra-button:focus-visible, .storage-dialog .chakra-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .storage-settings .chakra-button:disabled, .storage-settings .chakra-button[data-disabled], .storage-dialog .chakra-button:disabled { opacity: .45; cursor: not-allowed; }
-.storage-settings .settings-details dd { overflow-wrap: anywhere; }
-.storage-settings .settings-row > div { min-width: 0; }
-.storage-settings .settings-row > .chakra-button { flex-shrink: 0; }
-.storage-settings > .settings-note { margin-bottom: 16px; }
+.storage-settings { width: 100%; }
+.storage-overview { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-bottom: 24px; }
+.storage-total { font-size: 32px; font-weight: 600; line-height: 1.25; letter-spacing: -.7px; font-variant-numeric: tabular-nums; color: var(--text); }
+.storage-settings .storage-overview h3 { margin: 6px 0 0; color: var(--muted); font-size: 13px; font-weight: 400; }
+.storage-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.storage-tool-list > div { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 16px 0; border-top: 1px solid var(--line); }
+.storage-tool-list dt { font-size: 13px; font-weight: 500; color: var(--text); }
+.storage-tool-list dt small { display: block; margin-top: 4px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.storage-tool-list dd { flex-shrink: 0; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text); }
+.storage-unsupported { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 4px; }
+.storage-unsupported summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.storage-unsupported summary span { margin-left: 6px; font-variant-numeric: tabular-nums; }
+.storage-unsupported summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.settings-content .storage-unsupported p, .settings-content .storage-footnote { margin: 12px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.storage-unsupported ul { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 12px 0; list-style: none; font-size: 12px; color: var(--muted); }
+.settings-content .storage-empty { margin: 0 0 20px; font-size: 13px; color: var(--muted); }
+.storage-settings > [role=status], .storage-settings > [role=alert] { margin-top: 16px; font-size: 13px; }
 .storage-settings > [role=alert] { color: var(--danger, #b42332); }
-@media (max-width: 640px) { .storage-settings .settings-details > div { gap: 12px; } .storage-settings .settings-details dd { max-width: 65%; } }
+@media (max-width: 640px) { .storage-overview { align-items: flex-start; flex-direction: column; gap: 16px; } .storage-total { font-size: 28px; } }
 .library-page .toolbar .chakra-button { height: 32px; min-height: 32px; }
 .library-page .library-tablist button { font-size: 13px; font-weight: 500; }
 .library-page .package-catalog > .router-catalog-heading > div > p { font-size: 14px; line-height: 1.7; color: var(--muted); }

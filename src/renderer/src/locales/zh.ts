@@ -1,5 +1,13 @@
 // Simplified Chinese UI copy. User content, package metadata and terminal output stay untouched.
 export const chinese: Record<string, string> = {
+"Clear cache?": "清理缓存？",
+"Cache may be recreated when you use the tools again.": "再次使用工具时可能重新生成缓存。",
+"Safe cleanup is not available for these tools yet. Their files will not be deleted.": "暂不支持安全清理以下工具。不会删除其文件。",
+"Other tools": "其他工具",
+"temporary files": "个临时文件",
+"No cache needs cleaning.": "没有需要清理的缓存。",
+"Check again": "重新检查",
+"Clear temporary files. Your conversations and settings stay safe.": "清理临时文件。您的对话和设置保持安全。",
   'Website': '网站',
 "Review the report before sharing. Common secrets and your home folder path are masked, but some technical details remain.": "分享前请检查报告。常见密钥和用户主目录路径已隐藏，但仍保留部分技术信息。",
 "Could not copy automatically. The report is selected; press Ctrl+C (Cmd+C on Mac).": "无法自动复制。报告已选中，请按 Ctrl+C（Mac 上为 Cmd+C）。",

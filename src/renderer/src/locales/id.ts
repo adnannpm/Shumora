@@ -1,5 +1,13 @@
 // Application-owned copy only. Terminal output, user content and remote metadata stay untouched.
 export const indonesian: Record<string, string> = {
+"Clear cache?": "Bersihkan cache?",
+"Cache may be recreated when you use the tools again.": "Cache bisa terbentuk lagi saat tool digunakan.",
+"Safe cleanup is not available for these tools yet. Their files will not be deleted.": "Pembersihan aman untuk tool berikut belum tersedia. File mereka tidak akan dihapus.",
+"Other tools": "Tool lainnya",
+"temporary files": "file sementara",
+"No cache needs cleaning.": "Tidak ada cache yang perlu dibersihkan.",
+"Check again": "Periksa ulang",
+"Clear temporary files. Your conversations and settings stay safe.": "Bersihkan file sementara. Percakapan dan pengaturan tetap aman.",
   'Website': 'Situs web',
 "Review the report before sharing. Common secrets and your home folder path are masked, but some technical details remain.": "Periksa laporan sebelum dibagikan. Data rahasia umum dan lokasi folder pengguna disamarkan, tetapi beberapa detail teknis tetap tercantum.",
 "Could not copy automatically. The report is selected; press Ctrl+C (Cmd+C on Mac).": "Belum bisa menyalin otomatis. Laporan sudah dipilih; tekan Ctrl+C (Cmd+C di Mac).",
