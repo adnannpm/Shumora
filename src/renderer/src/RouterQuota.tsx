@@ -73,12 +73,13 @@ export function RouterQuota() {
   function clearFilters() { setQuery(''); setFilter('all') }
   return <section className="router-quota">
     <div className="router-catalog-heading quota-heading"><div><span className="quota-eyebrow">{t('ACCOUNT MONITOR')}</span><h2>{t('Quota & Usage')}</h2><p>{t('Account limits reported by your providers through 9router.')}</p></div><Button variant="outline" loading={busy} disabled={busy} onClick={() => void load()}>{t('Refresh')}</Button></div>
-    <section className="quota-summary" aria-label={t('Account summary')}>
+    {busy ? <DataSkeleton label={t('Account summary')} shape="quota-summary" /> : <section className="quota-summary" aria-label={t('Account summary')}>
       {[{ label: 'Connected accounts', count: accounts.length, tone: '' }, { label: 'Low quota', count: accounts.filter(lowQuota).length, tone: 'warning' }, { label: 'Refresh failed', count: accounts.filter(a => a.error).length, tone: 'danger' }].map(item => <div key={item.label} className={`quota-summary-item ${item.tone}`} aria-label={t(item.label)}><span>{t(item.label)}</span><strong>{busy && !accounts.length ? '—' : item.count}</strong><small>{t(item.label === 'Low quota' ? 'Active accounts with 20% or less remaining' : item.label === 'Refresh failed' ? 'Accounts that could not be updated' : 'Provider connections in 9router')}</small></div>)}
-    </section>
+    </section>}
     {error && <div role="alert" className="quota-notice quota-danger">{t(error)}{accounts.length > 0 && ` ${t('Showing last available data.')}`}</div>}
+    {busy && <DataSkeleton label={t('Loading account quotas…')} shape="quota" />}
+    {!busy && <>
     {accounts.length > 0 && <div className="quota-filters"><input type="search" aria-label={t('Search accounts')} placeholder={t('Search account, provider or plan…')} value={query} onChange={event => setQuery(event.target.value)} /><select aria-label={t('Filter accounts')} value={filter} onChange={event => setFilter(event.target.value)}><option value="all">{t('All accounts')}</option><option value="low">{t('Low quota')}</option><option value="failed">{t('Refresh failed')}</option><option value="disabled">{t('Disabled')}</option></select><span role="status">{t('{shown} of {total} accounts', { shown: visible.length, total: accounts.length })}</span></div>}
-    {busy && !accounts.length && <DataSkeleton label={t('Loading account quotas…')} shape="providers" />}
     {!busy && !error && !accounts.length && <div className="quota-empty"><h3>{t('No connected accounts')}</h3><p>{t('No connected accounts. Add a provider in the Providers tab first.')}</p></div>}
     {accounts.length > 0 && !visible.length && <div className="quota-empty"><h3>{t('No matching accounts.')}</h3><p>{t('Try another search or change the status filter.')}</p><Button variant="outline" onClick={clearFilters}>{t('Clear filters')}</Button></div>}
     <div className="quota-account-grid">{visible.map(account => {
@@ -86,11 +87,11 @@ export function RouterQuota() {
       const status = checking ? 'Checking…' : accountError ? 'Refresh failed' : !connection.active ? 'Disabled' : lowQuota(account) ? 'Low quota' : quota?.quotas.length ? 'Available' : 'Not reported'
       const tone = accountError ? 'danger' : !connection.active || checking ? 'neutral' : lowQuota(account) ? 'warning' : quota?.quotas.length ? 'healthy' : 'neutral'
       return <section className={`router-quota-account ${!connection.active ? 'quota-disabled' : ''}`} key={connection.id} aria-label={connection.name} aria-busy={checking}>
-        <header><span className="quota-avatar" aria-hidden="true">{connection.provider.slice(0, 2).toUpperCase()}</span><div className="quota-account-title"><h3>{connection.name}</h3><p>{connection.provider}{quota?.plan ? ` · ${quota.plan}` : ''}</p></div><span className={`quota-badge quota-${tone}`}>{status === 'Checking…' && !quota ? t('Loading') : t(status)}</span></header>
+        <header><span className="quota-avatar" aria-hidden="true">{connection.provider.slice(0, 2).toUpperCase()}</span><div className="quota-account-title"><h3>{connection.name}</h3><p>{connection.provider}{quota?.plan ? ` · ${quota.plan}` : ''}</p></div>{checking ? <DataSkeleton label={t('Checking…')} shape="button" /> : <span className={`quota-badge quota-${tone}`}>{t(status)}</span>}</header>
         {accountError && <p role="alert" className="quota-notice quota-danger">{t(accountError)}{quota ? ` ${t('Showing last available data.')}` : ''}</p>}
-        {!quota && checking && <DataSkeleton label={t('Checking…')} rows={3} />}
-        {quota && !quota.quotas.length && <div className="quota-unreported"><span aria-hidden="true">—</span><p>{t('Quota or credit balance is not provided for this account. Check the provider dashboard.')}</p></div>}
-        {quota && quota.quotas.length > 0 && <div className={`quota-model-list ${expanded.includes(connection.id) ? 'is-expanded' : ''}`} tabIndex={expanded.includes(connection.id) && quota.quotas.length > 3 ? 0 : undefined} role="group" aria-label={t('Model quotas')}>
+        {checking && <DataSkeleton label={t('Loading account quotas…')} rows={3} />}
+        {!checking && quota && !quota.quotas.length && <div className="quota-unreported"><span aria-hidden="true">—</span><p>{t('Quota or credit balance is not provided for this account. Check the provider dashboard.')}</p></div>}
+        {!checking && quota && quota.quotas.length > 0 && <div className={`quota-model-list ${expanded.includes(connection.id) ? 'is-expanded' : ''}`} tabIndex={expanded.includes(connection.id) && quota.quotas.length > 3 ? 0 : undefined} role="group" aria-label={t('Model quotas')}>
         {(expanded.includes(connection.id) ? quota.quotas : quota.quotas.slice(0, 3)).map(q => {
           const percent = remainingPercent(q)
           const tone = percent === undefined ? 'neutral' : percent <= 20 ? 'danger' : percent <= 50 ? 'warning' : 'healthy'
@@ -103,10 +104,11 @@ export function RouterQuota() {
             {!q.unlimited && q.resetAt && Number.isFinite(Date.parse(q.resetAt)) && <small>{t('Reset')}: {new Date(q.resetAt).toLocaleString(locale)}</small>}
           </div>
         })}</div>}
-        {quota && quota.quotas.length > 3 && <div className="quota-model-toggle"><span>{t('{shown} of {total} models', { shown: expanded.includes(connection.id) ? quota.quotas.length : 3, total: quota.quotas.length })}</span><Button size="sm" variant="ghost" aria-expanded={expanded.includes(connection.id)} onClick={() => setExpanded(previous => previous.includes(connection.id) ? previous.filter(id => id !== connection.id) : [...previous, connection.id])}>{expanded.includes(connection.id) ? t('Show fewer') : t('Show all {count} models', { count: quota.quotas.length })}</Button></div>}
-        {quota && <footer className="quota-account-footer"><span>{!connection.active ? t('Disabled') : t('Provider-reported data')}</span><span>{t('Last checked')}: {new Date(quota.checkedAt).toLocaleTimeString(locale)}</span></footer>}
+        {!checking && quota && quota.quotas.length > 3 && <div className="quota-model-toggle"><span>{t('{shown} of {total} models', { shown: expanded.includes(connection.id) ? quota.quotas.length : 3, total: quota.quotas.length })}</span><Button size="sm" variant="ghost" aria-expanded={expanded.includes(connection.id)} onClick={() => setExpanded(previous => previous.includes(connection.id) ? previous.filter(id => id !== connection.id) : [...previous, connection.id])}>{expanded.includes(connection.id) ? t('Show fewer') : t('Show all {count} models', { count: quota.quotas.length })}</Button></div>}
+        {!checking && quota && <footer className="quota-account-footer"><span>{!connection.active ? t('Disabled') : t('Provider-reported data')}</span><span>{t('Last checked')}: {new Date(quota.checkedAt).toLocaleTimeString(locale)}</span></footer>}
       </section>
     })}</div>
+    </>}
     <footer className="quota-page-footer"><p>{t('Quota is not a token wallet. Credits, tokens and reset windows depend on your provider; unavailable balances are not estimated.')}</p><a href="http://127.0.0.1:20128/dashboard/quota" target="_blank" rel="noopener noreferrer">{t('Open 9router quota dashboard')} ↗</a></footer>
   </section>
 }

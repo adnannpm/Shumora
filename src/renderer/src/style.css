@@ -367,9 +367,75 @@ button:disabled { opacity: .55; cursor: default; }
 .router-overview-card { margin-top: 24px; padding: 22px; border: 1px solid var(--line); border-radius: 8px; background: var(--sidebar); }
 .router-control-actions, .router-endpoint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 .router-endpoint code { flex: 1; overflow-wrap: anywhere; font-size: 14px; }
-.router-key-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding: 14px 0; }
-.router-key-row strong { min-width: 100px; font-size: 13px; }
-.router-key-row code { flex: 1; overflow-wrap: anywhere; font-size: 12px; }
+.router-provider-toolbar, .router-provider-filters, .router-provider-methods { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.router-provider-filters { margin: 20px 0; }
+.router-provider-filters > input { flex: 1 1 220px; min-width: 0; }
+.router-provider-filters > select { padding: 9px 12px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--text); font-size: 13px; }
+.router-provider-card { background: var(--surface); display: flex; flex-direction: column; }
+.router-provider-card .router-card-heading h3 { overflow-wrap: anywhere; }
+.router-provider-card .router-card-heading code { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.router-provider-health { color: var(--muted); font-size: 12px; margin: 20px 0; }
+.router-provider-card .router-control-actions { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); gap: 4px; }
+.router-add-provider { max-height: 90dvh; overflow-y: auto; background: var(--surface); color: var(--text); }
+.router-provider-methods { padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.router-provider-methods button { flex: 1 1 130px; font-size: 12px; }
+.router-provider-setup { padding-top: 20px; }
+.router-provider-setup h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.router-provider-setup > p { color: var(--muted); font-size: 12px; line-height: 1.8; }
+.router-provider-setup .router-provider-form { grid-template-columns: minmax(0, 1fr); }
+.router-model-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 12px; }
+.router-model-filters > input, .router-model-filters > select { padding: 9px 12px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; min-width: 0; }
+.router-model-filters > input { flex: 1 1 220px; }
+.router-model-filters > select { flex: 0 1 220px; }
+.router-model-filters > input:focus-visible, .router-model-filters > select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.router-model-results { margin: 0 0 20px; color: var(--muted); font-size: 12px; }
+.router-model-results strong { color: var(--text); font-weight: 600; }
+.router-model-table-scroll { max-height: 62vh; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+.router-model-table { width: 100%; min-width: 720px; border-collapse: separate; border-spacing: 0; text-align: left; font-size: 12px; }
+.router-model-table thead th { position: sticky; top: 0; z-index: 1; background: var(--sidebar); color: var(--muted); font-size: 11px; font-weight: 500; }
+.router-model-table th, .router-model-table td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.router-model-table tbody tr:last-child > * { border-bottom: 0; }
+.router-model-table tbody tr:hover { background: var(--sidebar); }
+.router-model-table tbody th { width: 42%; max-width: 360px; font-weight: 400; }
+.router-model-table tbody th strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.router-model-provider { display: inline-block; margin-left: 8px; color: var(--muted); font-size: 10px; }
+.router-model-identity { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+.router-model-identity code { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.router-model-alias-inline { display: flex; align-items: center; gap: 6px; }
+.router-model-alias-inline input { width: 100%; min-width: 90px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--text); background: var(--surface); font-size: 12px; }
+.router-model-alias-inline input:focus-visible { outline: 2px solid var(--accent); }
+.router-model-table .chakra-button { min-height: 26px; height: 26px; padding: 0 8px; font-size: 11px; flex-shrink: 0; }
+.router-model-table .router-status-badge { white-space: nowrap; font-size: 10px; padding: 3px 7px; }
+.router-model-pagination, .router-model-pagination > div { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.router-model-pagination { justify-content: space-between; padding-top: 14px; color: var(--muted); font-size: 12px; }
+.router-overview-heading { margin-bottom: 24px; }
+.router-overview-heading h2 { margin: 0 0 6px; font-size: 22px; font-weight: 600; }
+.router-overview-heading p { margin: 0; color: var(--muted); font-size: 13px; }
+.router-overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.router-overview-grid > .router-overview-card { margin-top: 0; min-width: 0; }
+.router-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.router-card-heading h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.router-card-heading p, .router-endpoint-card > p { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.router-service-card > p { margin-top: 16px; font-size: 13px; line-height: 1.7; }
+.router-service-card > .settings-note { margin-bottom: 0; color: var(--muted); font-size: 12px; }
+.router-status-badge, .router-protocol-badge { display: inline-flex; align-items: center; gap: 7px; padding: 4px 9px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); font-size: 11px; line-height: 1.4; }
+.router-status-badge.online { color: var(--selected-text); background: var(--selected); }
+.router-protocol-badge { color: var(--muted); }
+.router-endpoint-card .router-endpoint { padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); gap: 12px; }
+.router-endpoint-card .router-endpoint code { font-size: 13px; min-width: 0; }
+.router-keys-card { background: var(--surface); }
+.router-keys-scroll { margin-top: 20px; overflow-x: auto; }
+.router-keys-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.router-keys-table th, .router-keys-table td { padding: 12px; border-bottom: 1px solid var(--line); }
+.router-keys-table thead th { color: var(--muted); background: var(--sidebar); font-size: 11px; font-weight: 500; }
+.router-keys-table tbody th { font-weight: 500; overflow-wrap: anywhere; min-width: 100px; }
+.router-keys-table td code { font-size: 12px; overflow-wrap: anywhere; }
+.router-keys-table th:last-child, .router-keys-table td:last-child { text-align: right; width: 1%; }
+.router-key-actions { display: flex; justify-content: flex-end; gap: 4px; }
+.router-keys-empty { padding: 28px 16px; margin: 20px 0 0; border: 1px dashed var(--line); border-radius: 6px; color: var(--muted); text-align: center; font-size: 13px; }
+.router-key-create { padding-top: 20px; }
+@media (max-width: 1000px) { .router-overview-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .router-keys-card { padding: 16px; } .router-key-create > input { flex-basis: 100%; } }
 .router-control-actions input { flex: 1; min-width: 160px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--text); font-size: 13px; }
 .router-control-actions input:focus-visible { outline: 2px solid var(--accent); }
 .router-catalog-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }

@@ -1,5 +1,16 @@
 // Simplified Chinese UI copy. User content, package metadata and terminal output stay untouched.
 export const chinese: Record<string, string> = {
+  "Model pages": "模型分页",
+  "Model results": "模型结果",
+  "Routing alias": "路由别名",
+  "Model ID": "模型 ID",
+  "Connection method": "连接方式",
+  "No matching connections.": "没有匹配的连接。",
+  "All connections": "所有连接",
+  "Connection status": "连接状态",
+  "Add provider": "添加提供商",
+  "Actions": "操作",
+  "API key": "API 密钥",
   "You can install the local gateway now or add it later from Plugins.": "可以现在安装本地网关，也可以稍后通过插件安装。",
   "View extension details": "查看扩展详情",
   "Install extension": "安装扩展",

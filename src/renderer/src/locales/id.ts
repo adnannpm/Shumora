@@ -1,5 +1,16 @@
 // Application-owned copy only. Terminal output, user content and remote metadata stay untouched.
 export const indonesian: Record<string, string> = {
+  "Model pages": "Halaman model",
+  "Model results": "Hasil model",
+  "Routing alias": "Alias routing",
+  "Model ID": "ID model",
+  "Connection method": "Metode koneksi",
+  "No matching connections.": "Tidak ada koneksi yang cocok.",
+  "All connections": "Semua koneksi",
+  "Connection status": "Status koneksi",
+  "Add provider": "Tambah provider",
+  "Actions": "Aksi",
+  "API key": "Kunci API",
   "You can install the local gateway now or add it later from Plugins.": "Gateway lokal bisa dipasang sekarang atau nanti melalui Plugins.",
   "View extension details": "Lihat detail extension",
   "Install extension": "Pasang extension",
