@@ -1,5 +1,18 @@
 // Application-owned copy only. Terminal output, user content and remote metadata stay untouched.
 export const indonesian: Record<string, string> = {
+  "Could not sign out. Check that 9router is running and try again.": "Gagal keluar. Pastikan 9router berjalan lalu coba lagi.",
+  "This signs you out of the 9router dashboard in Shumora. It does not stop 9router or remove your provider accounts.": "Ini mengeluarkan kamu dari dashboard 9router di Shumora. Layanan 9router tetap berjalan dan akun provider tidak dihapus.",
+  "Sign out": "Keluar",
+  "Sign out of 9router?": "Yakin keluar dari 9router?",
+  "Signing in…": "Sedang masuk…",
+  "Hide password": "Sembunyikan password",
+  "Show password": "Tampilkan password",
+  "Caps Lock is on": "Caps Lock aktif",
+  "Your password is not saved. This session ends when Shumora closes or you sign out.": "Password tidak disimpan. Sesi berakhir saat Shumora ditutup atau kamu keluar.",
+  "Use your dashboard password, not a provider API key.": "Gunakan password dashboard, bukan API key provider.",
+  "Enter dashboard password": "Masukkan password dashboard",
+  "Local dashboard": "Dashboard lokal",
+  "Connect Shumora to your local dashboard.": "Hubungkan Shumora ke dashboard lokal kamu.",
   "Model pages": "Halaman model",
   "Model results": "Hasil model",
   "Routing alias": "Alias routing",

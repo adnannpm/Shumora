@@ -275,6 +275,34 @@ button:disabled { opacity: .55; cursor: default; }
 .skeleton-service { padding-block: 0; }
 .data-skeleton .router-catalog-grid { margin-top: 8px; }
 .data-skeleton .router-overview-card { margin-top: 0; }
+.router-signin-dialog { width: min(440px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--text); box-shadow: 0 24px 80px #0003; }
+.router-signin-header { display: flex; align-items: center; gap: 14px; padding: 24px 24px 20px; }
+.router-signin-icon { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; background: var(--selected); color: var(--accent); }
+.router-signin-icon svg { width: 24px; height: 24px; }
+.router-signin-header h2 { font-size: 19px; font-weight: 650; letter-spacing: -.4px; }
+.router-signin-header p { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.router-signin-body { padding: 0 24px 24px; }
+.router-signin-endpoint { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 12px 14px; margin-bottom: 24px; border: 1px solid var(--line); border-radius: 7px; background: var(--sidebar); font-size: 11px; }
+.router-signin-endpoint span { color: var(--muted); }
+.router-signin-endpoint code { font-size: 12px; }
+.router-signin-form > label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 550; }
+.router-signin-password { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.router-signin-password:focus-within { border-color: var(--accent); outline: 2px solid color-mix(in srgb, var(--accent) 25%, transparent); outline-offset: 1px; }
+.router-signin-password:has(input[aria-invalid=true]) { border-color: var(--danger, #b42332); }
+.router-signin-password input { width: 100%; min-width: 0; padding: 12px; border: 0; outline: 0; background: transparent; color: var(--text); font-family: inherit; font-size: 14px; }
+.router-signin-password input::placeholder { color: var(--muted); font-size: 13px; }
+.router-signin-password .chakra-button { flex-shrink: 0; width: 36px; min-width: 36px; height: 36px; padding: 8px; margin-right: 4px; color: var(--muted); border-radius: 5px; }
+.router-signin-password svg { width: 20px; height: 20px; }
+.router-signin-helper, .router-signin-privacy { color: var(--muted); font-size: 11px; line-height: 1.7; }
+.router-signin-helper { margin-top: 8px; }
+.router-signin-privacy { padding-top: 16px; margin-top: 20px; border-top: 1px solid var(--line); }
+.router-signin-caps { margin-top: 8px; color: var(--muted); font-size: 12px; }
+.router-signin-error { margin-top: 12px; padding: 10px 12px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--danger, #b42332) 30%, var(--line)); color: var(--danger, #b42332); background: color-mix(in srgb, var(--danger, #b42332) 5%, var(--surface)); font-size: 12px; line-height: 1.7; }
+.dark .router-signin-error { color: #ff93a3; }
+.router-signin-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--line); background: var(--sidebar); border-radius: 0 0 14px 14px; }
+.router-signin-footer .chakra-button { min-height: 36px; padding-inline: 16px; border-radius: 6px; font-size: 13px; }
+.router-signin-footer .chakra-button[type=submit] { background: var(--accent); color: var(--accent-contrast); }
+.router-signin-footer .chakra-button[type=button] { border: 1px solid var(--line); color: var(--text); background: var(--surface); }
 .router-toolbar { justify-content: space-between; }
 .router-dashboard .library-tabs { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .router-dashboard .library-tablist { flex-shrink: 0; }

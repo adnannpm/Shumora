@@ -1,5 +1,18 @@
 // Simplified Chinese UI copy. User content, package metadata and terminal output stay untouched.
 export const chinese: Record<string, string> = {
+  "Could not sign out. Check that 9router is running and try again.": "无法退出登录。请确认 9router 正在运行后重试。",
+  "This signs you out of the 9router dashboard in Shumora. It does not stop 9router or remove your provider accounts.": "这将退出 Shumora 中的 9router 仪表板，不会停止 9router 或删除提供商账户。",
+  "Sign out": "退出登录",
+  "Sign out of 9router?": "确定退出 9router？",
+  "Signing in…": "正在登录…",
+  "Hide password": "隐藏密码",
+  "Show password": "显示密码",
+  "Caps Lock is on": "大写锁定已开启",
+  "Your password is not saved. This session ends when Shumora closes or you sign out.": "密码不会被保存。关闭 Shumora 或退出登录后，此会话即结束。",
+  "Use your dashboard password, not a provider API key.": "请使用仪表板密码，而不是提供商 API 密钥。",
+  "Enter dashboard password": "输入仪表板密码",
+  "Local dashboard": "本地仪表板",
+  "Connect Shumora to your local dashboard.": "将 Shumora 连接到本地仪表板。",
   "Model pages": "模型分页",
   "Model results": "模型结果",
   "Routing alias": "路由别名",
