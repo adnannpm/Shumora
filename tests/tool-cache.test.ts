@@ -31,3 +31,13 @@ it('never traverses symbolic links at cache roots or files', async () => {
   expect(await readFile(join(home,'outside/models.json'),'utf8')).toBe('secret')
  } finally { await rm(home,{recursive:true,force:true}) }
 })
+it('counts cache files when an ancestor of the cache root is an OS-level link', async () => {
+ const real = await mkdtemp(join(tmpdir(), 'shumora-cache-real-'))
+ const linked = `${real}-link`
+ try {
+  await symlink(real, linked, 'dir')
+  await mkdir(join(real,'.cache/opencode'),{recursive:true}); await writeFile(join(real,'.cache/opencode/models.json'),'123')
+  const cache = new ToolCache(linked,join(linked,'.cache'))
+  expect((await cache.scan()).totalBytes).toBe(3)
+ } finally { await rm(linked,{force:true}); await rm(real,{recursive:true,force:true}) }
+})

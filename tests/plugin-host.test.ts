@@ -16,6 +16,7 @@ import { execFile } from 'node:child_process'
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); exec.shim = false; exec.files = {}; vi.unstubAllEnvs() })
 
 it('recognizes standalone OpenCode by its version command without npm metadata', async () => {
+  vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
   vi.stubEnv('PATH', '/standalone')
   exec.files['/standalone/opencode'] = ''
   exec.child = { stdout: new EventEmitter(), stderr: new EventEmitter() }
@@ -26,6 +27,7 @@ it('recognizes standalone OpenCode by its version command without npm metadata',
 })
 
 it('detects Node.js on PATH rather than reporting the embedded Electron runtime', async () => {
+  vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
   exec.files['/runtime/node'] = ''
   vi.stubEnv('PATH', '/runtime')
   exec.child = { stdout: new EventEmitter(), stderr: new EventEmitter() }

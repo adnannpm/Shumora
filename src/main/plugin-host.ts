@@ -13,7 +13,8 @@ export async function runPiPackage(args: string[], output: (text: string) => voi
   await run(launch.file, [...launch.args, ...args], 300_000, output)
 }
 function executable(name: string): string | undefined {
-  const paths = process.platform === 'win32' ? path.win32 : path
+  // Follow the target platform, not the host path module, so PATH parsing stays consistent.
+  const paths = process.platform === 'win32' ? path.win32 : path.posix
   const dirs = (process.env.PATH || process.env.Path || '').split(process.platform === 'win32' ? ';' : ':').filter(Boolean)
   const names = process.platform === 'win32' ? [`${name}.exe`, `${name}.cmd`, name] : [name]
   return dirs.flatMap(dir => names.map(n => paths.join(dir, n))).find(file => { try { accessSync(file, process.platform === 'win32' ? constants.F_OK : constants.X_OK); return true } catch { return false } })

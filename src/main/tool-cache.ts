@@ -16,16 +16,19 @@ export class ToolCache {
     ]
   }
   private async safeFile(file: string): Promise<number> {
-    // Reject symlinks/junctions in every component, including parent folders.
+    // Trust the configured cache root (it may live under OS-level links such as
+    // macOS /var -> /private/var), but reject links/junctions at or below it.
+    const root = path.resolve(this.cacheHome)
     const absolute = path.resolve(file)
-    const parsed = path.parse(absolute)
-    let current = parsed.root
-    for (const part of absolute.slice(parsed.root.length).split(path.sep)) {
+    const relative = path.relative(root, absolute)
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return 0
+    let current = root
+    if ((await lstat(current)).isSymbolicLink()) return 0
+    for (const part of relative.split(path.sep)) {
       current = path.join(current,part)
-      const stat = await lstat(current)
-      if (stat.isSymbolicLink()) return 0
+      if ((await lstat(current)).isSymbolicLink()) return 0
     }
-    if (await realpath(absolute) !== absolute) return 0
+    if (await realpath(absolute) !== path.join(await realpath(root), relative)) return 0
     const stat = await lstat(absolute)
     return stat.isFile() ? stat.size : 0
   }

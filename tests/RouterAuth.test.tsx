@@ -4,6 +4,8 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Provider } from '../src/renderer/src/Provider'
 import { RouterAuth } from '../src/renderer/src/RouterAuth'
+// jsdom lacks CSS.escape; Chakra's focus trap uses it from a MutationObserver.
+if (!globalThis.CSS?.escape) Object.assign(globalThis, { CSS: { ...globalThis.CSS, escape: (value: string) => value.replace(/[^\w-]/g, ch => `\\${ch}`) } })
 afterEach(cleanup)
 it('toggles password visibility, warns about Caps Lock and resets sensitive state on cancel', async () => {
   window.plugins = { routerAuthStatus: async () => ({ authenticated: false, required: true }) } as any
