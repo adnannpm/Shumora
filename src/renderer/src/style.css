@@ -422,7 +422,11 @@ button:disabled { opacity: .55; cursor: default; }
 .settings-section .settings-details { margin-top: 8px; }
 .settings-section .settings-details > div:last-child { border-bottom: 0; }
 .settings-section .settings-note { margin-top: 16px; }
-.settings-links { margin-top: 16px; font-size: 13px; color: var(--accent); }
+.settings-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 16px; font-size: 13px; color: var(--accent); }
+.settings-links a { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; border-radius: 4px; }
+.settings-links a svg { width: 16px; height: 16px; flex-shrink: 0; }
+.settings-links a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.settings-links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .terminal-check-actions, .terminal-check-support { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .terminal-check .chakra-button { height: 36px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--text); font-family: inherit; font-size: 13px; font-weight: 400; box-shadow: none; }
 .terminal-check .chakra-button:hover:not(:disabled) { background: var(--selected); color: var(--selected-text); }

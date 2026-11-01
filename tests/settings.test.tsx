@@ -37,6 +37,19 @@ it('groups settings into consistent pages including Storage with troubleshooting
   expect(screen.getByRole('button', { name: 'Check now' })).toBeTruthy()
   expect(screen.getByRole('heading', { name: 'Check terminal' })).toBeTruthy()
 })
+it('links to the GitHub repository and official website from About', () => {
+  render(<Provider><Settings /></Provider>)
+  fireEvent.click(screen.getByRole('button', { name: 'About & Updates' }))
+  const repo = screen.getByRole('link', { name: 'Repository' })
+  const website = screen.getByRole('link', { name: 'Website' })
+  expect(repo.getAttribute('href')).toBe('https://github.com/adnannpm/Shumora')
+  expect(website.getAttribute('href')).toBe('https://www.shumora.my.id/')
+  for (const link of [repo, website]) {
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toContain('noopener')
+    expect(link.querySelector('svg[aria-hidden="true"]')).toBeTruthy()
+  }
+})
 function mockSystemTheme(dark: boolean) {
   const changes = new EventTarget()
   const media = Object.assign(changes, { matches: dark, media: '(prefers-color-scheme: dark)' })

@@ -1,5 +1,6 @@
 // Simplified Chinese UI copy. User content, package metadata and terminal output stay untouched.
 export const chinese: Record<string, string> = {
+  'Website': '网站',
 "Review the report before sharing. Common secrets and your home folder path are masked, but some technical details remain.": "分享前请检查报告。常见密钥和用户主目录路径已隐藏，但仍保留部分技术信息。",
 "Could not copy automatically. The report is selected; press Ctrl+C (Cmd+C on Mac).": "无法自动复制。报告已选中，请按 Ctrl+C（Mac 上为 Cmd+C）。",
 "Report copied. Review it before sharing with support.": "报告已复制。分享给支持团队前请检查内容。",

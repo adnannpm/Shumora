@@ -1,5 +1,6 @@
 // Application-owned copy only. Terminal output, user content and remote metadata stay untouched.
 export const indonesian: Record<string, string> = {
+  'Website': 'Situs web',
 "Review the report before sharing. Common secrets and your home folder path are masked, but some technical details remain.": "Periksa laporan sebelum dibagikan. Data rahasia umum dan lokasi folder pengguna disamarkan, tetapi beberapa detail teknis tetap tercantum.",
 "Could not copy automatically. The report is selected; press Ctrl+C (Cmd+C on Mac).": "Belum bisa menyalin otomatis. Laporan sudah dipilih; tekan Ctrl+C (Cmd+C di Mac).",
 "Report copied. Review it before sharing with support.": "Laporan tersalin. Periksa isinya sebelum dikirim ke tim bantuan.",
