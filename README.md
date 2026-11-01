@@ -1,34 +1,102 @@
 # Shumora
 
-**A desktop workspace for managing multiple Pi Coding Agent sessions.**
+**A desktop workspace for terminal-based AI coding agents, with project terminals, split panes, and a local 9router dashboard in one app.**
 
-Shumora brings independent Pi terminals into a single application, combining session tabs with focused and split-screen layouts. It preserves Pi’s native terminal experience while providing a dedicated interface for organizing your work.
+[Download Shumora](https://www.shumora.my.id/) · [Documentation](https://www.shumora.my.id/docs) · [Source code](https://github.com/adnannpm/Shumora)
 
-Built with Electron, React, TypeScript, xterm.js, and node-pty. Shumora uses an existing Pi installation; cloning or modifying Pi’s source code is not required.
+## What is Shumora?
 
-> **Project status:** Early MVP. Linux build and native PTY checks have passed. Full desktop end-to-end testing and Windows runtime validation remain outstanding.
+Shumora gives your AI coding terminals a dedicated desktop workspace. Instead of switching between separate terminal windows, you can organize sessions into tabs, work on different project folders, and view multiple terminals side by side.
 
-## Features
+The coding agent still runs in a real terminal. Shumora provides the application around it: session management, layouts, tool setup, package browsing, Git review, and integrations. It does **not** replace the agent, provide an AI model of its own, or include a model subscription.
 
-- **Instant startup:** Opens one Pi session in your home directory when the application starts.
-- **Session tabs:** Create sessions with the ＋ button, switch between tabs, and close them with ×. Running sessions require confirmation before they are stopped and removed.
-- **Tab groups:** Split the active tab into a second group, arrange groups side by side or top to bottom, and resize the divider by dragging or using arrow keys.
-- **Move and merge:** Move the active tab to the other group or merge both groups without restarting Pi. Closing the last tab in a group collapses that group.
-- **Reserved sidebar:** The sidebar is intentionally empty for future features.
-- **Background continuity:** Hidden sessions keep running when you switch views.
-- **Working directory selection:** Choose a directory for newly created sessions without changing existing ones.
-- **Session controls:** Stop or restart individual processes and inspect launch errors.
-- **Exit confirmation:** Receive a warning before closing the application with active sessions.
+### How the pieces fit together
+
+| Component | What it does |
+| --- | --- |
+| **Shumora** | The desktop workspace: terminals, project folders, layouts, settings, and integration controls. |
+| **Pi / OpenCode** | The coding agent that reads your project, runs tools, and communicates with a model. Pi is the supported first-run setup path; OpenCode can be selected in terminal-agent settings when installed. |
+| **AI provider** | Supplies model access. Credentials, subscriptions, credits, and model capabilities depend on your provider and agent configuration. |
+| **9router** | An optional local AI gateway for provider connections, model routing, and an OpenAI-compatible endpoint. Shumora can display and manage its local dashboard data. |
+
+You do not need to clone or modify Pi's source code to use Shumora. Agent tools are separate installations; Shumora can help you detect and install supported tools with your confirmation.
+
+## Download and documentation
+
+**To use Shumora, start at [www.shumora.my.id](https://www.shumora.my.id/)** and choose an available download for your operating system. You do not need to clone this repository or run the development commands below just to use a packaged application.
+
+For installation instructions, configuration, and usage guides, visit **[Shumora Docs](https://www.shumora.my.id/docs)**.
+
+Shumora is under active development. Available installers and platform support can vary by release; consult the website and release notes rather than assuming every packaging target has been validated.
+
+## Your first session
+
+1. **Install and open Shumora.** Download it from the website, then follow the installation instructions for your platform.
+2. **Complete tool setup.** The first-run guide checks your installation tools and Pi. Missing supported tools can be reviewed through **Library → Plugins** before you approve installation. The current guide also checks the `pi-9router-ext` Pi extension; installing the local 9router service is optional.
+3. **Configure model access.** Authenticate your coding agent with a supported provider, or configure it to use your gateway. Installing Shumora does not automatically sign you in to an AI provider.
+4. **Open Terminals and choose your project folder.** Create a session in the repository you want the agent to work on. Separate sessions can use different folders.
+5. **Start working in the agent's terminal interface.** Write prompts and use the commands supported by your selected agent. Split the workspace when you want to see multiple sessions at once.
+
+Switching tabs or navigating to another page does not stop a running terminal. Closing a session or quitting the application can interrupt its work; review confirmation dialogs before continuing.
+
+## What you can do
+
+### Organize coding sessions
+
+- Create and switch between session tabs, rename terminals, and choose project folders.
+- Arrange sessions in **up to four panes**, with horizontal or vertical splits and resizable dividers.
+- Keep sessions running while you view another tab or page.
+- Stop or restart individual sessions and inspect launch errors.
+- Select Pi or an installed OpenCode as the agent for new terminal sessions. Close terminal tabs before changing the agent.
+
+### Manage tools and extensions
+
+- Browse Pi packages and inspect package details before installing third-party code.
+- Find supported tools in **Library → Plugins**, with search and category filters.
+- Review installation status, updates, and operation output.
+- Use **Settings** for appearance, language, terminal-agent selection, troubleshooting, and supported cache cleanup.
+
+### Use 9router from the workspace
+
+When 9router is installed, its integration appears in the sidebar:
+
+- **Overview:** local service status, the API endpoint, and API-key management.
+- **Providers:** provider connections and connection-management actions.
+- **Quota & Usage:** provider-reported limits, credit balances, reset windows, account filters, and compact model lists.
+- **Models:** model availability settings, search, provider filters, and routing aliases.
+- **Logs:** output from a 9router process started by Shumora.
+
+Sign in with your **local 9router dashboard password**, not a provider API key. This dashboard session is separate from your browser login and ends when Shumora closes or you sign out. Signing out does not stop 9router or delete provider accounts.
+
+Quota is not a shared token wallet. Providers may report different units or omit balances and reset times. Shumora does not invent missing totals or combine unrelated provider balances.
+
+An externally started 9router process must be managed outside Shumora. Shumora's service Stop and Restart controls apply only to processes it starts.
+
+### Review project work
+
+- Inspect Git changes and use the workspace's Git review controls.
+- Use **Council** for the application's meeting workflow and role configuration. This is separate from ordinary terminal tabs; it is not a guarantee that independent agent sessions automatically share context.
 
 ## Requirements
 
-- Node.js **22.19 or later**, using a version supported by the project’s dependencies, and npm.
-- [Pi Coding Agent](https://pi.dev) installed and available through `pi`, with provider authentication configured in Pi.
-- A Linux or Windows desktop environment. Linux requires Electron’s system libraries and appropriate sandbox support.
+### For desktop users
 
-The native `node-pty` dependency is prepared for Electron during installation. If a compatible prebuilt binary is unavailable, you will need a native build toolchain: a C/C++ compiler, make, and Python on Linux; or the appropriate Visual Studio Build Tools and Python on Windows.
+- A desktop environment supported by the installer you download.
+- An installed coding agent, such as Pi, and any runtime required by that installation. Use the setup guide or Library to review supported installation options.
+- Model access configured for your agent: a provider account, API credentials, or a compatible gateway, depending on your setup.
+- On Linux, Electron's system libraries and appropriate sandbox support.
 
-## Getting Started
+Shumora does not bundle provider subscriptions or grant access to paid models. Usage charges and account limits remain with your providers.
+
+### For contributors building from source
+
+- Node.js **22.19 or later**, using a version supported by the dependencies, and npm.
+- A desktop display for launching Electron.
+- A native build toolchain if compatible dependency binaries are unavailable: C/C++, make, and Python on Linux; appropriate Visual Studio Build Tools and Python on Windows.
+
+Built with **Electron, React, TypeScript, xterm.js, node-pty, and SQLite**. Native dependencies are prepared for Electron during installation.
+
+## Run from source
 
 ```bash
 git clone https://github.com/adnannpm/Shumora.git
@@ -37,13 +105,17 @@ npm install
 npm run dev
 ```
 
-The first Pi session uses your home directory, not the application’s source directory. Use the folder selector to change the working directory for subsequent sessions.
+If a packaged Shumora instance is already running, use a separate development profile to avoid the single-instance lock and keep development settings separate:
 
-Pi is an external dependency. Shumora does not bundle or automatically install it.
+```bash
+npm run dev -- -- --user-data-dir=/absolute/path/to/shumora-dev-profile
+```
 
-### Configuring the Pi Executable
+A separate profile also has separate Shumora settings and state. Coding agents still run under your OS user and can access their own existing configuration.
 
-If Pi is not available on the application’s `PATH`, specify its executable before launching Shumora.
+### Configure the Pi executable
+
+If Pi is not available on the application's `PATH`, specify its executable before launching Shumora.
 
 **Linux**
 
@@ -67,64 +139,57 @@ $env:PI_CLI_PATH = 'C:\path\to\node_modules\@earendil-works\pi-coding-agent\dist
 npm run dev
 ```
 
-These environment variables must be available when the application launches. Applications opened from a desktop menu may inherit a different `PATH` from your terminal.
+These variables must be available when the application launches. A desktop-menu launch may inherit a different `PATH` from your terminal. If a terminal will not open, use the terminal check in Settings and review the detected installation.
 
-## Development and Validation
+## Development and validation
 
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Start the application in development mode |
 | `npm test` | Run backend and UI regression tests |
 | `npm run typecheck` | Check TypeScript types |
-| `npm run build` | Build the main process, preload, and renderer |
+| `npm run build` | Check release metadata and types, then build the application |
 | `node scripts/smoke.mjs` | Run the desktop smoke test against an installed Pi runtime |
-| `npm run pack` | Create an unpacked application directory |
+| `npm run pack` | Build an unpacked application directory |
 | `npm run dist` | Build distribution artifacts for the current target platform |
 
-The desktop smoke test requires a working display, an available Electron binary, and an installed Pi runtime. It checks startup, terminal output, renderer isolation, session creation, layout changes, hidden-session continuity, and process shutdown. It does not submit a model prompt. Playwright may disable the sandbox for its test process; the normal application window is configured with sandboxing enabled.
+Desktop smoke tests require a working display, Electron, and an installed Pi runtime. They do not establish that provider authentication, model requests, clipboard behavior, or every packaged platform works correctly. Unit tests and successful builds are not substitutes for testing an installer on its target OS.
 
-### Verification Status
+## Release notes and packaging
 
-- **Passed:** Backend/UI regression tests, TypeScript checks, and production build.
-- **Passed:** Browser-rendered workspace fixtures at 1360px and 800px, covering tab groups, both split orientations, pointer resizing, stable terminal mounts, and closing all tabs. These fixtures do not exercise the native Electron confirmation dialog or a live Pi session.
-- **Passed:** Native Electron PTY receiving output from the installed Pi runtime.
-- **Passed:** Linux unpacked packaging and native PTY loading from the packaged application.
-- **Outstanding:** Desktop smoke test, which currently times out during the DevTools connection in the development environment.
-- **Outstanding:** Packaged GUI validation, Linux AppImage validation, and Windows runtime and installer testing.
+Shumora bundles version-specific **What's New** notes and lets you reopen them from Settings. The application and GitHub Release use `changelogs/<version>.md` as the shared release-note source.
 
-Passing unit tests and packaging checks does not establish release readiness. Internal design notes and verification artifacts are maintained locally and are not included in this repository.
+Build output goes to `out/`; packaged artifacts go to `release/`. Configured distribution targets are **Linux AppImage**, **Windows NSIS**, and **macOS DMG/ZIP**. A configured target is not a claim that the current release has been tested on that platform.
 
-## Release Notes and Publishing
+Supported packaged Windows NSIS and Linux AppImage installations have manual update checks, requested downloads, and a confirmed restart/install. Automatic downloads and install-on-exit are disabled. macOS automatic installation requires signing configuration. Save your work before installing an update because restarting stops managed sessions.
 
-Shumora shows **What's New** once per installed version and lets you reopen it from **Settings → About → Release notes**. Notes are bundled for offline reading. The application and GitHub Release use the same `changelogs/<version>.md` file.
+For version preparation, owner approval, publishing, signing limitations, and failure recovery, see the [release guide](docs/releases.md).
 
-Prepare a version explicitly with `npm run release:prepare -- 0.2.0`, finish the notes, and submit the version changes through a PR. After merging to `main`, the repository owner approves the exact version and commit through the **Approve and build release** GitHub Actions workflow. All Linux, Windows, and macOS build jobs must succeed before publication.
+## Important limitations
 
-**Settings → Updates** supports manual checks, requested downloads, and a confirmed restart/install for packaged Windows NSIS and Linux AppImage installations. Automatic downloads and install-on-exit are disabled. macOS auto-install is unavailable until signing is configured. Installers are initially unsigned, and hosted cross-platform packaging and real version-to-version updating have not been validated by local tests. See [the release guide](docs/releases.md) for approval steps, artifact targets, and failure recovery.
+- **A saved workspace is not a running process.** Restoring terminal entries or layouts does not preserve live agent processes across application exits. Restarting a terminal is not a guarantee of resuming its previous conversation; use the agent's own resume features where supported.
+- Normal shutdown stops managed PTYs. Cleanup of agent-created child processes after forced termination is not guaranteed; Shumora is not a production process supervisor.
+- Up to **32 open sessions** are supported. Stopped sessions retain their tab until closed. Running many agents can consume substantial RAM and CPU even when their tabs are hidden.
+- Terminal output replay is bounded to **512,000 UTF-16 code units per session**. It is not a conversation archive or a complete terminal-screen snapshot.
+- The workspace supports up to four panes, not arbitrary freeform docking.
+- Process liveness does not necessarily mean the AI is actively working.
+- Model capabilities, clipboard-image support, and authentication depend on your agent, terminal integration, platform, and provider. Do not assume that every model accepts images.
+- Provider-reported quotas can be unavailable or stale. Refresh failures do not mean your balance is zero.
 
-## Packaging
+## Security
 
-Build output is written to `out/`; packaged artifacts are written to `release/`. Distribution targets are **Linux AppImage**, **Windows NSIS**, and **macOS DMG/ZIP**.
+Coding agents run with your user's filesystem permissions, credentials, tools, and extensions. They may read or modify files and execute commands. Electron renderer isolation does **not** sandbox the agent's work.
 
-Build and validate releases on their target operating systems to ensure native dependencies are compatible. Code signing and production installer polish are not configured yet. Automatic installation is limited to the supported packaged formats described above. Release publication is handled separately by the owner-approved workflow.
+Review third-party packages and installation actions before approving them. A gallery listing is not a security endorsement. Review diagnostic reports before sharing them, even when common secrets and home paths are masked.
 
-## Current Limitations
+Shumora uses an isolated renderer and a restricted preload API, but remains under active development. Do not treat it as production-hardened software or use it for sensitive work without an independent security review.
 
-- Workspace settings, layouts, and session selection are not persisted between application launches.
-- Restarting creates a new Pi process; it does **not** resume the previous conversation.
-- Normal application shutdown stops managed PTYs. There is no background daemon or process persistence after exit.
-- Cleanup of Pi-created child processes after forced termination is not guaranteed. Shumora is not a production process supervisor.
-- Up to 32 open sessions are supported. Stopped sessions retain their tab until closed; closing a tab releases its slot and output buffer. Closing the final tab leaves an empty workspace rather than automatically starting another process.
-- Terminal output replay is limited to 512,000 UTF-16 code units per session. It is not a conversation archive or a complete terminal screen snapshot.
-- A maximum of two tab groups is supported. The divider adjusts between 25% and 75%; arrow keys adjust it in 5% steps, Home/End select the limits, and double-click resets it. Freeform docking and drag-and-drop tab movement are not implemented.
-- The `running` indicator describes process liveness, not whether the AI is actively working.
-- Prompt libraries, model/provider management, native chat views, and inter-agent coordination are not included in this MVP.
+## Links
 
-## Security Considerations
-
-Pi runs with the current user’s credentials, extensions, tools, and filesystem permissions. Electron renderer isolation does not sandbox the agent’s work or prevent Pi from modifying files.
-
-The application uses an isolated renderer and a restricted preload API. Additional hardening remains necessary before production use, including tightening the production Content Security Policy. Do not treat this MVP as production-hardened software or use it for sensitive work without an independent security review.
+- **Downloads and website:** https://www.shumora.my.id/
+- **Documentation:** https://www.shumora.my.id/docs
+- **Source and issues:** https://github.com/adnannpm/Shumora
+- **Pi Coding Agent:** https://pi.dev
 
 ## License
 
