@@ -19,10 +19,10 @@ const pluginCatalog = [
 ] as const
 const pluginCategories = { '': 'All categories', agent: 'AI agents', gateway: 'Gateways', runtime: 'Runtimes', manager: 'Package managers' } as const
 
-export function Library({ onPluginStatus, initialPlugin = null }: { onPluginStatus?: (plugin: RouterPlugin) => void; initialPlugin?: 'pi' | 'opencode' | '9router' | 'node' | ManagerPluginId | null }) {
+export function Library({ onPluginStatus, initialPlugin = null, initialPackage }: { initialPackage?: string; onPluginStatus?: (plugin: RouterPlugin) => void; initialPlugin?: 'pi' | 'opencode' | '9router' | 'node' | ManagerPluginId | null }) {
   const { t } = useLanguage()
   const [details, setDetails] = useState<'9router' | 'pi' | 'node' | 'opencode' | ManagerPluginId | null>(initialPlugin)
-  const [packageTarget, setPackageTarget] = useState<string>()
+  const [packageTarget, setPackageTarget] = useState<string | undefined>(initialPackage)
   const [tab, setTab] = useState('package')
   const [pluginSearch, setPluginSearch] = useState('')
   const [pluginCategory, setPluginCategory] = useState('')

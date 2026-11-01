@@ -6,7 +6,10 @@ import type { Session, WorkspaceAPI } from '../src/shared/types'
 vi.mock('../src/renderer/src/TerminalPane', () => ({ TerminalPane: ({ session, visible, focused, autoFocusBlocked, onFocus }: { session: Session; visible: boolean; focused: boolean; autoFocusBlocked: boolean; onFocus: () => void }) => <div data-testid={session.id} data-visible={visible} data-focused={focused && !autoFocusBlocked} onClick={onFocus}>{session.error}</div> }))
 import App from '../src/renderer/src/App'
 import { Provider } from '../src/renderer/src/Provider'
-beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }))
+beforeEach(() => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+  vi.stubGlobal('localStorage', { getItem: () => 'true', setItem() {} })
+})
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 function setup(count = 1, approved = true) {
   let sessions: Session[] = Array.from({ length: count }, (_, i) => ({ id: String(i + 1), name: `Pi ${i + 1}`, cwd: '/tmp', status: 'running', generation: 1 }))

@@ -24,6 +24,7 @@ export default function App() {
     void window.workspace?.setNotificationsEnabled?.(enabled).catch(() => {})
   }, [])
   const [page, setPage] = useState<Page>('workspace')
+  const [setupPackage, setSetupPackage] = useState<string>()
   const [setupPlugin, setSetupPlugin] = useState<'pi' | 'opencode' | '9router' | 'node' | 'pnpm' | 'bun' | 'yarn' | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [routerInstalled, setRouterInstalled] = useState(false)
@@ -234,7 +235,7 @@ export default function App() {
   const needsPartner = layout.groups[layout.focused].ids.length === 1
   const focusedSession = sessions.find(s => s.id === layout.groups[layout.focused]?.active)
   return <div className="workspace flex h-dvh overflow-hidden">
-    <Sidebar routerInstalled={routerInstalled} page={page} onPage={value => { setSetupPlugin(null); setPage(value) }} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
+    <Sidebar routerInstalled={routerInstalled} page={page} onPage={value => { setSetupPackage(undefined); setSetupPlugin(null); setPage(value) }} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
     <main className="flex min-w-0 flex-1 flex-col" style={{ display: page === 'workspace' ? 'flex' : 'none' }}>
       <header className="toolbar">       
         <h1>{t("Terminals")}</h1>
@@ -322,9 +323,9 @@ export default function App() {
       <MeetingRoom sessions={sessions} active={page === 'meeting'} />
     </div>
     {page === 'settings' && <Settings />}
-    {page === 'library' && <Library initialPlugin={setupPlugin} onPluginStatus={pluginStatus} />}
+    {page === 'library' && <Library key={setupPackage || setupPlugin || 'catalog'} initialPlugin={setupPlugin} initialPackage={setupPackage} onPluginStatus={pluginStatus} />}
     {page === '9router' && routerInstalled && <RouterDashboard />}
-    <WorkspaceSetup startupOnly active={page === 'workspace'} onContinue={async () => {}} onSetup={id => { setSetupPlugin(id); setPage('library') }} />
+    <WorkspaceSetup startupOnly active={page === 'workspace'} onContinue={async () => {}} onPackage={name => { setSetupPlugin(null); setSetupPackage(name); setPage('library') }} onSetup={id => { setSetupPackage(undefined); setSetupPlugin(id); setPage('library') }} />
     <GitAskPassModal />
     {tabMenu && <Portal><div ref={tabMenuElement} className="terminal-tab-menu" role="menu" aria-labelledby={`tab-${tabMenu.id}`} style={{ left: tabMenu.x, top: tabMenu.y }} onKeyDown={event => {
       const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))

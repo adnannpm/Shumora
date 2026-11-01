@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
 import React from 'react'
-import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Provider } from '../src/renderer/src/Provider'
 import { WorkspaceSetup } from '../src/renderer/src/WorkspaceSetup'
-afterEach(cleanup)
+beforeEach(() => {
+  const values = new Map([['shumora.setup-completed', 'true']])
+  vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) })
+})
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 function tools(installed = true) {
+  window.packages = { status: async () => ({ configured: true, installed: true, installedVersion: '1.0.0' }) } as any
   window.opencodePlugin = { status: async () => ({ installed: true, installedVersion: '1.18.34' }) } as any
   window.nodePlugin = { status: async () => ({ installed: true, installedVersion: '22.0.0' }) } as any
   window.piPlugin = { status: async () => ({ installed, availableManagers: ['npm', 'bun'], latestVersion: '1.0.0' }), onOperation: () => () => {}, mutate: vi.fn(async () => ({ installed: true })) } as any
@@ -20,10 +25,10 @@ it('guides package manager, Pi, optional 9router and completion without folder o
   expect(screen.queryByRole('button', { name: 'Choose folder' })).toBeNull()
   fireEvent.click(screen.getByRole('radio', { name: /Bun/ }))
   fireEvent.click(next)
-  expect(screen.getByRole('heading', { name: 'Choose your harness' })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Set up Pi' })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-  expect(screen.getByRole('heading', { name: 'Add 9router' })).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }))
+  expect(screen.getByRole('heading', { name: '9router integration' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }))
   expect(screen.getByRole('heading', { name: 'Ready to code' })).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull()
   expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
@@ -55,30 +60,73 @@ it('routes missing tools to existing plugin details without installing inside se
   fireEvent.click(await screen.findByRole('button', { name: 'Open 9router plugin' }))
   expect(open).toHaveBeenLastCalledWith('9router')
 })
-it('allows installed OpenCode instead of missing Pi and summarizes the selected harness', async () => {
+it('disables OpenCode even when installed and keeps Pi required', async () => {
   tools(false)
-  const done = vi.fn(async () => {})
-  const open = vi.fn()
-  render(<Provider><WorkspaceSetup active onSetup={open} onContinue={done} /></Provider>)
+  render(<Provider><WorkspaceSetup active onSetup={() => {}} /></Provider>)
   const next = screen.getByRole('button', { name: 'Next' })
   await waitFor(() => expect(next.hasAttribute('disabled')).toBe(false))
   fireEvent.click(next)
-  expect(next.hasAttribute('disabled')).toBe(true)
-  fireEvent.click(screen.getByRole('radio', { name: /OpenCode/ }))
-  expect(next.hasAttribute('disabled')).toBe(false)
-  fireEvent.click(screen.getByRole('button', { name: 'Details OpenCode' }))
-  expect(open).toHaveBeenCalledWith('opencode')
-  fireEvent.click(next)
-  fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }))
-  expect(screen.getByText('OpenCode')).toBeTruthy()
-  expect(screen.getByText('Installed · 1.18.34')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'Go to Terminals' }))
-  await waitFor(() => expect(done).toHaveBeenCalledOnce())
+  expect(screen.getByRole('radio', { name: /OpenCode/ })).toHaveProperty('disabled', true)
+  expect(screen.getByText('Not available in setup yet')).toBeTruthy()
+  expect(next).toHaveProperty('disabled', true)
+})
+it('requires a verified router extension and opens its package detail', async () => {
+  tools()
+  window.packages.status = vi.fn(async () => ({ configured: true, installed: false }))
+  const open = vi.fn()
+  const view = render(<Provider><WorkspaceSetup active onSetup={() => {}} onPackage={open} /></Provider>)
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Next' })).toHaveProperty('disabled', false))
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+  expect(window.packages.status).toHaveBeenCalledWith('pi-9router-ext')
+  expect(screen.getByRole('button', { name: 'Next' })).toHaveProperty('disabled', true)
+  fireEvent.click(screen.getByRole('button', { name: 'Install extension' }))
+  expect(open).toHaveBeenCalledWith('pi-9router-ext')
+  view.rerender(<Provider><WorkspaceSetup active={false} onSetup={() => {}} onPackage={open} /></Provider>)
+  window.packages.status = async () => ({ configured: true, installed: true, installedVersion: '1.2.0' })
+  view.rerender(<Provider><WorkspaceSetup active onSetup={() => {}} onPackage={open} /></Provider>)
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Next' })).toHaveProperty('disabled', false))
+})
+it('distinguishes checking and verification failure with a retry action', async () => {
+  tools()
+  window.packages.status = vi.fn(() => new Promise<import('../src/shared/packages').PackageInstallation>(() => {}))
+  const view = render(<Provider><WorkspaceSetup active onSetup={() => {}} onPackage={() => {}} /></Provider>)
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Next' })).toHaveProperty('disabled', false))
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+  const region = screen.getByRole('region', { name: 'pi-9router-ext' })
+  expect(within(region).getByRole('status').textContent).toContain('Checking…')
+  expect(screen.queryByRole('button', { name: 'Install extension' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'Next' })).toHaveProperty('disabled', true)
+  view.rerender(<Provider><WorkspaceSetup active={false} onSetup={() => {}} onPackage={() => {}} /></Provider>)
+  window.packages.status = vi.fn().mockRejectedValueOnce(new Error('unavailable')).mockResolvedValue({ installed: true, configured: true })
+  view.rerender(<Provider><WorkspaceSetup active onSetup={() => {}} onPackage={() => {}} /></Provider>)
+  fireEvent.click(await screen.findByRole('button', { name: 'Retry verification' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Next' })).toHaveProperty('disabled', false))
+  expect(screen.queryByRole('button', { name: 'Retry verification' })).toBeNull()
 })
 it('does not open startup setup for missing optional router when Pi is installed', async () => {
   tools()
   render(<Provider><WorkspaceSetup startupOnly active onSetup={() => {}} /></Provider>)
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+})
+it('keeps setup incomplete after dismissal and only persists completion at step four', async () => {
+  tools()
+  window.localStorage.removeItem('shumora.setup-completed')
+  const view = render(<Provider><WorkspaceSetup startupOnly active onSetup={() => {}} /></Provider>)
+  fireEvent.click(await screen.findByRole('button', { name: 'Later' }))
+  expect(window.localStorage.getItem('shumora.setup-completed')).toBeNull()
+  view.unmount()
+  const reopened = render(<Provider><WorkspaceSetup startupOnly active onSetup={() => {}} /></Provider>)
+  await screen.findByRole('dialog')
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Next' })).toHaveProperty('disabled', false))
+  for (let step = 0; step < 3; step++) fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+  expect(window.localStorage.getItem('shumora.setup-completed')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Go to Terminals' }))
+  await waitFor(() => expect(window.localStorage.getItem('shumora.setup-completed')).toBe('true'))
+  reopened.unmount()
+  render(<Provider><WorkspaceSetup startupOnly active onSetup={() => {}} /></Provider>)
+  expect(screen.queryByRole('dialog')).toBeNull()
 })
 it('shows missing Pi setup and dismisses without installation', async () => {
   tools(false)

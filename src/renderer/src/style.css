@@ -115,7 +115,7 @@ button:disabled { opacity: .55; cursor: default; }
 .library-page .package-filters { gap: 8px; margin-top: 0; }
 @media (max-width: 900px) { .library-page .library-content { padding: 24px 18px; } }
 .library-content h2 { font-size: 18px; font-weight: 600; margin-bottom: 10px; }
-.terminal-setup-dialog { width: min(600px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 12px; }
+.terminal-setup-dialog { display: flex; flex-direction: column; width: min(600px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: hidden; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 12px; }
 .terminal-setup-dialog .chakra-button { background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 4px; box-shadow: none; font-family: inherit; }
 .terminal-setup-dialog .chakra-button:hover:not(:disabled):not([data-disabled]) { background: var(--selected); color: var(--selected-text); }
 .terminal-setup-header .chakra-button, .terminal-setup-managers .chakra-button { background: transparent; border-color: transparent; color: var(--muted); }
@@ -126,7 +126,8 @@ button:disabled { opacity: .55; cursor: default; }
 .terminal-setup-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 24px 24px 0; }
 .terminal-setup-header [data-part=title] { font-size: 20px; font-weight: 650; letter-spacing: -.4px; }
 .terminal-setup-header [data-part=description] { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.6; }
-.terminal-setup-dialog [data-part=body] { padding: 0 24px 24px; }
+.terminal-setup-dialog .terminal-setup-body { flex: 1 1 auto; padding: 0 24px 24px; overflow-y: auto; min-height: 0; }
+.terminal-setup-header, .terminal-setup-footer { flex-shrink: 0; }
 .terminal-setup-steps { display: flex; gap: 8px; padding: 24px 0; margin: 0; list-style: none; }
 .terminal-setup-steps li { position: relative; flex: 1; color: var(--muted); font-size: 11px; }
 .terminal-setup-steps li:not(:last-child)::after { content: ''; position: absolute; top: 12px; left: 32px; right: 0; height: 1px; background: var(--line); }
@@ -150,6 +151,16 @@ button:disabled { opacity: .55; cursor: default; }
 .terminal-setup-managers label:has(input:disabled) { cursor: default; }
 .terminal-setup-managers input { accent-color: var(--accent); flex-shrink: 0; }
 .terminal-setup-managers strong { width: 48px; font-size: 14px; font-weight: 550; }
+.terminal-setup-router { display: flex; flex-direction: column; }
+.terminal-setup-component { padding: 18px 0; }
+.terminal-setup-component + .terminal-setup-component { border-top: 1px solid var(--line); }
+.terminal-setup-component-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.terminal-setup-component-heading h3 { font-size: 14px; font-weight: 600; margin: 0; }
+.terminal-setup-requirement { color: var(--muted); font-size: 12px; }
+.terminal-setup-component > p { font-size: 12px; line-height: 1.7; color: var(--muted); margin: 8px 0 14px; }
+.terminal-setup-component-footer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.terminal-setup-component .terminal-setup-tool-status { margin: 0 auto 0 0; gap: 6px; font-size: 12px; flex: 1 1 160px; }
+.terminal-setup-managers label:has(input:disabled) { opacity: .5; cursor: not-allowed; }
 .terminal-setup-harnesses strong { width: 82px; }
 .terminal-setup-managers small { color: var(--muted); font-size: 12px; }
 .terminal-setup-managers > div[data-selected=true] strong { color: var(--accent); }
@@ -169,7 +180,7 @@ button:disabled { opacity: .55; cursor: default; }
 .terminal-setup-finish p { max-width: 43ch; font-size: 14px; }
 .terminal-setup-footer { display: flex; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--line); background: var(--sidebar); }
 .terminal-setup-navigation { display: flex; gap: 8px; margin-left: auto; }
-@media (max-width: 540px) { .terminal-setup-header { padding: 20px 16px 0; } .terminal-setup-dialog [data-part=body] { padding-inline: 16px; } .terminal-setup-footer { padding-inline: 16px; } .terminal-setup-steps { gap: 6px; } .terminal-setup-step { min-height: 260px; } .terminal-setup-step .terminal-setup-tool { gap: 10px; flex-wrap: wrap; } }
+@media (max-width: 540px) { .terminal-setup-header { padding: 20px 16px 0; } .terminal-setup-dialog .terminal-setup-body { padding-inline: 16px; } .terminal-setup-footer { padding-inline: 16px; } .terminal-setup-steps { gap: 6px; } .terminal-setup-step { min-height: 260px; } .terminal-setup-step .terminal-setup-tool { gap: 10px; flex-wrap: wrap; } }
 .workspace-setup-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--line); }
 .workspace-setup-item p { color: var(--muted); font-size: 13px; margin: 6px 0; }
 .workspace-setup-item small { color: var(--muted); }

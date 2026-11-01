@@ -11,10 +11,11 @@ vi.mock('../src/renderer/src/TerminalPane', () => ({ TerminalPane: ({ session, v
 import App from '../src/renderer/src/App'
 import { Provider } from '../src/renderer/src/Provider'
 beforeEach(() => {
+  vi.stubGlobal('localStorage', { getItem: () => 'true', setItem() {} })
   window.piPlugin = { status: async () => ({ installed: true }) } as any
   window.plugins = { status: async () => ({ installed: true }) } as any
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 it('preserves terminal mounts when splitting, moving tabs and merging groups', async () => {
   const list: Session[] = [1, 2, 3].map(n => ({ id: String(n), name: `Pi ${n}`, cwd: '/tmp', status: 'running', generation: 1 }))
   window.workspace = { list: async () => list, folder: async () => '/tmp', onEvent: () => () => {} } as any

@@ -81,6 +81,12 @@ it('shows Packages and Plugins as accessible tabs with separate empty panels', a
   fireEvent.click(screen.getByRole('button', { name: 'Back to plugins' }))
   expect(screen.getByRole('tab', { name: 'Plugins' }).getAttribute('aria-selected')).toBe('true')
 })
+it('opens the setup extension directly as a package detail', async () => {
+  window.packages = { catalog: async () => ({ items: [], page: 1, pages: 1 }), detail: async () => ({ name: 'pi-9router-ext', description: 'Pi integration', author: 'Author', types: ['extension'], version: '1.0.0', downloads: 0 }), status: async () => ({ configured: false, installed: false }), onOperation: () => () => {} } as any
+  render(<Provider><Library initialPackage="pi-9router-ext" /></Provider>)
+  expect(await screen.findByRole('heading', { level: 1, name: 'pi-9router-ext' })).toBeTruthy()
+  expect(await screen.findByRole('button', { name: 'Install for Pi' })).toBeTruthy()
+})
 it('opens a package detail as a standalone page outside the Library tab shell', async () => {
   window.packages = { status: async () => ({ configured: false, installed: false }), catalog: async () => ({ items: [{ name: 'demo-tools', description: 'Tools', author: 'Demo', types: ['extension'], downloads: 10, version: '1.2.3' }], page: 1, pages: 1 }), onOperation: () => () => {} } as any
   render(<Provider><Library /></Provider>)
