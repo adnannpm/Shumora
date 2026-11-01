@@ -24,6 +24,7 @@ import { fetchPackagePage } from './package-fetch'
 import { PluginService, piDefinition, opencodeDefinition, managerDefinitions } from './plugins'
 import { pluginHost, piPluginHost, routerHost, runPiPackage, opencodePluginHost, resolveOpenCodeLaunch, detectNode, managerPluginHosts } from './plugin-host'
 import { routerLogin, routerLogout, routerAuthStatus } from './router-auth'
+import { routerQuota } from './router-quota'
 import { RouterCatalog } from './router-catalog'
 import { RouterService } from './router-service'
 import { routerKeys, routerCreateKey } from './router-keys'
@@ -201,6 +202,7 @@ function registerIPC() {
     'plugins:router-custom-provider': input => catalog.custom(input),
     'plugins:router-model-enabled': (provider, model, enabled) => catalog.modelEnabled(provider, model, enabled),
     'plugins:router-providers': () => catalog.providers(),
+    'plugins:router-quota': (connectionId: string) => routerQuota(connectionId),
     'plugins:router-models': () => catalog.models(),
     'plugins:router-add-provider': input => catalog.add(input),
     'plugins:router-toggle-provider': (id, active) => catalog.toggle(id, active),

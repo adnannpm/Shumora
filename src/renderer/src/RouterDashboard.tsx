@@ -2,6 +2,7 @@ import { useLanguage } from './Language'
 import { useEffect, useState } from 'react'
 import { Button, Tabs } from '@chakra-ui/react'
 import { RouterProviders, RouterModels } from './RouterCatalog'
+import { RouterQuota } from './RouterQuota'
 import { RouterAuth } from './RouterAuth'
 import { DataSkeleton } from './DataSkeleton'
 import type { RouterPlugin, RouterState, RouterControl, RouterKey } from '../../shared/plugins'
@@ -84,7 +85,8 @@ export function RouterDashboard() {
       <Tabs.List aria-label={t("9router sections")} className="library-tablist">
         <Tabs.Trigger value="overview">{t("Overview")}</Tabs.Trigger>
         <Tabs.Trigger value="providers">{t("Providers")}</Tabs.Trigger>
-        <Tabs.Trigger value="models">{t("Models")}</Tabs.Trigger>
+        <Tabs.Trigger value="quota">{t('Quota & Usage')}</Tabs.Trigger>
+      <Tabs.Trigger value="models">{t("Models")}</Tabs.Trigger>
         <Tabs.Trigger value="logs">{t("Logs")}</Tabs.Trigger>
         <Tabs.Indicator />
       </Tabs.List>
@@ -112,6 +114,7 @@ export function RouterDashboard() {
 
       </Tabs.Content>
       <Tabs.Content value="providers" className="library-content"><RouterProviders key={authRevision} /></Tabs.Content>
+      <Tabs.Content value="quota" className="library-content"><RouterQuota key={authRevision} /></Tabs.Content>
       <Tabs.Content value="models" className="library-content"><RouterModels key={authRevision} /></Tabs.Content>
       <Tabs.Content value="logs" className="library-content router-logs-panel"><h2>{t("Service logs")}</h2><p>{t("Output from Shumora-managed processes. External service logs are unavailable here.")}</p>{online === null ? <DataSkeleton label={t("Loading service logs")} shape="logs" rows={10} /> : <pre className="plugin-output-log" role="log" tabIndex={0}>{service.logs || t("No service output yet.")}</pre>}</Tabs.Content>
     </Tabs.Root>

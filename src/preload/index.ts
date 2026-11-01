@@ -107,6 +107,7 @@ const plugins: PluginsAPI = {
   routerCustomProvider: input => ipcRenderer.invoke('plugins:router-custom-provider', input),
   routerModelEnabled: (provider, model, enabled) => ipcRenderer.invoke('plugins:router-model-enabled', provider, model, enabled),
   routerProviders: () => ipcRenderer.invoke('plugins:router-providers'),
+  routerQuota: connectionId => ipcRenderer.invoke('plugins:router-quota', connectionId),
   routerModels: () => ipcRenderer.invoke('plugins:router-models'),
   routerAddProvider: input => ipcRenderer.invoke('plugins:router-add-provider', input),
   routerToggleProvider: (id, active) => ipcRenderer.invoke('plugins:router-toggle-provider', id, active),

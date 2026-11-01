@@ -52,6 +52,11 @@ export interface PluginOperation {
 export type RouterControl = 'start' | 'stop' | 'restart'
 export interface RouterState { online: boolean; managed: boolean; busy: boolean; logs: string }
 export interface RouterKey { id: string; name: string; key: string }
+export interface RouterAccountQuota {
+  checkedAt: string
+  plan?: string
+  quotas: { name: string; used?: number; total?: number; remaining?: number; remainingPercentage?: number; unlimited: boolean; resetAt?: string }[]
+}
 export interface RouterConnection { id: string; provider: string; name: string; active: boolean; status: string }
 export interface RouterModel { id: string; provider: string; name: string; alias: string; enabled: boolean; providerAlias: string; modelId: string }
 export interface RouterCustomInput { name: string; prefix: string; baseUrl: string; type: 'openai-compatible' | 'anthropic-compatible'; apiType: 'chat' | 'responses' }
@@ -65,6 +70,7 @@ export interface PluginsAPI {
   routerModelEnabled(provider: string, model: string, enabled: boolean): Promise<void>
   routerOpenOAuth(): Promise<void>
   routerProviders(): Promise<RouterConnection[]>
+  routerQuota(connectionId: string): Promise<RouterAccountQuota>
   routerModels(): Promise<RouterModel[]>
   routerAddProvider(input: RouterProviderInput): Promise<void>
   routerToggleProvider(id: string, active: boolean): Promise<void>
