@@ -44,7 +44,8 @@ it('shows live read-only output, closes confirmation, copies errors and cleans u
   expect(screen.getByText('Failed', { exact: true })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Copy log' }))
   await waitFor(() => expect(copy).toHaveBeenCalledWith('npm ERR! EACCES permission denied\n'))
-  expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy()
+  // The copy promise resolves before React commits the label update.
+  expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy()
   view.unmount()
   expect(unsubscribe).toHaveBeenCalledOnce()
 })
