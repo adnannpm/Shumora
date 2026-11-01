@@ -423,6 +423,17 @@ button:disabled { opacity: .55; cursor: default; }
 .settings-section .settings-details > div:last-child { border-bottom: 0; }
 .settings-section .settings-note { margin-top: 16px; }
 .settings-links { margin-top: 16px; font-size: 13px; color: var(--accent); }
+.terminal-check-actions, .terminal-check-support { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.terminal-check .chakra-button { height: 36px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--text); font-family: inherit; font-size: 13px; font-weight: 400; box-shadow: none; }
+.terminal-check .chakra-button:hover:not(:disabled) { background: var(--selected); color: var(--selected-text); }
+.terminal-check .chakra-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.terminal-check .chakra-button:disabled { opacity: .45; cursor: not-allowed; }
+.terminal-check-result { margin-top: 20px; padding-block: 16px; border-block: 1px solid var(--line); }
+.terminal-check-result strong { font-size: 14px; font-weight: 600; color: var(--text); }
+.settings-content .terminal-check-result p { margin: 6px 0 0; font-size: 13px; line-height: 1.6; }
+.terminal-check-support { margin-top: 16px; }
+.settings-content .terminal-check-support p { flex: 1 1 240px; margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.terminal-check > [role=status], .terminal-check > [role=alert] { margin: 12px 0 0; font-size: 13px; }
 .diagnostic-details { margin-top: 20px; }
 .diagnostic-details summary { cursor: pointer; font-size: 13px; color: var(--text); }
 .diagnostic-details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }

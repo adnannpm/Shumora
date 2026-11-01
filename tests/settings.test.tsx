@@ -34,8 +34,8 @@ it('groups settings into consistent pages including Storage with troubleshooting
     expect(content.querySelectorAll('h2')).toHaveLength(1)
   }
   fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
-  expect(screen.getByRole('button', { name: 'Run diagnostics' })).toBeTruthy()
-  expect(screen.getByRole('heading', { name: 'Troubleshooting' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Check now' })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Check terminal' })).toBeTruthy()
 })
 function mockSystemTheme(dark: boolean) {
   const changes = new EventTarget()
