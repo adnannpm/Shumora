@@ -186,6 +186,7 @@ function registerIPC() {
       if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag')
       return managerPlugin(id).status(refresh)
     },
+    'manager-plugin:operation': id => managerPlugin(id).operation(),
     'manager-plugin:mutate': (id, action, version, manager) => managerPlugin(id).mutate(action, version, manager),
     'opencode-plugin:status': refresh => {
       if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag')

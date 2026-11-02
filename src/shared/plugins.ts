@@ -2,6 +2,7 @@ declare global { interface Window { appClipboard?: { writeText(text: string): Pr
 export type ManagerPluginId = 'pnpm' | 'bun' | 'yarn'
 export type PluginId = '9router' | 'pi' | 'opencode' | ManagerPluginId
 export interface ManagerPluginsAPI {
+  operation(id: ManagerPluginId): Promise<PluginOperation>
   status(id: ManagerPluginId, refresh?: boolean): Promise<PluginMetadata<ManagerPluginId>>
   mutate(id: ManagerPluginId, action: PluginAction, version?: string, manager?: PackageManager): Promise<PluginMetadata<ManagerPluginId>>
   onOperation(id: ManagerPluginId, callback: (operation: PluginOperation) => void): () => void

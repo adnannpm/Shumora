@@ -19,10 +19,18 @@ function executable(name: string): string | undefined {
   const names = process.platform === 'win32' ? [`${name}.exe`, `${name}.cmd`, name] : [name]
   return dirs.flatMap(dir => names.map(n => paths.join(dir, n))).find(file => { try { accessSync(file, process.platform === 'win32' ? constants.F_OK : constants.X_OK); return true } catch { return false } })
 }
+export function installTimeout(env: NodeJS.ProcessEnv = process.env): number {
+  const value = Number(env.SHUMORA_INSTALL_TIMEOUT_MS)
+  return Number.isSafeInteger(value) && value >= 120_000 && value <= 3_600_000 ? value : 900_000
+}
 function run(file: string, args: string[], timeout = 120_000, output?: (text: string) => void): Promise<string> {
   return new Promise((resolve, reject) => {
+    const started = Date.now()
     const child = execFile(file, args, { timeout, maxBuffer: 8 * 1024 * 1024, windowsHide: true, env: { ...process.env, npm_config_update_notifier: 'false', NO_COLOR: '1' } }, (error, stdout, stderr) => {
-      if (error) reject(new Error(commandFailure(error, stdout, stderr))); else resolve(stdout)
+      if (error) {
+        const reason = error.killed && Date.now() - started >= timeout ? 'timeout' : error.signal ? 'signal' : typeof error.code === 'number' ? 'nonzero exit' : 'spawn or buffer failure'
+        reject(new Error(`${commandFailure(error, stdout, stderr)}\nTermination reason: ${reason}; timeout: ${timeout} ms; executable: ${file}`))
+      } else resolve(stdout)
     })
     if (output) {
       child.stdout?.on('data', (text: string) => output(text))
@@ -66,6 +74,34 @@ async function managerPackageDir(manager: PackageManager, packageName: string): 
   }
   return paths.join(location, ...(manager === 'yarn' ? ['node_modules'] : []), packageName)
 }
+async function managerInstallation(manager: PackageManager, command: string, packageName: string) {
+  const paths = process.platform === 'win32' ? path.win32 : path.posix
+  const dir = await managerPackageDir(manager, packageName)
+  const pkg = JSON.parse(readFileSync(paths.join(dir, 'package.json'), 'utf8'))
+  if (pkg.name !== packageName || typeof pkg.version !== 'string') return undefined
+  const cli = managerCommand(manager)
+  const binArgs = manager === 'npm' ? ['prefix', '--global'] : manager === 'yarn' ? ['global', 'bin'] : ['bin', '--global']
+  const location = (await run(cli.file, [...cli.args, ...(manager === 'bun' ? ['pm', 'bin', '--global'] : binArgs)], 15000)).trim()
+  if (!paths.isAbsolute(location)) throw new Error(`Cannot verify ${manager} global bin location`)
+  const bin = manager === 'npm' && process.platform !== 'win32' ? paths.join(location, 'bin') : location
+  const names = process.platform === 'win32' ? [`${command}.exe`, `${command}.cmd`, command] : [command]
+  const file = names.map(name => paths.join(bin, name)).find(file => existsSync(file))
+  if (!file) return undefined
+  // A package manifest alone must not authorize an unrelated Windows shim.
+  if (process.platform === 'win32' && /\.cmd$/i.test(file) && !windowsShimTargetsPackage(file, readFileSync(file, 'utf8'), dir)) return undefined
+  if (process.platform === 'win32' && /\.exe$/i.test(file)) {
+    const version = (await run(file, ['--version'], 15000)).trim().replace(/^v/, '')
+    if (version !== pkg.version) throw new Error(`Global executable ${file} reports ${version}, but ${paths.join(dir, 'package.json')} declares ${pkg.version}`)
+  }
+  return { installedVersion: pkg.version, executable: file }
+}
+function addGlobalBin(file: string) {
+  const paths = process.platform === 'win32' ? path.win32 : path.posix
+  const sep = process.platform === 'win32' ? ';' : ':'
+  const bin = paths.dirname(file)
+  const current = process.env.PATH || process.env.Path || ''
+  if (!current.split(sep).some(dir => process.platform === 'win32' ? dir.toLowerCase() === bin.toLowerCase() : dir === bin)) process.env.PATH = [current, bin].filter(Boolean).join(sep)
+}
 async function installationOwner(file: string, packageName: string, managers: PackageManager[]): Promise<PackageManager | undefined> {
   for (const manager of managers) {
     try {
@@ -78,6 +114,11 @@ async function installationOwner(file: string, packageName: string, managers: Pa
       const paths = process.platform === 'win32' ? path.win32 : path
       const normalize = (value: string) => process.platform === 'win32' ? paths.resolve(value).toLowerCase() : paths.resolve(value)
       if (normalize(realFile).startsWith(normalize(realDir) + paths.sep)) return manager
+      // Bun's Windows global launcher can be a native .exe rather than a text shim.
+      if (manager === 'bun' && process.platform === 'win32' && /\.exe$/i.test(file) && packageName === '@earendil-works/pi-coding-agent') {
+        const installed = await managerInstallation(manager, 'pi', packageName)
+        if (installed && normalize(realFile) === normalize(realpathSync(installed.executable))) return manager
+      }
       if (process.platform === 'win32' && /\.(cmd|ps1)$/i.test(file)) {
         if (windowsShimTargetsPackage(file, readFileSync(file, 'utf8'), realDir)) return manager
       }
@@ -142,7 +183,21 @@ function createPluginHost(command: string, packageName: string, repository: stri
   managers: async () => (await availableManagers()).filter(manager => !['pnpm', 'bun', 'yarn'].includes(command) || manager === 'npm'),
   async detect() {
     const file = command === 'pi' && process.env.PI_EXECUTABLE ? process.env.PI_EXECUTABLE : executable(command)
-    if (!file) return { installed: false }
+    if (!file) {
+      // A GUI's inherited PATH may predate the creation of a global bin folder.
+      if (command === 'pi') {
+        for (const manager of await availableManagers()) {
+          try {
+            const installed = await managerInstallation(manager, command, packageName)
+            if (installed) {
+              addGlobalBin(installed.executable)
+              return { installed: true, ...installed, managed: true, packageManager: manager }
+            }
+          } catch { /* Other managers may have no global installation. */ }
+        }
+      }
+      return { installed: false }
+    }
     const real = realpathSync(file)
     let installerPackage: string | undefined
     if (command === 'pi' && process.platform === 'win32') {
@@ -180,6 +235,18 @@ function createPluginHost(command: string, packageName: string, repository: stri
     }
     throw new Error(`${command} exists at ${file}, but its package version could not be verified. Manage this installation manually.`)
   },
+  async verify(manager, version) {
+    if (command !== 'pi') return
+    const installed = await managerInstallation(manager, command, packageName)
+    if (!installed || installed.installedVersion !== version) throw new Error(`Cannot verify ${packageName}@${version} in ${manager}'s global installation.`)
+    const current = process.env.PI_EXECUTABLE || executable(command)
+    const paths = process.platform === 'win32' ? path.win32 : path.posix
+    const normalize = (file: string) => process.platform === 'win32' ? paths.resolve(file).toLowerCase() : paths.resolve(file)
+    if (current && normalize(realpathSync(current)) !== normalize(realpathSync(installed.executable))) {
+      throw new Error(`${manager} installed ${packageName}@${version} at ${installed.executable}, but ${current} shadows it on PATH (or PI_EXECUTABLE). Remove the conflict or select the intended Pi executable, then restart Shumora. No files were removed.`)
+    }
+    addGlobalBin(installed.executable)
+  },
   async catalog() {
     const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(packageName)}/latest`, { signal: AbortSignal.timeout(15_000) })
     if (!response.ok) throw new Error(`npm registry HTTP ${response.status}`)
@@ -203,6 +270,8 @@ function createPluginHost(command: string, packageName: string, repository: stri
     // Only log once ownership verification has passed.
     output?.(`$ ${manager} ${args.join(' ')}\n`)
     // Fixed argv only, no shell, sudo, password prompting or arbitrary package names.
-    await run(npm.file, [...npm.args, ...args], 120_000, output)
+    const timeout = installTimeout()
+    output?.(`[Shumora] Executable: ${npm.file}; install timeout: ${timeout} ms\n`)
+    await run(npm.file, [...npm.args, ...args], timeout, output)
   }
 } }

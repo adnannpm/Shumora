@@ -155,6 +155,7 @@ const opencodePlugin: OpenCodePluginAPI = {
 }
 contextBridge.exposeInMainWorld('opencodePlugin', opencodePlugin)
 const managerPlugins: import('../shared/plugins').ManagerPluginsAPI = {
+  operation: id => ipcRenderer.invoke('manager-plugin:operation', id),
   status: (id, refresh) => ipcRenderer.invoke('manager-plugin:status', id, refresh),
   mutate: (id, action, version, manager) => ipcRenderer.invoke('manager-plugin:mutate', id, action, version, manager),
   onOperation: (id, callback) => {
