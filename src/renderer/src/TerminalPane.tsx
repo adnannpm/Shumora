@@ -5,6 +5,7 @@ import { Button } from '@chakra-ui/react'
 import { FitAddon } from '@xterm/addon-fit'
 import { ImageAddon } from '@xterm/addon-image'
 import { terminalTheme } from './theme'
+import { terminalClipboardHandler } from './terminal-clipboard'
 import type { Session, SessionEvent } from '../../shared/types'
 
 export function TerminalPane({ session, visible, focused, autoFocusBlocked = false, onFocus }: { session: Session; visible: boolean; focused: boolean; autoFocusBlocked?: boolean; onFocus: () => void }) {
@@ -47,14 +48,32 @@ export function TerminalPane({ session, visible, focused, autoFocusBlocked = fal
       pending.forEach(apply); pending.length = 0
     }).catch((e) => { if (!disposed) setError(String(e)) })
     const report = (e: unknown) => { if (!disposed) setError(String(e)) }
+    term.attachCustomKeyEventHandler(terminalClipboardHandler(term, {
+      copy: text => window.appClipboard ? window.appClipboard.writeText(text) : navigator.clipboard.writeText(text),
+      read: () => window.appClipboard?.readText ? window.appClipboard.readText() : navigator.clipboard.readText(),
+      canPaste: () => running.current && !disposed,
+      report
+    }))
     const input = term.onData((data) => {
       if (!running.current || disposed) return
       void window.workspace.input(session.id, data).catch(report)
     })
+    let reportedCols = 0, reportedRows = 0
     const resize = () => {
       if (!host.current || host.current.clientWidth < 20 || host.current.clientHeight < 20) return
+      const cols = term.cols, rows = term.rows
+      const buffer = term.buffer.active
+      const wasAtBottom = buffer.viewportY === buffer.baseY
       addon.fit()
-      void window.workspace.resize(session.id, Math.min(1000, term.cols), Math.min(1000, term.rows)).catch(report)
+      // Splitting changes the width and reflows scrollback. Preserve follow mode
+      // against the NEW buffer bottom, but leave readers of older output alone.
+      if (wasAtBottom && (term.cols !== cols || term.rows !== rows)) term.scrollToBottom()
+      const nextCols = Math.min(1000, term.cols), nextRows = Math.min(1000, term.rows)
+      // Focus and ResizeObserver can both request the same fit. Avoid redundant
+      // PTY resizes, which can trigger an unnecessary full-screen CLI redraw.
+      if (nextCols === reportedCols && nextRows === reportedRows) return
+      reportedCols = nextCols; reportedRows = nextRows
+      void window.workspace.resize(session.id, nextCols, nextRows).catch(report)
     }
     fit.current = resize
     const observer = new ResizeObserver(resize); observer.observe(host.current!)

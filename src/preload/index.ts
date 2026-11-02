@@ -8,7 +8,10 @@ contextBridge.exposeInMainWorld('terminalAgent', terminalAgent)
 import type { ToolCacheAPI } from '../shared/tool-cache'
 const toolCache: ToolCacheAPI = { scan: () => ipcRenderer.invoke('tool-cache:scan'), clear: () => ipcRenderer.invoke('tool-cache:clear') }
 contextBridge.exposeInMainWorld('toolCache', toolCache)
-contextBridge.exposeInMainWorld('appClipboard', { writeText: (text: string) => ipcRenderer.invoke('clipboard:write-text', text) })
+contextBridge.exposeInMainWorld('appClipboard', {
+  writeText: (text: string) => ipcRenderer.invoke('clipboard:write-text', text),
+  readText: () => ipcRenderer.invoke('clipboard:read-text')
+})
 import type { AppearanceAPI } from '../shared/appearance'
 const appearance: AppearanceAPI = {
   systemDark: () => ipcRenderer.invoke('appearance:system-dark'),

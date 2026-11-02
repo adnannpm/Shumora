@@ -141,6 +141,11 @@ function registerIPC() {
       if (sessions.list().some(session => session.status === 'running') || plugins.operation().status === 'running' || piPlugin.operation().status === 'running' || opencodePlugin.operation().status === 'running') throw new Error('Stop running terminals and installation operations before cleaning cache.')
       return toolCache.clear()
     },
+    'clipboard:read-text': () => {
+      const text = clipboard.readText()
+      if (text.length > 1_000_000) throw new Error('Clipboard text is too large')
+      return text
+    },
     'clipboard:write-text': (text: unknown) => {
       if (typeof text !== 'string' || text.length > 1_000_000) throw new Error('Invalid clipboard text')
       clipboard.writeText(text)

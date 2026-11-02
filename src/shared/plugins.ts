@@ -1,4 +1,4 @@
-declare global { interface Window { appClipboard?: { writeText(text: string): Promise<void> } } }
+declare global { interface Window { appClipboard?: { writeText(text: string): Promise<void>; readText?(): Promise<string> } } }
 export type ManagerPluginId = 'pnpm' | 'bun' | 'yarn'
 export type PluginId = '9router' | 'pi' | 'opencode' | ManagerPluginId
 export interface ManagerPluginsAPI {
