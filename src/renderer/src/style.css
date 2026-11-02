@@ -266,7 +266,9 @@ button:disabled { opacity: .55; cursor: default; }
 .skeleton-lines, .skeleton-card { display: flex; flex-direction: column; gap: 12px; }
 .skeleton-line { display: block; }
 .skeleton-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
-.skeleton-endpoint { justify-content: space-between; }
+.skeleton-models { padding: 0; }
+.skeleton-model-name { display: flex; align-items: center; gap: 8px; }
+.skeleton-models .router-model-alias-inline > .chakra-skeleton:last-child { flex-shrink: 0; }
 .skeleton-detail-row { display: flex; justify-content: space-between; gap: 20px; padding: 16px 0; border-bottom: 1px solid var(--line); }
 .skeleton-details { padding: 0; }
 .skeleton-keys { padding: 0; }
