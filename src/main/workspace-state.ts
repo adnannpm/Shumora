@@ -14,6 +14,20 @@ export function loadTerminals(path: string): SavedTerminal[] | null {
     return data.map(({ id, name, cwd }) => ({ id, name, cwd }))
   } catch { return null }
 }
+// Each app instance owns one writer. Do not delay actual tab metadata changes:
+// only skip successful writes whose persisted fields are identical.
+export class TerminalStateWriter {
+  private previousPath: string | undefined
+  private previousData: string | undefined
+  constructor(private write: typeof saveTerminals = saveTerminals) {}
+  save(path: string, sessions: Pick<Session, 'id' | 'name' | 'cwd'>[]): void {
+    const data = JSON.stringify(sessions.map(({ id, name, cwd }) => ({ id, name, cwd })))
+    if (path === this.previousPath && data === this.previousData) return
+    this.write(path, sessions)
+    this.previousPath = path; this.previousData = data
+  }
+}
+
 export function saveTerminals(path: string, sessions: Pick<Session, 'id' | 'name' | 'cwd'>[]): void {
   writeFileSync(`${path}.tmp`, JSON.stringify(sessions.map(({ id, name, cwd }) => ({ id, name, cwd }))), { mode: 0o600 })
   renameSync(`${path}.tmp`, path)

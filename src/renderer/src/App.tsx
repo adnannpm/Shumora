@@ -1,16 +1,17 @@
 import { useLanguage } from './Language'
-import { useEffect, useReducer, useRef, useState, type CSSProperties } from 'react'
+import { lazy, Suspense, useEffect, useReducer, useRef, useState, type CSSProperties } from 'react'
 import { Button, Dialog, Portal } from '@chakra-ui/react'
 import type { Session } from '../../shared/types'
 import { TerminalPane } from './TerminalPane'
 import { GitReviewButton } from './GitReview'
 import { Sidebar, type Page } from './Sidebar'
+import { PageBoundary } from './PageBoundary'
 import { Settings } from './Settings'
 import { MeetingRoom } from './MeetingRoom'
-import { Library } from './Library'
+const Library = lazy(() => import('./Library').then(module => ({ default: module.Library })))
 import { WorkspaceSetup } from './WorkspaceSetup'
 import { GitAskPassModal } from './GitAskPassModal'
-import { RouterDashboard } from './RouterDashboard'
+const RouterDashboard = lazy(() => import('./RouterDashboard').then(module => ({ default: module.RouterDashboard })))
 import type { RouterPlugin } from '../../shared/plugins'
 import { initialLayout, layoutReducer, layoutRects, type Layout } from './layout'
 
@@ -323,8 +324,10 @@ export default function App() {
       <MeetingRoom sessions={sessions} active={page === 'meeting'} />
     </div>
     {page === 'settings' && <Settings />}
+    <PageBoundary key={page}><Suspense fallback={<main className="library-page" aria-busy="true"><p role="status">{t('Loading…')}</p></main>}>
     {page === 'library' && <Library key={setupPackage || setupPlugin || 'catalog'} initialPlugin={setupPlugin} initialPackage={setupPackage} onPluginStatus={pluginStatus} />}
     {page === '9router' && routerInstalled && <RouterDashboard />}
+    </Suspense></PageBoundary>
     <WorkspaceSetup startupOnly active={page === 'workspace'} onContinue={async () => {}} onPackage={name => { setSetupPlugin(null); setSetupPackage(name); setPage('library') }} onSetup={id => { setSetupPackage(undefined); setSetupPlugin(id); setPage('library') }} />
     <GitAskPassModal />
     {tabMenu && <Portal><div ref={tabMenuElement} className="terminal-tab-menu" role="menu" aria-labelledby={`tab-${tabMenu.id}`} style={{ left: tabMenu.x, top: tabMenu.y }} onKeyDown={event => {

@@ -124,7 +124,7 @@ it('opens 9router and Library without recreating or stopping terminal sessions',
   await screen.findByRole('button', { name: '9router' })
   for (const name of ['9router', 'Library']) {
     fireEvent.click(screen.getByRole('button', { name }))
-    expect(screen.getByRole('heading', { name, level: 1 })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name, level: 1 })).toBeTruthy()
     expect(screen.getByRole('button', { name }).getAttribute('aria-current')).toBe('page')
     expect(screen.queryByRole('tab', { name: 'Pi 1' })).toBeNull()
     expect(screen.getByTestId('1')).toBeTruthy()

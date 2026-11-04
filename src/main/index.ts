@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { statSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { SessionManager } from './sessions'
-import { loadTerminals, saveTerminals } from './workspace-state'
+import { loadTerminals, TerminalStateWriter } from './workspace-state'
 import { MeetingBridge } from './meeting-bridge'
 import { meetingExtensionPath } from './meeting-extension-path'
 import { MeetingManager } from './meetings'
@@ -41,6 +41,7 @@ let window: BrowserWindow | undefined
 let folder = homedir()
 let closing = false
 let rendererReady = false
+const terminalStateWriter = new TerminalStateWriter()
 let terminalStatePath: string | undefined
 let restoringTerminals = false
 const pendingFolders: string[] = []
@@ -104,7 +105,7 @@ const sessions = new SessionManager((cwd, id, generation) => {
   if (window && !window.isDestroyed()) window.webContents.send('sessions:event', event)
   if (event.type !== 'data') publishMeeting()
   if (!restoringTerminals && terminalStatePath && (event.type === 'state' || event.type === 'removed')) {
-    try { saveTerminals(terminalStatePath, sessions.list()) } catch (error) { console.error('Could not save workspace terminals', error) }
+    try { terminalStateWriter.save(terminalStatePath, sessions.list()) } catch (error) { console.error('Could not save workspace terminals', error) }
   }
 })
 
@@ -390,7 +391,7 @@ if (primaryInstance) app.whenReady().then(async () => {
       else console.warn('Workspace is full; cannot open the requested folder.')
     }
   } finally { restoringTerminals = false }
-  try { saveTerminals(terminalStatePath, sessions.list()) } catch (error) { console.error('Could not save workspace terminals', error) }
+  try { terminalStateWriter.save(terminalStatePath, sessions.list()) } catch (error) { console.error('Could not save workspace terminals', error) }
   createWindow()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
