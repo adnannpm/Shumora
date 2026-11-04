@@ -8,6 +8,7 @@ import { Sidebar, type Page } from './Sidebar'
 import { PageBoundary } from './PageBoundary'
 import { Settings } from './Settings'
 import { SkillSuggestion } from './SkillSuggestion'
+import { UpdateNotification } from './UpdateNotification'
 import { MeetingRoom } from './MeetingRoom'
 const Library = lazy(() => import('./Library').then(module => ({ default: module.Library })))
 import { WorkspaceSetup } from './WorkspaceSetup'
@@ -26,6 +27,7 @@ export default function App() {
     void window.workspace?.setNotificationsEnabled?.(enabled).catch(() => {})
   }, [])
   const [page, setPage] = useState<Page>('workspace')
+  const [updatesRequest, setUpdatesRequest] = useState(0)
   const [findSkills, setFindSkills] = useState(false)
   const [setupPackage, setSetupPackage] = useState<string>()
   const [setupPlugin, setSetupPlugin] = useState<'pi' | 'opencode' | '9router' | 'node' | 'pnpm' | 'bun' | 'yarn' | null>(null)
@@ -325,7 +327,8 @@ export default function App() {
     <div className="meeting-page-host" style={{ display: page === 'meeting' ? 'flex' : 'none' }}>
       <MeetingRoom sessions={sessions} active={page === 'meeting'} />
     </div>
-    {page === 'settings' && <Settings />}
+    <UpdateNotification onView={() => { setUpdatesRequest(value => value + 1); setPage('settings') }} />
+    {page === 'settings' && <Settings updatesRequest={updatesRequest} />}
     <SkillSuggestion onFind={() => { setFindSkills(true); setSetupPackage(undefined); setSetupPlugin(null); setPage('library') }} />
     <PageBoundary key={page}><Suspense fallback={<main className="library-page" aria-busy="true"><p role="status">{t('Loading…')}</p></main>}>
       {page === 'library' && <Library initialType={findSkills ? 'skill' : ''} key={setupPackage || setupPlugin || (findSkills ? 'skills' : 'catalog')} initialPlugin={setupPlugin} initialPackage={setupPackage} onPluginStatus={pluginStatus} />}
