@@ -72,6 +72,8 @@ it('opens Pi details from Library without creating an integration menu', async (
 })
 it('shows Packages and Plugins as accessible tabs with separate empty panels', async () => {
   render(<Provider><Library /></Provider>)
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Packages', 'Plugins'])
+  expect(screen.queryByRole('tab', { name: 'Add-ons' })).toBeNull()
   expect(screen.getByRole('tab', { name: 'Packages' }).getAttribute('aria-selected')).toBe('true')
   expect(screen.getByRole('tabpanel', { name: 'Packages' }).textContent).toContain('Pi Packages')
   fireEvent.click(screen.getByRole('tab', { name: 'Plugins' }))
