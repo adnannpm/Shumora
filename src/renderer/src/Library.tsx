@@ -2,6 +2,7 @@ import { useLanguage } from './Language'
 import { useEffect, useState } from 'react'
 import { Tabs } from '@chakra-ui/react'
 import { Packages } from './Packages'
+import { ThemeAddons } from './ThemeAddons'
 import { PackageDetails } from './PackageDetails'
 import { LibraryUpdates } from './LibraryUpdates'
 import { RouterCard, RouterDetails, PiCard } from './RouterPlugin'
@@ -56,6 +57,7 @@ export function Library({ onPluginStatus, initialPlugin = null, initialPackage }
       <Tabs.List aria-label={t("Library categories")} className="library-tablist">
         <Tabs.Trigger value="package">{t("Packages")}</Tabs.Trigger>
         <Tabs.Trigger value="plugin">{t("Plugins")}</Tabs.Trigger>
+        <Tabs.Trigger value="addons">{t("Add-ons")}</Tabs.Trigger>
         <Tabs.Indicator />
       </Tabs.List>
       <Tabs.Content value="package" className="library-content">
@@ -65,6 +67,7 @@ export function Library({ onPluginStatus, initialPlugin = null, initialPackage }
           onSelect={setSelectedPackage}
         />
       </Tabs.Content>
+      <Tabs.Content value="addons" className="library-content"><ThemeAddons /></Tabs.Content>
       <Tabs.Content value="plugin" className="library-content">
         <div className="router-control-actions plugin-filters">
           <input type="search" aria-label={t('Search plugins')} placeholder={t('Search plugins…')} value={pluginSearch} onChange={event => setPluginSearch(event.target.value)} />

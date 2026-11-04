@@ -33,7 +33,7 @@ export function Settings() {
     } catch { setNotificationError(true) }
   }
   const { show } = useReleaseNotes()
-  const { theme, setTheme } = useAppearance()
+  const { theme, setTheme, activeLocalTheme, localThemes } = useAppearance()
   return <main className="settings-page flex min-w-0 flex-1 flex-col">
     <header className="toolbar"><h1>{t("Settings")}</h1></header>
     <div className="settings-layout">
@@ -46,7 +46,7 @@ export function Settings() {
           <section className="settings-section"><div className="settings-row"><div><h3 id="language-label">{t('Language')}</h3><p>{t('Choose the language used by Shumora. Terminal output and AI replies are not translated.')}</p></div><select aria-labelledby="language-label" aria-label={t('Language')} value={language} onChange={event => setLanguage(isLanguage(event.target.value) ? event.target.value : 'en')}><option value="en">English</option><option value="id">Bahasa Indonesia</option><option value="zh">中文（简体）</option></select></div></section>
           <section className="settings-section"><h3 id="theme-label">{t("Application theme")}</h3>
           <div className="theme-choices" role="radiogroup" aria-labelledby="theme-label">
-            {themes.map(value => <button key={value} role="radio" aria-label={t(themeLabels[value])} aria-checked={theme === value} tabIndex={theme === value ? 0 : -1} onClick={() => setTheme(value)} onKeyDown={event => {
+            {themes.map(value => <button key={value} role="radio" aria-label={t(themeLabels[value])} aria-checked={!activeLocalTheme && theme === value} tabIndex={!activeLocalTheme && theme === value ? 0 : -1} onClick={() => setTheme(value)} onKeyDown={event => {
               if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
               event.preventDefault()
               const direction = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1
@@ -54,9 +54,10 @@ export function Settings() {
               setTheme(next); (event.currentTarget.parentElement?.querySelector(`[aria-label="${t(themeLabels[next])}"]`) as HTMLButtonElement)?.focus()
             }} className="theme-choice">
               <span className={`theme-preview preview-${value}`} aria-hidden="true"><span /><span><i /><i /><i /></span></span>
-              <span className="theme-choice-label">{t(themeLabels[value])}<span aria-hidden="true">{theme === value ? '●' : '○'}</span></span>
+              <span className="theme-choice-label">{t(themeLabels[value])}<span aria-hidden="true">{!activeLocalTheme && theme === value ? '●' : '○'}</span></span>
             </button>)}
           </div>
+          {activeLocalTheme && <p className="settings-note">{t('Custom theme active: {name}', { name: localThemes.find(item => item.id === activeLocalTheme)?.name || activeLocalTheme })}</p>}
           <p className="settings-note">{t("Auto follows your operating system’s theme. The terminal stays dark in all modes. Changing appearance does not restart your sessions.")}</p></section>
         </>}
         {section === 'workspace' && <>
