@@ -6,6 +6,7 @@ import { TerminalPane } from './TerminalPane'
 import { GitReviewButton } from './GitReview'
 import { Sidebar, type Page } from './Sidebar'
 import { PageBoundary } from './PageBoundary'
+import { DataSkeleton } from './DataSkeleton'
 import { Settings } from './Settings'
 import { SkillSuggestion } from './SkillSuggestion'
 import { UpdateNotification } from './UpdateNotification'
@@ -330,7 +331,13 @@ export default function App() {
     <UpdateNotification onView={() => { setUpdatesRequest(value => value + 1); setPage('settings') }} />
     {page === 'settings' && <Settings updatesRequest={updatesRequest} />}
     <SkillSuggestion onFind={() => { setFindSkills(true); setSetupPackage(undefined); setSetupPlugin(null); setPage('library') }} />
-    <PageBoundary key={page}><Suspense fallback={<main className="library-page" aria-busy="true"><p role="status">{t('Loading…')}</p></main>}>
+    <PageBoundary key={page}><Suspense fallback={<main className="library-page page-skeleton flex min-w-0 flex-1 flex-col" aria-busy="true">
+      <header className="toolbar"><h1>{t(page === '9router' ? '9router' : 'Library')}</h1></header>
+      <div className="library-content">
+        <DataSkeleton label={t('Loading…')} shape="button" />
+        <DataSkeleton label={t('Loading…')} shape="providers" />
+      </div>
+    </main>}>
       {page === 'library' && <Library initialType={findSkills ? 'skill' : ''} key={setupPackage || setupPlugin || (findSkills ? 'skills' : 'catalog')} initialPlugin={setupPlugin} initialPackage={setupPackage} onPluginStatus={pluginStatus} />}
       {page === '9router' && routerInstalled && <RouterDashboard />}
     </Suspense></PageBoundary>
