@@ -106,12 +106,12 @@ async function installationOwner(file: string, packageName: string, managers: Pa
   for (const manager of managers) {
     try {
       const dir = await managerPackageDir(manager, packageName)
-      if (!existsSync(path.join(dir, 'package.json'))) continue
-      const pkg = JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8'))
+      const paths = process.platform === 'win32' ? path.win32 : path
+      if (!existsSync(paths.join(dir, 'package.json'))) continue
+      const pkg = JSON.parse(readFileSync(paths.join(dir, 'package.json'), 'utf8'))
       if (pkg.name !== packageName) continue
       const realDir = realpathSync(dir)
       const realFile = realpathSync(file)
-      const paths = process.platform === 'win32' ? path.win32 : path
       const normalize = (value: string) => process.platform === 'win32' ? paths.resolve(value).toLowerCase() : paths.resolve(value)
       if (normalize(realFile).startsWith(normalize(realDir) + paths.sep)) return manager
       // Bun's Windows global launcher can be a native .exe rather than a text shim.
@@ -225,7 +225,8 @@ function createPluginHost(command: string, packageName: string, repository: stri
     }
     const owner = await installationOwner(file, packageName, (await availableManagers()).filter(manager => !['pnpm', 'bun', 'yarn'].includes(command) || manager === 'npm'))
     if (owner) {
-      const pkg = JSON.parse(readFileSync(path.join(await managerPackageDir(owner, packageName), 'package.json'), 'utf8'))
+      const paths = process.platform === 'win32' ? path.win32 : path
+      const pkg = JSON.parse(readFileSync(paths.join(await managerPackageDir(owner, packageName), 'package.json'), 'utf8'))
       if (typeof pkg.version === 'string') return { installed: true, installedVersion: pkg.version, executable: file, managed: true, packageManager: owner }
     }
     if (['opencode', 'pnpm', 'bun', 'yarn'].includes(command)) {
