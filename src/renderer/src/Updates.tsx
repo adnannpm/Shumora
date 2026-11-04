@@ -32,7 +32,7 @@ export function Updates({ embedded = false }: { embedded?: boolean }) {
     {embedded ? <h3>{t('Updates')}</h3> : <h2>{t('Updates')}</h2>}<p>{t("Check stable GitHub Releases and install a new Shumora version when you are ready.")}</p>
     <dl className="settings-details"><div><dt>{t("Installed version")}</dt><dd>{state.currentVersion}</dd></div>{state.version && <div><dt>{t("Available version")}</dt><dd>{state.version}</dd></div>}</dl>
     {!['downloading', 'downloaded'].includes(state.status) && <div className="update-status" role="status">
-      {state.status === 'idle' && t("Updates are checked only when you request them.")}
+      {state.status === 'idle' && t("Updates are checked automatically when Shumora opens. You can also check manually.")}
       {state.status === 'unsupported' && state.reason}
       {state.status === 'checking' && t("Checking for updates…")}
       {state.status === 'current' && t("You are using the latest available version.")}

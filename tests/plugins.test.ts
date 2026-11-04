@@ -140,3 +140,28 @@ it('reports permission failures without claiming success or deleting package fil
   expect(s.installed).toBe(true); expect(s.operationError).toContain('EACCES')
   expect(calls).toEqual([]); db.close()
 })
+
+
+it('does not enter verification after a failed package-manager command', async () => {
+  const { db, host, service } = fixture()
+  await service.status(true)
+  host.verify = vi.fn(async () => {})
+  host.run = async () => { throw new Error('Termination reason: timeout; timeout: 900000 ms') }
+  await service.mutate('install', '0.5.109')
+  expect(host.verify).not.toHaveBeenCalled()
+  expect(service.operation().output).not.toContain('Verifying installation')
+  expect(service.operation().output).toContain('Termination reason: timeout')
+  expect(service.operation().status).toBe('failed')
+  db.close()
+})
+it('verifies the selected manager and retains a specific PATH conflict', async () => {
+  const { db, host, service } = fixture()
+  host.managers = async () => ['bun']
+  await service.status(true)
+  host.run = async () => {}
+  host.verify = vi.fn(async () => { throw new Error('Bun pi.exe shadows it on PATH') })
+  const result = await service.mutate('install', '0.5.109', 'bun')
+  expect(host.verify).toHaveBeenCalledWith('bun', '0.5.109')
+  expect(result.operationError).toContain('shadows it on PATH')
+  db.close()
+})

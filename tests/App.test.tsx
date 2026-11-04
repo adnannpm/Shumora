@@ -25,6 +25,29 @@ function setup(count = 1, approved = true) {
   window.plugins = { status: async () => ({ id: '9router', installed: true }) } as any
   window.workspace = api; render(<Provider><App /></Provider>); return api
 }
+it('checks on startup and opens About & Updates from the in-app update notification without stopping sessions', async () => {
+  let listener = (_: import('../src/shared/updates').UpdateState) => {}
+  window.updates = {
+    status: async () => ({ status: 'idle', currentVersion: '1.0.0' }),
+    onState: cb => { listener = cb; return () => {} },
+    check: vi.fn(async () => { listener({ status: 'available', currentVersion: '1.0.0', version: '1.1.0' }) }),
+    download: vi.fn(async () => {}), install: vi.fn(async () => {})
+  }
+  const api = setup()
+  try {
+    const viewUpdate = await screen.findByRole('button', { name: 'View update' })
+    expect(screen.getByRole('status').textContent).toContain('1.1.0')
+    expect(window.updates.check).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    fireEvent.click(viewUpdate)
+    expect(await screen.findByRole('heading', { name: 'About & Updates' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Check for updates' })).toBeTruthy()
+    expect(window.updates.download).not.toHaveBeenCalled()
+    expect(window.updates.install).not.toHaveBeenCalled()
+    expect(api.stop).not.toHaveBeenCalled()
+  } finally { delete (window as any).updates }
+})
+
 it('creates sessions directly without a setup modal when Pi is installed', async () => {
   const api = setup()
   await screen.findByRole('tab', { name: 'Pi 1' })
@@ -124,7 +147,7 @@ it('opens 9router and Library without recreating or stopping terminal sessions',
   await screen.findByRole('button', { name: '9router' })
   for (const name of ['9router', 'Library']) {
     fireEvent.click(screen.getByRole('button', { name }))
-    expect(screen.getByRole('heading', { name, level: 1 })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name, level: 1 })).toBeTruthy()
     expect(screen.getByRole('button', { name }).getAttribute('aria-current')).toBe('page')
     expect(screen.queryByRole('tab', { name: 'Pi 1' })).toBeNull()
     expect(screen.getByTestId('1')).toBeTruthy()

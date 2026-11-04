@@ -3,6 +3,7 @@ import { globalPackageArgs, packageManagerNames } from './package-managers'
 import type { PluginId, PackageManager, PluginAction, PluginOperation, PluginMetadata, RouterPlugin } from '../shared/plugins'
 export interface PluginHost {
   detect(): Promise<Pick<RouterPlugin, 'installed' | 'installedVersion' | 'executable' | 'managed' | 'packageManager' | 'installationKind'>>
+  verify?(manager: PackageManager, version: string): Promise<void>
   catalog(): Promise<Pick<RouterPlugin, 'latestVersion' | 'changelog'>>
   managers?(): Promise<PackageManager[]>
   run(args: string[], output?: (text: string) => void, manager?: PackageManager): Promise<void>
@@ -69,7 +70,12 @@ export class PluginService<Id extends PluginId = '9router'> {
       const args = globalPackageArgs(manager, action === 'uninstall', action === 'uninstall' ? this.definition.packageName : `${this.definition.packageName}@${version}`)
       let operationError: string | undefined
       try { await this.host.run(args, text => this.log(text), manager) } catch (e) { operationError = `${String(e)}\nNo elevation was attempted.` }
-      this.log('\n[Shumora] Verifying installation…\n')
+      if (!operationError) {
+        this.log('\n[Shumora] Verifying installation…\n')
+        if (action !== 'uninstall' && this.host.verify) {
+          try { await this.host.verify(manager, version!) } catch (e) { operationError = String(e) }
+        }
+      } else this.log('\n[Shumora] Command failed; refreshing installation status…\n')
       const result = await this.status()
       result.busy = false
       result.operationError = operationError

@@ -14,9 +14,10 @@ const themes = ['light', 'dark', 'auto'] as const
 const themeLabels = { light: 'Light', dark: 'Dark', auto: 'Auto' }
 type Section = 'general' | 'workspace' | 'storage' | 'about'
 const sections = { general: 'General', workspace: 'Workspace', storage: 'Storage', about: 'About & Updates' } as const
-export function Settings() {
+export function Settings({ updatesRequest = 0 }: { updatesRequest?: number }) {
   const { t, language, setLanguage } = useLanguage()
-  const [section, setSection] = useState<Section>('general')
+  const [section, setSection] = useState<Section>(updatesRequest ? 'about' : 'general')
+  useEffect(() => { if (updatesRequest) setSection('about') }, [updatesRequest])
   const [notifications, setNotifications] = useState(true)
   const [notificationError, setNotificationError] = useState(false)
   useEffect(() => {

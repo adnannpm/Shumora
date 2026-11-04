@@ -8,7 +8,10 @@ contextBridge.exposeInMainWorld('terminalAgent', terminalAgent)
 import type { ToolCacheAPI } from '../shared/tool-cache'
 const toolCache: ToolCacheAPI = { scan: () => ipcRenderer.invoke('tool-cache:scan'), clear: () => ipcRenderer.invoke('tool-cache:clear') }
 contextBridge.exposeInMainWorld('toolCache', toolCache)
-contextBridge.exposeInMainWorld('appClipboard', { writeText: (text: string) => ipcRenderer.invoke('clipboard:write-text', text) })
+contextBridge.exposeInMainWorld('appClipboard', {
+  writeText: (text: string) => ipcRenderer.invoke('clipboard:write-text', text),
+  readText: () => ipcRenderer.invoke('clipboard:read-text')
+})
 import type { AppearanceAPI } from '../shared/appearance'
 const appearance: AppearanceAPI = {
   systemDark: () => ipcRenderer.invoke('appearance:system-dark'),
@@ -43,6 +46,12 @@ import type { PluginsAPI, PluginOperation, PiPluginAPI, OpenCodePluginAPI, NodeP
 import type { UpdatesAPI, UpdateState } from '../shared/updates'
 import type { WorkspaceAPI, SessionEvent, GitAskPassRequest } from '../shared/types'
 const api: WorkspaceAPI = {
+  skillStatus: () => ipcRenderer.invoke('skills:status'),
+  onSkillsChange: callback => {
+    const listener = (_event: unknown, counts: Record<string, number>) => callback(counts)
+    ipcRenderer.on('skills:change', listener)
+    return () => { ipcRenderer.removeListener('skills:change', listener) }
+  },
   notificationsEnabled: () => ipcRenderer.invoke('agents:notifications'),
   setNotificationsEnabled: enabled => ipcRenderer.invoke('agents:set-notifications', enabled),
   list: () => ipcRenderer.invoke('sessions:list'),
@@ -152,6 +161,7 @@ const opencodePlugin: OpenCodePluginAPI = {
 }
 contextBridge.exposeInMainWorld('opencodePlugin', opencodePlugin)
 const managerPlugins: import('../shared/plugins').ManagerPluginsAPI = {
+  operation: id => ipcRenderer.invoke('manager-plugin:operation', id),
   status: (id, refresh) => ipcRenderer.invoke('manager-plugin:status', id, refresh),
   mutate: (id, action, version, manager) => ipcRenderer.invoke('manager-plugin:mutate', id, action, version, manager),
   onOperation: (id, callback) => {

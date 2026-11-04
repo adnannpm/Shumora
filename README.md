@@ -141,6 +141,10 @@ npm run dev
 
 These variables must be available when the application launches. A desktop-menu launch may inherit a different `PATH` from your terminal. If a terminal will not open, use the terminal check in Settings and review the detected installation.
 
+Pi package-manager installs also check the selected manager's global package and bin locations. Newly discovered bin directories are added to Shumora's process PATH (not the system PATH). If another Pi executable shadows the installed one, the operation reports both paths rather than replacing or deleting the existing installation.
+
+Package-manager mutations have a 15-minute timeout and stream stdout/stderr into the operation log. For slower systems, set `SHUMORA_INSTALL_TIMEOUT_MS` before launching Shumora; accepted values are 120000–3600000 milliseconds. For example, `$env:SHUMORA_INSTALL_TIMEOUT_MS = '1800000'` in PowerShell allows 30 minutes. Failure logs include the executable, timeout, exit code, signal, and termination reason; an external signal is not labelled as a user cancellation.
+
 ## Development and validation
 
 | Command | Purpose |

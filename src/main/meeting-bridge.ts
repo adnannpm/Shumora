@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { createServer, type Server, type Socket } from 'node:net'
 export type AgentStatus = 'ready' | 'busy' | 'disconnected'
 type Pending = { id: string; finish: (error?: Error, text?: string) => void }
-type Peer = { token: string; generation: number; socket?: Socket; idle: boolean; pending?: Pending }
+type Peer = { token: string; generation: number; socket?: Socket; idle: boolean; skillCount?: number; pending?: Pending }
 export class MeetingBridge {
   private server: Server
   private peers = new Map<string, Peer>()
@@ -30,6 +30,9 @@ export class MeetingBridge {
     if (!peer) return
     peer.pending?.finish(new Error('Meeting agent disconnected'))
     peer.socket?.destroy(); this.peers.delete(id); this.changed()
+  }
+  skillCounts(): Record<string, number> {
+    return Object.fromEntries([...this.peers].filter(([, peer]) => peer.skillCount !== undefined).map(([id, peer]) => [id, peer.skillCount!]))
   }
   status(id: string): AgentStatus {
     const peer = this.peers.get(id)
@@ -77,6 +80,8 @@ export class MeetingBridge {
             if (!peer || peer.socket) throw new Error()
             peer.socket = socket; peer.idle = record.idle; clearTimeout(authTimer); this.changed()
             this.activity(peerId!, peer.generation, record.idle ? 'waiting' : 'working')
+          } else if (record.type === 'skills' && Number.isInteger(record.count) && record.count >= 0 && record.count <= 100000) {
+            peer.skillCount = record.count; this.changed()
           } else if (record.type === 'activity' && ['working', 'waiting', 'done', 'error'].includes(record.status)) {
             this.activity(peerId!, peer.generation, record.status)
           } else if (record.type === 'state' && typeof record.idle === 'boolean') {

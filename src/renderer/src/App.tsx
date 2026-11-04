@@ -1,16 +1,20 @@
 import { useLanguage } from './Language'
-import { useEffect, useReducer, useRef, useState, type CSSProperties } from 'react'
+import { lazy, Suspense, useEffect, useReducer, useRef, useState, type CSSProperties } from 'react'
 import { Button, Dialog, Portal } from '@chakra-ui/react'
 import type { Session } from '../../shared/types'
 import { TerminalPane } from './TerminalPane'
 import { GitReviewButton } from './GitReview'
 import { Sidebar, type Page } from './Sidebar'
+import { PageBoundary } from './PageBoundary'
+import { DataSkeleton } from './DataSkeleton'
 import { Settings } from './Settings'
+import { SkillSuggestion } from './SkillSuggestion'
+import { UpdateNotification } from './UpdateNotification'
 import { MeetingRoom } from './MeetingRoom'
-import { Library } from './Library'
+const Library = lazy(() => import('./Library').then(module => ({ default: module.Library })))
 import { WorkspaceSetup } from './WorkspaceSetup'
 import { GitAskPassModal } from './GitAskPassModal'
-import { RouterDashboard } from './RouterDashboard'
+const RouterDashboard = lazy(() => import('./RouterDashboard').then(module => ({ default: module.RouterDashboard })))
 import type { RouterPlugin } from '../../shared/plugins'
 import { initialLayout, layoutReducer, layoutRects, type Layout } from './layout'
 
@@ -24,6 +28,8 @@ export default function App() {
     void window.workspace?.setNotificationsEnabled?.(enabled).catch(() => {})
   }, [])
   const [page, setPage] = useState<Page>('workspace')
+  const [updatesRequest, setUpdatesRequest] = useState(0)
+  const [findSkills, setFindSkills] = useState(false)
   const [setupPackage, setSetupPackage] = useState<string>()
   const [setupPlugin, setSetupPlugin] = useState<'pi' | 'opencode' | '9router' | 'node' | 'pnpm' | 'bun' | 'yarn' | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -235,7 +241,7 @@ export default function App() {
   const needsPartner = layout.groups[layout.focused].ids.length === 1
   const focusedSession = sessions.find(s => s.id === layout.groups[layout.focused]?.active)
   return <div className="workspace flex h-dvh overflow-hidden">
-    <Sidebar routerInstalled={routerInstalled} page={page} onPage={value => { setSetupPackage(undefined); setSetupPlugin(null); setPage(value) }} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
+    <Sidebar routerInstalled={routerInstalled} page={page} onPage={value => { setFindSkills(false); setSetupPackage(undefined); setSetupPlugin(null); setPage(value) }} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
     <main className="flex min-w-0 flex-1 flex-col" style={{ display: page === 'workspace' ? 'flex' : 'none' }}>
       <header className="toolbar">       
         <h1>{t("Terminals")}</h1>
@@ -322,9 +328,19 @@ export default function App() {
     <div className="meeting-page-host" style={{ display: page === 'meeting' ? 'flex' : 'none' }}>
       <MeetingRoom sessions={sessions} active={page === 'meeting'} />
     </div>
-    {page === 'settings' && <Settings />}
-    {page === 'library' && <Library key={setupPackage || setupPlugin || 'catalog'} initialPlugin={setupPlugin} initialPackage={setupPackage} onPluginStatus={pluginStatus} />}
-    {page === '9router' && routerInstalled && <RouterDashboard />}
+    <UpdateNotification onView={() => { setUpdatesRequest(value => value + 1); setPage('settings') }} />
+    {page === 'settings' && <Settings updatesRequest={updatesRequest} />}
+    <SkillSuggestion onFind={() => { setFindSkills(true); setSetupPackage(undefined); setSetupPlugin(null); setPage('library') }} />
+    <PageBoundary key={page}><Suspense fallback={<main className="library-page page-skeleton flex min-w-0 flex-1 flex-col" aria-busy="true">
+      <header className="toolbar"><h1>{t(page === '9router' ? '9router' : 'Library')}</h1></header>
+      <div className="library-content">
+        <DataSkeleton label={t('Loading…')} shape="button" />
+        <DataSkeleton label={t('Loading…')} shape="providers" />
+      </div>
+    </main>}>
+      {page === 'library' && <Library initialType={findSkills ? 'skill' : ''} key={setupPackage || setupPlugin || (findSkills ? 'skills' : 'catalog')} initialPlugin={setupPlugin} initialPackage={setupPackage} onPluginStatus={pluginStatus} />}
+      {page === '9router' && routerInstalled && <RouterDashboard />}
+    </Suspense></PageBoundary>
     <WorkspaceSetup startupOnly active={page === 'workspace'} onContinue={async () => {}} onPackage={name => { setSetupPlugin(null); setSetupPackage(name); setPage('library') }} onSetup={id => { setSetupPackage(undefined); setSetupPlugin(id); setPage('library') }} />
     <GitAskPassModal />
     {tabMenu && <Portal><div ref={tabMenuElement} className="terminal-tab-menu" role="menu" aria-labelledby={`tab-${tabMenu.id}`} style={{ left: tabMenu.x, top: tabMenu.y }} onKeyDown={event => {

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { TerminalHistory } from './terminal-history'
 import type { AgentActivity, Session, SessionEvent, Snapshot } from '../shared/types'
 
 interface Disposable { dispose(): void }
@@ -9,7 +10,7 @@ export interface PtyProcess {
   resize(cols: number, rows: number): void
   kill(): void
 }
-interface Entry { session: Session; process?: PtyProcess; output: string; seq: number; subscriptions: Disposable[] }
+interface Entry { session: Session; process?: PtyProcess; output: TerminalHistory; seq: number; subscriptions: Disposable[] }
 export class SessionManager {
   private entries = new Map<string, Entry>()
   private count = 0
@@ -25,19 +26,19 @@ export class SessionManager {
     if (typeof cwd !== 'string' || !cwd) throw new Error('Invalid directory')
     const name = `Pi ${++this.count}`
     if (saved && this.entries.has(saved.id)) throw new Error('Duplicate session')
-    const e: Entry = { session: { id: saved?.id || randomUUID(), name: saved?.name || name, cwd, status: 'exited', generation: 0 }, output: '', seq: 0, subscriptions: [] }
+    const e: Entry = { session: { id: saved?.id || randomUUID(), name: saved?.name || name, cwd, status: 'exited', generation: 0 }, output: new TerminalHistory(this.historyLimit), seq: 0, subscriptions: [] }
     this.entries.set(e.session.id, e)
     return this.start(e)
   }
   private start(e: Entry): Session {
     e.session = { ...e.session, generation: e.session.generation + 1, status: 'running', activity: 'disconnected', error: undefined, exitCode: undefined }
-    e.output = ''; e.seq = 0
+    e.output.clear(); e.seq = 0
     const generation = e.session.generation
     try {
       const p = this.spawn(e.session.cwd, e.session.id, generation); e.process = p
       e.subscriptions = [p.onData((data) => {
         if (e.session.generation !== generation || e.process !== p) return
-        e.output = (e.output + data).slice(-this.historyLimit)
+        e.output.append(data)
         this.emit({ type: 'data', id: e.session.id, generation, seq: ++e.seq, data })
       }), p.onExit(({ exitCode }) => {
         if (e.process !== p) return
@@ -64,7 +65,7 @@ export class SessionManager {
     this.publish(e)
     return { ...e.session }
   }
-  snapshot(id: string): Snapshot { const e = this.get(id); return { session: { ...e.session }, output: e.output, seq: e.seq } }
+  snapshot(id: string): Snapshot { const e = this.get(id); return { session: { ...e.session }, output: e.output.text(), seq: e.seq } }
   input(id: string, data: string) {
     if (this.closed.has(id)) {
       if (typeof data !== 'string' || data.length > 65536) throw new Error('Invalid terminal input')

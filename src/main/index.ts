@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { statSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { SessionManager } from './sessions'
-import { loadTerminals, saveTerminals } from './workspace-state'
+import { loadTerminals, TerminalStateWriter } from './workspace-state'
 import { MeetingBridge } from './meeting-bridge'
 import { meetingExtensionPath } from './meeting-extension-path'
 import { MeetingManager } from './meetings'
@@ -41,6 +41,7 @@ let window: BrowserWindow | undefined
 let folder = homedir()
 let closing = false
 let rendererReady = false
+const terminalStateWriter = new TerminalStateWriter()
 let terminalStatePath: string | undefined
 let restoringTerminals = false
 const pendingFolders: string[] = []
@@ -85,6 +86,7 @@ function meetingSnapshot() {
   return { state: meetings.snapshot(), agents: Object.fromEntries(sessions.list().map(s => [s.id, s.status === 'running' ? bridge.status(s.id) : 'disconnected'])) }
 }
 function publishMeeting() {
+  if (window && !window.isDestroyed()) window.webContents.send('skills:change', bridge.skillCounts())
   if (window && !window.isDestroyed()) window.webContents.send('meetings:change', meetingSnapshot())
 }
 let terminalAgent: TerminalAgentSettings | undefined
@@ -104,7 +106,7 @@ const sessions = new SessionManager((cwd, id, generation) => {
   if (window && !window.isDestroyed()) window.webContents.send('sessions:event', event)
   if (event.type !== 'data') publishMeeting()
   if (!restoringTerminals && terminalStatePath && (event.type === 'state' || event.type === 'removed')) {
-    try { saveTerminals(terminalStatePath, sessions.list()) } catch (error) { console.error('Could not save workspace terminals', error) }
+    try { terminalStateWriter.save(terminalStatePath, sessions.list()) } catch (error) { console.error('Could not save workspace terminals', error) }
   }
 })
 
@@ -141,10 +143,16 @@ function registerIPC() {
       if (sessions.list().some(session => session.status === 'running') || plugins.operation().status === 'running' || piPlugin.operation().status === 'running' || opencodePlugin.operation().status === 'running') throw new Error('Stop running terminals and installation operations before cleaning cache.')
       return toolCache.clear()
     },
+    'clipboard:read-text': () => {
+      const text = clipboard.readText()
+      if (text.length > 1_000_000) throw new Error('Clipboard text is too large')
+      return text
+    },
     'clipboard:write-text': (text: unknown) => {
       if (typeof text !== 'string' || text.length > 1_000_000) throw new Error('Invalid clipboard text')
       clipboard.writeText(text)
     },
+    'skills:status': () => bridge.skillCounts(),
     'agents:notifications': () => agentNotifications,
     'agents:set-notifications': (enabled: unknown) => {
       if (typeof enabled !== 'boolean') throw new Error('Invalid notification setting')
@@ -181,6 +189,7 @@ function registerIPC() {
       if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag')
       return managerPlugin(id).status(refresh)
     },
+    'manager-plugin:operation': id => managerPlugin(id).operation(),
     'manager-plugin:mutate': (id, action, version, manager) => managerPlugin(id).mutate(action, version, manager),
     'opencode-plugin:status': refresh => {
       if (refresh !== undefined && typeof refresh !== 'boolean') throw new Error('Invalid refresh flag')
@@ -384,7 +393,7 @@ if (primaryInstance) app.whenReady().then(async () => {
       else console.warn('Workspace is full; cannot open the requested folder.')
     }
   } finally { restoringTerminals = false }
-  try { saveTerminals(terminalStatePath, sessions.list()) } catch (error) { console.error('Could not save workspace terminals', error) }
+  try { terminalStateWriter.save(terminalStatePath, sessions.list()) } catch (error) { console.error('Could not save workspace terminals', error) }
   createWindow()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })

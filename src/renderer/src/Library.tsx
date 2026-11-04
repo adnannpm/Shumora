@@ -19,7 +19,7 @@ const pluginCatalog = [
 ] as const
 const pluginCategories = { '': 'All categories', agent: 'AI agents', gateway: 'Gateways', runtime: 'Runtimes', manager: 'Package managers' } as const
 
-export function Library({ onPluginStatus, initialPlugin = null, initialPackage }: { initialPackage?: string; onPluginStatus?: (plugin: RouterPlugin) => void; initialPlugin?: 'pi' | 'opencode' | '9router' | 'node' | ManagerPluginId | null }) {
+export function Library({ onPluginStatus, initialPlugin = null, initialPackage, initialType = '' }: { initialType?: '' | 'skill'; initialPackage?: string; onPluginStatus?: (plugin: RouterPlugin) => void; initialPlugin?: 'pi' | 'opencode' | '9router' | 'node' | ManagerPluginId | null }) {
   const { t } = useLanguage()
   const [details, setDetails] = useState<'9router' | 'pi' | 'node' | 'opencode' | ManagerPluginId | null>(initialPlugin)
   const [packageTarget, setPackageTarget] = useState<string | undefined>(initialPackage)
@@ -31,7 +31,7 @@ export function Library({ onPluginStatus, initialPlugin = null, initialPackage }
     `${plugin.name} ${plugin.description} ${t(plugin.description)}`.toLocaleLowerCase().includes(search))
   // Catalog browsing state (page/search/type/sort) is kept here so it survives
   // opening and closing a package detail page.
-  const [query, setQuery] = useState<PackageQuery>({ page: 1, search: '', type: '', sort: 'downloads' })
+  const [query, setQuery] = useState<PackageQuery>({ page: 1, search: '', type: initialType, sort: 'downloads' })
   const [selectedPackage, setSelectedPackage] = useState<PiPackage>()
   const [packageError, setPackageError] = useState('')
 

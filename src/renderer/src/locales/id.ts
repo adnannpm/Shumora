@@ -1,5 +1,15 @@
 // Application-owned copy only. Terminal output, user content and remote metadata stay untouched.
 export const indonesian: Record<string, string> = {
+  'Optional skills': 'Skill opsional',
+  'Make your agent more capable': 'Bantu agent bekerja lebih baik',
+  'This agent has no skills loaded. Add specialized instructions, or keep working without them.': 'Agent ini belum memuat skill. Tambahkan panduan khusus, atau tetap bekerja tanpanya.',
+  'Find skills': 'Cari skill',
+  'Not now': 'Nanti saja',
+  'Don’t show again': 'Jangan tampilkan lagi',
+  'Application update': 'Pembaruan aplikasi',
+  'New update available': 'Pembaruan terbaru tersedia',
+  'View update': 'Lihat update',
+  'Updates are checked automatically when Shumora opens. You can also check manually.': 'Pembaruan diperiksa otomatis saat Shumora dibuka. Kamu juga bisa memeriksanya secara manual.',
   "Could not sign out. Check that 9router is running and try again.": "Gagal keluar. Pastikan 9router berjalan lalu coba lagi.",
   "This signs you out of the 9router dashboard in Shumora. It does not stop 9router or remove your provider accounts.": "Ini mengeluarkan kamu dari dashboard 9router di Shumora. Layanan 9router tetap berjalan dan akun provider tidak dihapus.",
   "Sign out": "Keluar",

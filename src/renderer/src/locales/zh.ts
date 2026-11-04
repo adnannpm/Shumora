@@ -1,5 +1,15 @@
 // Simplified Chinese UI copy. User content, package metadata and terminal output stay untouched.
 export const chinese: Record<string, string> = {
+  'Optional skills': '可选技能',
+  'Make your agent more capable': '让助手更得心应手',
+  'This agent has no skills loaded. Add specialized instructions, or keep working without them.': '此助手尚未加载技能。你可以添加专项指引，也可以直接继续工作。',
+  'Find skills': '查找技能',
+  'Not now': '暂时不用',
+  'Don’t show again': '不再显示',
+  'Application update': '应用更新',
+  'New update available': '有新更新可用',
+  'View update': '查看更新',
+  'Updates are checked automatically when Shumora opens. You can also check manually.': 'Shumora 启动时会自动检查更新。你也可以手动检查。',
   "Could not sign out. Check that 9router is running and try again.": "无法退出登录。请确认 9router 正在运行后重试。",
   "This signs you out of the 9router dashboard in Shumora. It does not stop 9router or remove your provider accounts.": "这将退出 Shumora 中的 9router 仪表板，不会停止 9router 或删除提供商账户。",
   "Sign out": "退出登录",

@@ -31,7 +31,7 @@ export function RouterCard({ onOpen }: { onOpen: () => void }) {
 export function RouterDetails({ onBack, onStatus, pi = false, opencode = false, managerId }: { onBack?: () => void; onStatus?: (plugin: RouterPlugin) => void; pi?: boolean; opencode?: boolean; managerId?: ManagerPluginId }) {
   const { t } = useLanguage()
   const managerInfo = managerId ? managerPluginInfo[managerId] : undefined
-  const api = managerId ? window.managerPlugins && { status: (refresh?: boolean) => window.managerPlugins.status(managerId, refresh), mutate: (action: PluginAction, version?: string, manager?: PackageManager) => window.managerPlugins.mutate(managerId, action, version, manager), onOperation: (callback: (operation: PluginOperation) => void) => window.managerPlugins.onOperation(managerId, callback) } : opencode ? window.opencodePlugin : pi ? window.piPlugin : window.plugins
+  const api = managerId ? window.managerPlugins && { operation: () => window.managerPlugins.operation?.(managerId), status: (refresh?: boolean) => window.managerPlugins.status(managerId, refresh), mutate: (action: PluginAction, version?: string, manager?: PackageManager) => window.managerPlugins.mutate(managerId, action, version, manager), onOperation: (callback: (operation: PluginOperation) => void) => window.managerPlugins.onOperation(managerId, callback) } : opencode ? window.opencodePlugin : pi ? window.piPlugin : window.plugins
   const name = managerInfo?.name || (opencode ? 'OpenCode' : pi ? 'Pi' : '9router')
   const packageName = managerId || (opencode ? 'opencode-ai' : pi ? '@earendil-works/pi-coding-agent' : '9router')
   const [plugin, setPlugin] = useState<PluginMetadata<PluginId>>()
@@ -53,8 +53,18 @@ export function RouterDetails({ onBack, onStatus, pi = false, opencode = false, 
   const [logsOpen, setLogsOpen] = useState(false)
   useEffect(() => { if (operation.status !== 'idle') setLogsOpen(true) }, [operation.status])
   useEffect(() => {
-    let active = true
-    const off = api?.onOperation?.(value => { if (active && ownsOperation.current) setOperation(value) })
+    let active = true, receivedEvent = false
+    const accept = (value: PluginOperation) => {
+      if (!active) return
+      ownsOperation.current = value.status !== 'idle'
+      setOperation(value)
+      if (value.status === 'success' || value.status === 'failed') {
+        void api?.status().then(value => { if (active) update(value) }).catch(e => { if (active) setError(String(e)) })
+      }
+    }
+    // Subscribe first; a delayed snapshot must not overwrite newer live output.
+    const off = api?.onOperation?.(value => { receivedEvent = true; accept(value) })
+    void api?.operation?.()?.then(value => { if (!receivedEvent) accept(value) }).catch(e => { if (active) setError(String(e)) })
     return () => { active = false; off?.() }
   }, [])
   useEffect(() => {
