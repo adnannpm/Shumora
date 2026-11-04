@@ -46,6 +46,12 @@ import type { PluginsAPI, PluginOperation, PiPluginAPI, OpenCodePluginAPI, NodeP
 import type { UpdatesAPI, UpdateState } from '../shared/updates'
 import type { WorkspaceAPI, SessionEvent, GitAskPassRequest } from '../shared/types'
 const api: WorkspaceAPI = {
+  skillStatus: () => ipcRenderer.invoke('skills:status'),
+  onSkillsChange: callback => {
+    const listener = (_event: unknown, counts: Record<string, number>) => callback(counts)
+    ipcRenderer.on('skills:change', listener)
+    return () => { ipcRenderer.removeListener('skills:change', listener) }
+  },
   notificationsEnabled: () => ipcRenderer.invoke('agents:notifications'),
   setNotificationsEnabled: enabled => ipcRenderer.invoke('agents:set-notifications', enabled),
   list: () => ipcRenderer.invoke('sessions:list'),

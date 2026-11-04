@@ -86,6 +86,7 @@ function meetingSnapshot() {
   return { state: meetings.snapshot(), agents: Object.fromEntries(sessions.list().map(s => [s.id, s.status === 'running' ? bridge.status(s.id) : 'disconnected'])) }
 }
 function publishMeeting() {
+  if (window && !window.isDestroyed()) window.webContents.send('skills:change', bridge.skillCounts())
   if (window && !window.isDestroyed()) window.webContents.send('meetings:change', meetingSnapshot())
 }
 let terminalAgent: TerminalAgentSettings | undefined
@@ -151,6 +152,7 @@ function registerIPC() {
       if (typeof text !== 'string' || text.length > 1_000_000) throw new Error('Invalid clipboard text')
       clipboard.writeText(text)
     },
+    'skills:status': () => bridge.skillCounts(),
     'agents:notifications': () => agentNotifications,
     'agents:set-notifications': (enabled: unknown) => {
       if (typeof enabled !== 'boolean') throw new Error('Invalid notification setting')

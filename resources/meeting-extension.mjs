@@ -13,7 +13,16 @@ export default function meetingExtension(pi, dependencies = {}) {
     context = ctx; closed = false; buffer = ''
     socket = (dependencies.connect || connect)({ port, host: '127.0.0.1' })
     socket.setEncoding('utf8')
-    socket.on('connect', () => send({ type: 'hello', version: 1, token, idle: ctx.isIdle() }))
+    socket.on('connect', () => {
+      send({ type: 'hello', version: 1, token, idle: ctx.isIdle() })
+      if (typeof pi.getCommands === 'function') {
+        const commands = pi.getCommands()
+        const count = commands.filter(command => command.source === 'skill').length
+        // An empty command list can also mean skill commands are disabled.
+        // Wait for the actual loaded skill list before reporting zero.
+        if (count > 0) send({ type: 'skills', count })
+      }
+    })
     socket.on('error', () => {})
     socket.on('close', () => { closed = true; if (pending) context.abort() })
     socket.on('data', chunk => {
@@ -36,6 +45,13 @@ export default function meetingExtension(pi, dependencies = {}) {
         } catch { socket.destroy(); return }
       }
     })
+  })
+  pi.on('before_agent_start', event => {
+    if (pending) return
+    const skills = event.systemPromptOptions?.skills
+    if (Array.isArray(skills)) send({ type: 'skills', count: skills.length })
+    const guidance = 'Shumora skill guidance: For each user request, consider the available skills. When a skill is relevant, read its SKILL.md and follow its instructions before doing the task. If no skill fits, continue normally without requiring a skill. Skills are optional: respect requests to work without them. Never install or fetch skills without user approval. Do not repeatedly suggest skills or claim a skill was used unless you read it.'
+    return { systemPrompt: `${event.systemPrompt}\n\n${guidance}` }
   })
   pi.on('agent_start', (_event, ctx) => { context = ctx; agentFailed = false; send({ type: 'activity', status: 'working' }); state() })
   pi.on('input', event => {

@@ -64,6 +64,8 @@ export interface GitAskPassResponse {
   skip?: boolean
 }
 export interface WorkspaceAPI {
+  skillStatus?(): Promise<Record<string, number>>
+  onSkillsChange?(callback: (counts: Record<string, number>) => void): () => void
   notificationsEnabled?(): Promise<boolean>
   setNotificationsEnabled?(enabled: boolean): Promise<void>
   list(): Promise<Session[]>

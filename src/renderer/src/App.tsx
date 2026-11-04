@@ -7,6 +7,7 @@ import { GitReviewButton } from './GitReview'
 import { Sidebar, type Page } from './Sidebar'
 import { PageBoundary } from './PageBoundary'
 import { Settings } from './Settings'
+import { SkillSuggestion } from './SkillSuggestion'
 import { MeetingRoom } from './MeetingRoom'
 const Library = lazy(() => import('./Library').then(module => ({ default: module.Library })))
 import { WorkspaceSetup } from './WorkspaceSetup'
@@ -25,6 +26,7 @@ export default function App() {
     void window.workspace?.setNotificationsEnabled?.(enabled).catch(() => {})
   }, [])
   const [page, setPage] = useState<Page>('workspace')
+  const [findSkills, setFindSkills] = useState(false)
   const [setupPackage, setSetupPackage] = useState<string>()
   const [setupPlugin, setSetupPlugin] = useState<'pi' | 'opencode' | '9router' | 'node' | 'pnpm' | 'bun' | 'yarn' | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -236,7 +238,7 @@ export default function App() {
   const needsPartner = layout.groups[layout.focused].ids.length === 1
   const focusedSession = sessions.find(s => s.id === layout.groups[layout.focused]?.active)
   return <div className="workspace flex h-dvh overflow-hidden">
-    <Sidebar routerInstalled={routerInstalled} page={page} onPage={value => { setSetupPackage(undefined); setSetupPlugin(null); setPage(value) }} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
+    <Sidebar routerInstalled={routerInstalled} page={page} onPage={value => { setFindSkills(false); setSetupPackage(undefined); setSetupPlugin(null); setPage(value) }} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
     <main className="flex min-w-0 flex-1 flex-col" style={{ display: page === 'workspace' ? 'flex' : 'none' }}>
       <header className="toolbar">       
         <h1>{t("Terminals")}</h1>
@@ -324,9 +326,10 @@ export default function App() {
       <MeetingRoom sessions={sessions} active={page === 'meeting'} />
     </div>
     {page === 'settings' && <Settings />}
+    <SkillSuggestion onFind={() => { setFindSkills(true); setSetupPackage(undefined); setSetupPlugin(null); setPage('library') }} />
     <PageBoundary key={page}><Suspense fallback={<main className="library-page" aria-busy="true"><p role="status">{t('Loading…')}</p></main>}>
-    {page === 'library' && <Library key={setupPackage || setupPlugin || 'catalog'} initialPlugin={setupPlugin} initialPackage={setupPackage} onPluginStatus={pluginStatus} />}
-    {page === '9router' && routerInstalled && <RouterDashboard />}
+      {page === 'library' && <Library initialType={findSkills ? 'skill' : ''} key={setupPackage || setupPlugin || (findSkills ? 'skills' : 'catalog')} initialPlugin={setupPlugin} initialPackage={setupPackage} onPluginStatus={pluginStatus} />}
+      {page === '9router' && routerInstalled && <RouterDashboard />}
     </Suspense></PageBoundary>
     <WorkspaceSetup startupOnly active={page === 'workspace'} onContinue={async () => {}} onPackage={name => { setSetupPlugin(null); setSetupPackage(name); setPage('library') }} onSetup={id => { setSetupPackage(undefined); setSetupPlugin(id); setPage('library') }} />
     <GitAskPassModal />

@@ -35,6 +35,17 @@ it('forwards authenticated activity with its session generation and reports disc
   await until(() => updates.length === 4)
   expect(updates[3]).toEqual(['a', 1, 'disconnected'])
 })
+it('keeps skill availability unknown until the authenticated runtime reports it and resets on replacement', async () => {
+  const { bridge, socket, credential } = await fixture()
+  expect(bridge.skillCounts()).toEqual({})
+  send(socket, { type: 'hello', token: credential, version: 1, idle: true })
+  send(socket, { type: 'skills', count: 0 })
+  await until(() => bridge.skillCounts().a === 0)
+  send(socket, { type: 'skills', count: 4 })
+  await until(() => bridge.skillCounts().a === 4)
+  bridge.register('a', 2)
+  expect(bridge.skillCounts()).toEqual({})
+})
 it('authenticates split records and correlates only the matching completed reply', async () => {
   const { bridge, socket, records, credential } = await fixture()
   const hello = JSON.stringify({ type: 'hello', token: credential, version: 1, idle: true }) + '\n'

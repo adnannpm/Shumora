@@ -71,3 +71,18 @@ it('aborts owned work and closes its socket on runtime shutdown', () => {
   expect(ctx.abort).toHaveBeenCalled()
   expect(socket.destroy).toHaveBeenCalled()
 })
+
+it('adds optional skill guidance per prompt without blocking normal tools or changing the original prompt', () => {
+  const { handlers, ctx } = fixture()
+  const result = handlers.before_agent_start({ systemPrompt: 'Original instructions', prompt: 'Fix a bug' }, ctx)
+  expect(result.systemPrompt).toContain('Original instructions')
+  expect(result.systemPrompt).toContain('If no skill fits, continue normally')
+  expect(handlers.tool_call({}, ctx)).toBeUndefined()
+})
+it('reports actual loaded skill availability without exposing skill contents', () => {
+  const { handlers, ctx, socket } = fixture()
+  handlers.before_agent_start({ systemPrompt: 'Original', systemPromptOptions: { skills: [] } }, ctx)
+  expect(socket.write.mock.calls.map(([line]) => JSON.parse(line))).toContainEqual({ type: 'skills', count: 0 })
+  handlers.before_agent_start({ systemPrompt: 'Original', systemPromptOptions: { skills: [{ name: 'private-skill' }] } }, ctx)
+  expect(socket.write.mock.calls.map(([line]) => JSON.parse(line))).toContainEqual({ type: 'skills', count: 1 })
+})

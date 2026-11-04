@@ -624,6 +624,13 @@ button:disabled { opacity: .55; cursor: default; }
 .theme-choice[aria-checked=true] .theme-choice-label { color: var(--accent); }
 .update-status { margin: 24px 0 16px; font-size: 13px; line-height: 1.7; color: var(--muted); }
 .update-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+.skill-suggestion { position: fixed; left: 248px; bottom: 40px; z-index: 90; width: min(380px, calc(100vw - 280px)); padding: 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); box-shadow: 0 4px 16px #0002; }
+.skill-suggestion strong { font-size: 13px; font-weight: 600; }
+.skill-suggestion p { margin: 6px 0 12px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.skill-suggestion-actions { display: flex; flex-wrap: wrap; gap: 14px; }
+.skill-suggestion button { padding: 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.skill-suggestion button:first-child { color: var(--selected-text); }
+.skill-suggestion button:hover { text-decoration: underline; text-underline-offset: 3px; }
 .update-download-card { width: 100%; margin: 24px 0; padding: 20px 0; border-block: 1px solid var(--line); }
 .update-download-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
 .update-download-heading { flex: 1; min-width: 0; overflow-wrap: anywhere; }
