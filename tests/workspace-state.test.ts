@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { loadTerminals, saveTerminals, TerminalStateWriter } from '../src/main/workspace-state'
@@ -11,13 +11,13 @@ it('restores five named terminals in their original folders with stable identiti
   const path = file()
   const spawn = () => ({ onData: () => ({ dispose() {} }), onExit: () => ({ dispose() {} }), write() {}, resize() {}, kill() {} })
   const original = new SessionManager(spawn, () => {})
-  for (const cwd of ['/b', '/e', '/c', '/c', '/c']) original.create(cwd)
+  for (const cwd of ['/b', '/e', '/c', '/c', '/c']) original.create(cwd, undefined, cwd === '/e' ? 'opencode' : 'pi')
   original.rename(original.list()[0].id, 'Backend')
   saveTerminals(path, original.list())
   original.dispose()
   const restored = new SessionManager(spawn, () => {})
-  for (const terminal of loadTerminals(path)!) restored.create(terminal.cwd, terminal)
-  expect(restored.list().map(({ id, name, cwd }) => ({ id, name, cwd }))).toEqual(loadTerminals(path))
+  for (const terminal of loadTerminals(path)!) restored.create(terminal.cwd, terminal, terminal.agent)
+  expect(restored.list().map(({ id, name, cwd, agent }) => ({ id, name, cwd, agent }))).toEqual(loadTerminals(path))
   expect(restored.list().every(s => s.status === 'running')).toBe(true)
   restored.close(restored.list()[0].id)
   saveTerminals(path, restored.list())
@@ -36,7 +36,7 @@ it('distinguishes an intentionally empty workspace from missing or corrupt state
 it('writes metadata changes immediately but skips identical state on stop or restart', () => {
   const write = vi.fn()
   const writer = new TerminalStateWriter(write)
-  const session = { id: 'one', name: 'Pi 1', cwd: '/tmp', status: 'running' as const }
+  const session = { id: 'one', name: 'Pi 1', cwd: '/tmp', agent: 'pi' as const, status: 'running' as const }
   writer.save('state.json', [session])
   const stopped = { ...session, status: 'exited' as const }
   writer.save('state.json', [stopped])
@@ -45,6 +45,31 @@ it('writes metadata changes immediately but skips identical state on stop or res
   writer.save('other.json', [{ ...session, name: 'Renamed' }])
   writer.save('other.json', [])
   expect(write).toHaveBeenCalledTimes(4)
+})
+it('accepts legacy missing programs but rejects explicit invalid programs and persists the resolved identity', () => {
+  const path = file()
+  const legacy = { id: 'legacy', name: 'Custom', cwd: '/tmp' }
+  writeFileSync(path, JSON.stringify([legacy]))
+  expect(loadTerminals(path)).toEqual([legacy])
+  const manager = new SessionManager(() => { throw new Error('Not installed') }, () => {})
+  for (const saved of loadTerminals(path)!) manager.create(saved.cwd, saved, saved.agent ?? 'opencode')
+  saveTerminals(path, manager.list())
+  expect(loadTerminals(path)).toEqual([{ ...legacy, agent: 'opencode' }])
+  for (const agent of ['invalid', null, 0]) {
+    writeFileSync(path, JSON.stringify([{ ...legacy, agent }]))
+    const original = JSON.stringify([{ ...legacy, agent }, { id: 'valid', name: 'Keep me', cwd: '/project', agent: 'pi' }])
+    writeFileSync(path, original)
+    expect(() => loadTerminals(path)).toThrow('Invalid terminal agent in saved workspace')
+    expect(readFileSync(path, 'utf8')).toBe(original)
+  }
+})
+it('includes program identity in the writer deduplication key', () => {
+  const write = vi.fn()
+  const writer = new TerminalStateWriter(write)
+  const session = { id: 'one', name: 'Custom', cwd: '/tmp', agent: 'pi' as const }
+  writer.save('state.json', [session])
+  writer.save('state.json', [{ ...session, agent: 'opencode' }])
+  expect(write).toHaveBeenCalledTimes(2)
 })
 it('retries a failed state write rather than marking it persisted', () => {
   const write = vi.fn().mockImplementationOnce(() => { throw new Error('Disk full') })

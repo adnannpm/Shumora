@@ -2,6 +2,7 @@ import { accessSync, constants, existsSync, readFileSync, realpathSync } from 'n
 import path from 'node:path'
 import { spawn, type ChildProcess, execFile } from 'node:child_process'
 import type { PluginHost } from './plugins'
+import type { TerminalAgent } from '../shared/terminal-agent'
 import type { ManagerPluginId, PackageManager } from '../shared/plugins'
 import { packageManagerNames, managerRootArgs } from './package-managers'
 import type { RouterHost } from './router-service'
@@ -34,6 +35,19 @@ function executable(name: string): string | undefined {
         // Continue searching PATH.
       }
     }
+  }
+}
+// Launch availability is independent of package-manager ownership. In particular,
+// the official Pi shell wrapper can run even when npm cannot manage its release.
+export function isTerminalAgentAvailable(agent: TerminalAgent): boolean {
+  try {
+    const launch = agent === 'pi'
+      ? resolveLaunch(process.platform, process.env, process.env.PATH || process.env.Path || '', existsSync, () => '')
+      : resolveOpenCodeLaunch()
+    accessSync(launch.file, process.platform === 'win32' ? constants.F_OK : constants.X_OK)
+    return true
+  } catch {
+    return false
   }
 }
 

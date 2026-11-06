@@ -17,7 +17,7 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 it('preserves terminal mounts when splitting, moving tabs and merging groups', async () => {
-  const list: Session[] = [1, 2, 3].map(n => ({ id: String(n), name: `Pi ${n}`, cwd: '/tmp', status: 'running', generation: 1 }))
+  const list: Session[] = [1, 2, 3].map(n => ({ id: String(n), name: `Pi ${n}`, cwd: '/tmp', agent: 'pi', status: 'running', generation: 1 }))
   window.workspace = { list: async () => list, folder: async () => '/tmp', onEvent: () => () => {} } as any
   render(<Provider><App /></Provider>)
   await screen.findByRole('tab', { name: 'Pi 1' }); await waitFor(() => expect(mounts.count).toBe(3))
@@ -45,7 +45,7 @@ it('preserves terminal mounts when splitting, moving tabs and merging groups', a
 })
 
 it('shows one workspace git button that follows the focused group in split view', async () => {
-  const list: Session[] = [1, 2].map(n => ({ id: String(n), name: `Pi ${n}`, cwd: `/repo${n}`, status: 'running', generation: 1 }))
+  const list: Session[] = [1, 2].map(n => ({ id: String(n), name: `Pi ${n}`, cwd: `/repo${n}`, agent: 'pi', status: 'running', generation: 1 }))
   const gitStatus = vi.fn(async (id: string) => ({ isRepo: true, branch: id === '1' ? 'main' : 'feature', changes: [] }))
   window.workspace = { list: async () => list, folder: async () => '/tmp', onEvent: () => () => {}, gitStatus } as any
   render(<Provider><App /></Provider>)

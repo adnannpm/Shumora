@@ -664,6 +664,9 @@ h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.3px; }
 .tab-workspace { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; background: #10151e; }
 .tab-group-bar { display: flex; align-items: center; min-width: 0; overflow: hidden; background: var(--sidebar); border-bottom: 1px solid var(--line); }
 .tab-group-bar.active-group { border-bottom-color: #6385cc; }
+.session-launcher { display: flex; flex-shrink: 0; align-items: center; border: 1px solid var(--line); border-radius: 5px; margin: 0 4px; }
+.session-launcher > button { border-radius: 4px 0 0 4px; }
+.session-launcher > button + button { min-width: 22px; padding-inline: 4px; border-left: 1px solid var(--line); border-radius: 0 4px 4px 0; }
 .session-tablist { display: flex; flex: 1; align-items: stretch; min-width: 0; overflow: hidden; }
 .session-tab { position: relative; display: flex; align-items: stretch; flex: 1 1 0; min-width: 0; overflow: hidden; container-type: inline-size; border-right: 1px solid var(--line); color: var(--muted); }
 .session-tab { touch-action: pan-y; user-select: none; transition: transform 140ms ease; }

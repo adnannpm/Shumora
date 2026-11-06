@@ -65,6 +65,20 @@ it('stops running sessions before a package change and restarts only those after
   expect(sessions.snapshot(active.id).session.status).toBe('running')
   expect(sessions.snapshot(stopped.id).session.status).toBe('exited')
 })
+it('keeps OpenCode running during Pi package changes and only restarts Pi', async () => {
+  const { sessions, events, active } = workspace()
+  const code = sessions.create('/code', undefined, 'opencode')
+  events.length = 0
+  const service = new PackageService(async () => html, async () => {
+    expect(sessions.snapshot(active.id).session.status).toBe('exited')
+    expect(sessions.snapshot(code.id).session).toMatchObject({ status: 'running', generation: 1 })
+    events.push('update')
+  }, () => {}, () => {}, undefined, sessions)
+  await service.catalog({})
+  await service.install('@demo/tools', '1.2.3')
+  expect(events).toEqual(['stop', 'update', 'start'])
+  expect(sessions.snapshot(code.id).session).toMatchObject({ agent: 'opencode', status: 'running', generation: 1 })
+})
 it('leaves sessions stopped when the package command fails', async () => {
   const { sessions, events } = workspace()
   const service = new PackageService(async () => html, async () => { throw new Error('offline') }, () => {}, () => {}, undefined, sessions)
