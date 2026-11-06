@@ -84,7 +84,7 @@ An externally started 9router process must be managed outside Shumora. Shumora's
 - A desktop environment supported by the installer you download.
 - An installed coding agent, such as Pi, and any runtime required by that installation. Use the setup guide or Library to review supported installation options.
 - Model access configured for your agent: a provider account, API credentials, or a compatible gateway, depending on your setup.
-- On Linux, Electron's system libraries and appropriate sandbox support.
+- On Linux, Electron's system libraries and appropriate sandbox support..
 
 Shumora does not bundle provider subscriptions or grant access to paid models. Usage charges and account limits remain with your providers.
 
