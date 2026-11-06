@@ -14,14 +14,11 @@ vi.mock('node:child_process', () => ({
   execFile: vi.fn((_file, _args, _options, callback) => {
     exec.callback = callback
     const response = exec.responses[_args.join(' ')]
-    if (response !== undefined) {
-      queueMicrotask(() => callback(null, response, ''))
-    } else if (_args.includes('--version') && !String(_file).endsWith('opencode') && !String(_file).endsWith('/node')) {
+    if (response !== undefined) queueMicrotask(() => callback(null, response, ''))
+    else if (_args.includes('--version') && !String(_file).endsWith('opencode') && !String(_file).endsWith('/node')) {
       queueMicrotask(() => callback(null, '1.0.0\n', ''))
     }
-    if (_args.includes('root')) {
-      queueMicrotask(() => callback(new Error('No global installation'), '', ''))
-    }
+    if (_args.includes('root')) queueMicrotask(() => callback(new Error('No global installation'), '', ''))
     return exec.child
   })
 }))
@@ -30,8 +27,7 @@ vi.mock('node:fs', () => ({
   accessSync: (file: string) => {
     if (file in exec.files) return
     const name = file.split(/[\\/]/).pop()
-    const allowed = exec.shim ? name === 'npm.cmd' || name === 'node.exe' : name === 'npm' || name === 'npm.exe'
-    if (!allowed) throw new Error('not found')
+    if (exec.shim ? name !== 'npm.cmd' && name !== 'node.exe' : name !== 'npm' && name !== 'npm.exe') throw new Error('not found')
   },
   constants: { F_OK: 0, X_OK: 1 },
   existsSync: (file: string) => file in exec.files || (exec.shim && /npm-cli\.js$/.test(file)),
@@ -53,19 +49,15 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 
-function setupStandaloneOpenCode() {
+function mockStandaloneOpenCode() {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
   vi.stubEnv('PATH', '/standalone')
   exec.files['/standalone/opencode'] = ''
   exec.child = { stdout: new EventEmitter(), stderr: new EventEmitter() }
 }
 
-async function waitForOpenCodeExecution() {
-  await vi.waitFor(() => {
-    const calledOpenCode = vi.mocked(execFile).mock.calls.some(call => String(call[0]).endsWith('opencode'))
-    expect(calledOpenCode).toBe(true)
-  })
-}
+const waitForOpenCodeCall = () =>
+  vi.waitFor(() => expect(vi.mocked(execFile).mock.calls.some(call => String(call[0]).endsWith('opencode'))).toBe(true))
 
 it.each([
   ['1.18.34\n', '1.18.34'],
@@ -73,16 +65,11 @@ it.each([
   ['opencode 2.2.5\r\n', '2.2.5'],
   ['v2.2.5\n', '2.2.5']
 ])('recognizes standalone OpenCode version output %j without npm metadata', async (output, version) => {
-  setupStandaloneOpenCode()
+  mockStandaloneOpenCode()
   const pending = opencodePluginHost.detect()
-  await waitForOpenCodeExecution()
+  await waitForOpenCodeCall()
   exec.callback(null, output, '')
-  expect(await pending).toEqual({
-    installed: true,
-    installedVersion: version,
-    executable: '/standalone/opencode',
-    managed: false
-  })
+  expect(await pending).toEqual({ installed: true, installedVersion: version, executable: '/standalone/opencode', managed: false })
 })
 
 it.each([
@@ -90,9 +77,9 @@ it.each([
   'opencode v2.2.5\nstartup failed',
   'opencode version unavailable'
 ])('rejects unverified standalone OpenCode version output %j', async output => {
-  setupStandaloneOpenCode()
+  mockStandaloneOpenCode()
   const pending = expect(opencodePluginHost.detect()).rejects.toThrow('package version could not be verified')
-  await waitForOpenCodeExecution()
+  await waitForOpenCodeCall()
   exec.callback(null, output, '')
   await pending
 })
@@ -106,11 +93,7 @@ it('detects Node.js on PATH rather than reporting the embedded Electron runtime'
   expect(vi.mocked(execFile).mock.calls[0][0]).toBe('/runtime/node')
   expect(vi.mocked(execFile).mock.calls[0][1]).toEqual(['--version'])
   exec.callback(null, 'v22.20.0\n', '')
-  expect(await pending).toEqual({
-    installed: true,
-    installedVersion: '22.20.0',
-    executable: '/runtime/node'
-  })
+  expect(await pending).toEqual({ installed: true, installedVersion: '22.20.0', executable: '/runtime/node' })
 })
 
 it.each(['linux', 'darwin', 'win32'] as const)('streams stdout/stderr before completion on %s', async platform => {
@@ -119,14 +102,7 @@ it.each(['linux', 'darwin', 'win32'] as const)('streams stdout/stderr before com
   const chunks: string[] = []
   const pending = pluginHost.run(['install', '--global', '9router@0.5.109'], text => chunks.push(text))
   let settled = false
-  void pending.then(
-    () => {
-      settled = true
-    },
-    () => {
-      settled = true
-    }
-  )
+  void pending.then(() => { settled = true }, () => { settled = true })
   exec.child.stdout.emit('data', 'downloading\n')
   exec.child.stderr.emit('data', 'npm WARN example\n')
   expect(chunks[0]).toBe('$ npm install --global 9router@0.5.109\n')
@@ -140,13 +116,13 @@ it.each(['linux', 'darwin', 'win32'] as const)('streams stdout/stderr before com
 it('detects the active release of the official Windows Pi installer', async () => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
   const bin = 'C:\\Users\\Alice Smith\\.pi\\agent\\bin'
-  const installRoot = 'C:\\Users\\Alice Smith\\.pi\\agent\\install'
+  const install = 'C:\\Users\\Alice Smith\\.pi\\agent\\install'
   vi.stubEnv('PI_EXECUTABLE', `${bin}\\pi.cmd`)
   exec.files = {
     [`${bin}\\pi.cmd`]: '',
     [`${bin}\\pi-launcher.js`]: '// versioned installer launcher',
-    [`${installRoot}\\current-version`]: '1.4.0\r\n',
-    [`${installRoot}\\releases\\1.4.0\\node_modules\\@earendil-works\\pi-coding-agent\\package.json`]: JSON.stringify({
+    [`${install}\\current-version`]: '1.4.0\r\n',
+    [`${install}\\releases\\1.4.0\\node_modules\\@earendil-works\\pi-coding-agent\\package.json`]: JSON.stringify({
       name: '@earendil-works/pi-coding-agent',
       version: '1.4.0'
     })
@@ -193,10 +169,7 @@ it.each([false, true])('verifies Bun global Pi independently of PATH and reports
   exec.files = {
     ['C:\\tools\\bun.exe']: '',
     [`${bin}\\pi.exe`]: '',
-    [`${packageDir}\\package.json`]: JSON.stringify({
-      name: '@earendil-works/pi-coding-agent',
-      version: '1.4.0'
-    }),
+    [`${packageDir}\\package.json`]: JSON.stringify({ name: '@earendil-works/pi-coding-agent', version: '1.4.0' }),
     ...(conflict ? { ['C:\\tools\\pi.exe']: '' } : {})
   }
   exec.responses['pm bin --global'] = bin
