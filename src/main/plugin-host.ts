@@ -231,7 +231,8 @@ function createPluginHost(command: string, packageName: string, repository: stri
     }
     if (['opencode', 'pnpm', 'bun', 'yarn'].includes(command)) {
       const cli = command === 'opencode' ? { file, args: [] } : managerCommand(command as PackageManager)
-      const version = (await run(cli.file, [...cli.args, '--version'], 5000)).trim()
+      const output = (await run(cli.file, [...cli.args, '--version'], 5000)).trim()
+      const version = command === 'opencode' ? output.replace(/^opencode\s+/, '').replace(/^v/, '') : output
       if (/^\d+\.\d+\.\d+$/.test(version)) return { installed: true, installedVersion: version, executable: file, managed: false }
     }
     throw new Error(`${command} exists at ${file}, but its package version could not be verified. Manage this installation manually.`)

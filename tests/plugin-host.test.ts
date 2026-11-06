@@ -15,15 +15,35 @@ import { pluginHost, piPluginHost, opencodePluginHost, detectNode, installTimeou
 import { execFile } from 'node:child_process'
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); exec.shim = false; exec.responses = {}; exec.files = {}; vi.unstubAllEnvs() })
 
-it('recognizes standalone OpenCode by its version command without npm metadata', async () => {
+it.each([
+  ['1.18.34\n', '1.18.34'],
+  ['opencode v2.2.5\n', '2.2.5'],
+  ['opencode 2.2.5\r\n', '2.2.5'],
+  ['v2.2.5\n', '2.2.5']
+])('recognizes standalone OpenCode version output %j without npm metadata', async (output, version) => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
   vi.stubEnv('PATH', '/standalone')
   exec.files['/standalone/opencode'] = ''
   exec.child = { stdout: new EventEmitter(), stderr: new EventEmitter() }
   const pending = opencodePluginHost.detect()
   await vi.waitFor(() => expect(vi.mocked(execFile).mock.calls.some(call => String(call[0]).endsWith('opencode'))).toBe(true))
-  exec.callback(null, '1.18.34\n', '')
-  expect(await pending).toEqual({ installed: true, installedVersion: '1.18.34', executable: '/standalone/opencode', managed: false })
+  exec.callback(null, output, '')
+  expect(await pending).toEqual({ installed: true, installedVersion: version, executable: '/standalone/opencode', managed: false })
+})
+
+it.each([
+  'error: opencode v2.2.5',
+  'opencode v2.2.5\nstartup failed',
+  'opencode version unavailable'
+])('rejects unverified standalone OpenCode version output %j', async output => {
+  vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+  vi.stubEnv('PATH', '/standalone')
+  exec.files['/standalone/opencode'] = ''
+  exec.child = { stdout: new EventEmitter(), stderr: new EventEmitter() }
+  const pending = expect(opencodePluginHost.detect()).rejects.toThrow('package version could not be verified')
+  await vi.waitFor(() => expect(vi.mocked(execFile).mock.calls.some(call => String(call[0]).endsWith('opencode'))).toBe(true))
+  exec.callback(null, output, '')
+  await pending
 })
 
 it('detects Node.js on PATH rather than reporting the embedded Electron runtime', async () => {
