@@ -1,5 +1,4 @@
 import { EventEmitter } from 'node:events'
-import { execFile } from 'node:child_process'
 import { afterEach, expect, it, vi } from 'vitest'
 
 const exec = vi.hoisted(() => ({
@@ -62,7 +61,7 @@ it('checks the configured Pi executable and does not offer a missing launcher', 
   expect(isTerminalAgentAvailable('opencode')).toBe(true)
 })
 
-it('recognizes standalone OpenCode by its version command without npm metadata', async () => {
+function mockStandaloneOpenCode() {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
   vi.stubEnv('PATH', '/standalone')
   exec.files['/standalone/opencode'] = ''
