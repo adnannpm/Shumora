@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { assertTerminalAgent, TERMINAL_AGENT_LABELS, type TerminalAgent } from '../shared/terminal-agent'
 import { TerminalHistory } from './terminal-history'
 import type { AgentActivity, Session, SessionEvent, Snapshot } from '../shared/types'
 
@@ -13,20 +14,33 @@ export interface PtyProcess {
 interface Entry { session: Session; process?: PtyProcess; output: TerminalHistory; seq: number; subscriptions: Disposable[] }
 export class SessionManager {
   private entries = new Map<string, Entry>()
-  private count = 0
+  private count: Record<TerminalAgent, number> = { pi: 0, opencode: 0 }
   private closed = new Set<string>()
-  constructor(private spawn: (cwd: string, id: string, generation: number) => PtyProcess, private emit: (e: SessionEvent) => void, private historyLimit = 512_000) {}
+  constructor(private spawn: (cwd: string, id: string, generation: number, agent: TerminalAgent) => PtyProcess, private emit: (e: SessionEvent) => void, private historyLimit = 512_000) {}
   list(): Session[] { return [...this.entries.values()].map((e) => ({ ...e.session })) }
   private get(id: string): Entry {
     if (typeof id !== 'string' || !this.entries.has(id)) throw new Error('Unknown session')
     return this.entries.get(id)!
   }
   private publish(e: Entry) { this.emit({ type: 'state', session: { ...e.session } }) }
-  create(cwd: string, saved?: { id: string; name: string }): Session {
+  create(cwd: string, saved?: { id: string; name: string }, agent: TerminalAgent = 'pi'): Session {
     if (typeof cwd !== 'string' || !cwd) throw new Error('Invalid directory')
-    const name = `Pi ${++this.count}`
+    assertTerminalAgent(agent)
+    const name = `${TERMINAL_AGENT_LABELS[agent]} ${++this.count[agent]}`
     if (saved && this.entries.has(saved.id)) throw new Error('Duplicate session')
-    const e: Entry = { session: { id: saved?.id || randomUUID(), name: saved?.name || name, cwd, status: 'exited', generation: 0 }, output: new TerminalHistory(this.historyLimit), seq: 0, subscriptions: [] }
+    const e: Entry = {
+      session: {
+        id: saved?.id || randomUUID(),
+        name: saved?.name || name,
+        cwd,
+        agent,
+        status: 'exited',
+        generation: 0
+      },
+      output: new TerminalHistory(this.historyLimit),
+      seq: 0,
+      subscriptions: []
+    }
     this.entries.set(e.session.id, e)
     return this.start(e)
   }
@@ -35,7 +49,7 @@ export class SessionManager {
     e.output.clear(); e.seq = 0
     const generation = e.session.generation
     try {
-      const p = this.spawn(e.session.cwd, e.session.id, generation); e.process = p
+      const p = this.spawn(e.session.cwd, e.session.id, generation, e.session.agent); e.process = p
       e.subscriptions = [p.onData((data) => {
         if (e.session.generation !== generation || e.process !== p) return
         e.output.append(data)

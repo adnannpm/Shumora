@@ -1,29 +1,99 @@
 import { EventEmitter } from 'node:events'
 import { afterEach, expect, it, vi } from 'vitest'
 
-const exec = vi.hoisted(() => ({ callback: undefined as any, child: undefined as any, shim: false, responses: {} as Record<string, string>, files: {} as Record<string, string> }))
-vi.mock('node:child_process', () => ({ execFile: vi.fn((_file, _args, _options, callback) => { exec.callback = callback; const response = exec.responses[_args.join(' ')]; if (response !== undefined) queueMicrotask(() => callback(null, response, '')); else if (_args.includes('--version') && !String(_file).endsWith('opencode') && !String(_file).endsWith('/node')) queueMicrotask(() => callback(null, '1.0.0\n', '')); if (_args.includes('root')) queueMicrotask(() => callback(new Error('No global installation'), '', '')); return exec.child }) }))
+const exec = vi.hoisted(() => ({
+  callback: undefined as any,
+  child: undefined as any,
+  shim: false,
+  responses: {} as Record<string, string>,
+  files: {} as Record<string, string>
+}))
+
+vi.mock('node:child_process', () => ({
+  execFile: vi.fn((_file, _args, _options, callback) => {
+    exec.callback = callback
+    const response = exec.responses[_args.join(' ')]
+    if (response !== undefined) queueMicrotask(() => callback(null, response, ''))
+    else if (_args.includes('--version') && !String(_file).endsWith('opencode') && !String(_file).endsWith('/node')) {
+      queueMicrotask(() => callback(null, '1.0.0\n', ''))
+    }
+    if (_args.includes('root')) queueMicrotask(() => callback(new Error('No global installation'), '', ''))
+    return exec.child
+  })
+}))
+
 vi.mock('node:fs', () => ({
   accessSync: (file: string) => {
     if (file in exec.files) return
     const name = file.split(/[\\/]/).pop()
     if (exec.shim ? name !== 'npm.cmd' && name !== 'node.exe' : name !== 'npm' && name !== 'npm.exe') throw new Error('not found')
   },
-  constants: { F_OK: 0, X_OK: 1 }, existsSync: (file: string) => file in exec.files || exec.shim && /npm-cli\.js$/.test(file), readFileSync: (file: string) => { if (!(file in exec.files)) throw new Error('missing'); return exec.files[file] }, realpathSync: (file: string) => file
+  constants: { F_OK: 0, X_OK: 1 },
+  existsSync: (file: string) => file in exec.files || (exec.shim && /npm-cli\.js$/.test(file)),
+  readFileSync: (file: string) => {
+    if (!(file in exec.files)) throw new Error('missing')
+    return exec.files[file]
+  },
+  realpathSync: (file: string) => file
 }))
-import { pluginHost, piPluginHost, opencodePluginHost, detectNode, installTimeout } from '../src/main/plugin-host'
+import { pluginHost, piPluginHost, opencodePluginHost, detectNode, installTimeout, isTerminalAgentAvailable } from '../src/main/plugin-host'
 import { execFile } from 'node:child_process'
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); exec.shim = false; exec.responses = {}; exec.files = {}; vi.unstubAllEnvs() })
 
-it('recognizes standalone OpenCode by its version command without npm metadata', async () => {
+it('offers a runnable Pi installer wrapper without package-manager ownership checks', () => {
+  vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+  vi.stubEnv('PATH', '/home/alecto/.pi/agent/bin')
+  vi.stubEnv('PI_EXECUTABLE', '')
+  exec.files['/home/alecto/.pi/agent/bin/pi'] = '#!/bin/sh\n# managed release launcher'
+  expect(isTerminalAgentAvailable('pi')).toBe(true)
+  expect(isTerminalAgentAvailable('opencode')).toBe(false)
+  expect(execFile).not.toHaveBeenCalled()
+})
+
+it('checks the configured Pi executable and does not offer a missing launcher', () => {
+  vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+  vi.stubEnv('PATH', '/empty')
+  vi.stubEnv('PI_EXECUTABLE', '/custom/pi')
+  expect(isTerminalAgentAvailable('pi')).toBe(false)
+  exec.files['/custom/pi'] = ''
+  expect(isTerminalAgentAvailable('pi')).toBe(true)
+  exec.files['/empty/opencode'] = ''
+  expect(isTerminalAgentAvailable('opencode')).toBe(true)
+})
+
+function mockStandaloneOpenCode() {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
   vi.stubEnv('PATH', '/standalone')
   exec.files['/standalone/opencode'] = ''
   exec.child = { stdout: new EventEmitter(), stderr: new EventEmitter() }
+}
+
+const waitForOpenCodeCall = () =>
+  vi.waitFor(() => expect(vi.mocked(execFile).mock.calls.some(call => String(call[0]).endsWith('opencode'))).toBe(true))
+
+it.each([
+  ['1.18.34\n', '1.18.34'],
+  ['opencode v2.2.5\n', '2.2.5'],
+  ['opencode 2.2.5\r\n', '2.2.5'],
+  ['v2.2.5\n', '2.2.5']
+])('recognizes standalone OpenCode version output %j without npm metadata', async (output, version) => {
+  mockStandaloneOpenCode()
   const pending = opencodePluginHost.detect()
-  await vi.waitFor(() => expect(vi.mocked(execFile).mock.calls.some(call => String(call[0]).endsWith('opencode'))).toBe(true))
-  exec.callback(null, '1.18.34\n', '')
-  expect(await pending).toEqual({ installed: true, installedVersion: '1.18.34', executable: '/standalone/opencode', managed: false })
+  await waitForOpenCodeCall()
+  exec.callback(null, output, '')
+  expect(await pending).toEqual({ installed: true, installedVersion: version, executable: '/standalone/opencode', managed: false })
+})
+
+it.each([
+  'error: opencode v2.2.5',
+  'opencode v2.2.5\nstartup failed',
+  'opencode version unavailable'
+])('rejects unverified standalone OpenCode version output %j', async output => {
+  mockStandaloneOpenCode()
+  const pending = expect(opencodePluginHost.detect()).rejects.toThrow('package version could not be verified')
+  await waitForOpenCodeCall()
+  exec.callback(null, output, '')
+  await pending
 })
 
 it('detects Node.js on PATH rather than reporting the embedded Electron runtime', async () => {
@@ -54,18 +124,30 @@ it.each(['linux', 'darwin', 'win32'] as const)('streams stdout/stderr before com
   exec.callback(new Error('npm exited 1'), '', 'EACCES')
   await expect(pending).rejects.toThrow('EACCES')
 })
+
 it('detects the active release of the official Windows Pi installer', async () => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
   const bin = 'C:\\Users\\Alice Smith\\.pi\\agent\\bin'
+  const install = 'C:\\Users\\Alice Smith\\.pi\\agent\\install'
   vi.stubEnv('PI_EXECUTABLE', `${bin}\\pi.cmd`)
   exec.files = {
     [`${bin}\\pi.cmd`]: '',
     [`${bin}\\pi-launcher.js`]: '// versioned installer launcher',
-    ['C:\\Users\\Alice Smith\\.pi\\agent\\install\\current-version']: '1.4.0\r\n',
-    ['C:\\Users\\Alice Smith\\.pi\\agent\\install\\releases\\1.4.0\\node_modules\\@earendil-works\\pi-coding-agent\\package.json']: JSON.stringify({ name: '@earendil-works/pi-coding-agent', version: '1.4.0' })
+    [`${install}\\current-version`]: '1.4.0\r\n',
+    [`${install}\\releases\\1.4.0\\node_modules\\@earendil-works\\pi-coding-agent\\package.json`]: JSON.stringify({
+      name: '@earendil-works/pi-coding-agent',
+      version: '1.4.0'
+    })
   }
-  await expect(piPluginHost.detect()).resolves.toEqual({ installed: true, installedVersion: '1.4.0', executable: `${bin}\\pi.cmd`, managed: false, installationKind: 'pi-windows-installer' })
+  await expect(piPluginHost.detect()).resolves.toEqual({
+    installed: true,
+    installedVersion: '1.4.0',
+    executable: `${bin}\\pi.cmd`,
+    managed: false,
+    installationKind: 'pi-windows-installer'
+  })
 })
+
 it('runs Windows npm.cmd through node and npm-cli.js without a shell', async () => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
   exec.shim = true
@@ -80,12 +162,14 @@ it('runs Windows npm.cmd through node and npm-cli.js without a shell', async () 
   await pending
 })
 
-
 it('uses a generous bounded configurable install timeout', () => {
   expect(installTimeout({})).toBe(900_000)
   expect(installTimeout({ SHUMORA_INSTALL_TIMEOUT_MS: '1800000' })).toBe(1_800_000)
-  for (const value of ['0', '-1', 'NaN', '999999999', '1.5']) expect(installTimeout({ SHUMORA_INSTALL_TIMEOUT_MS: value })).toBe(900_000)
+  for (const value of ['0', '-1', 'NaN', '999999999', '1.5']) {
+    expect(installTimeout({ SHUMORA_INSTALL_TIMEOUT_MS: value })).toBe(900_000)
+  }
 })
+
 it.each([false, true])('verifies Bun global Pi independently of PATH and reports shadowing: %s', async conflict => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
   vi.stubEnv('PI_EXECUTABLE', '')
@@ -109,6 +193,12 @@ it.each([false, true])('verifies Bun global Pi independently of PATH and reports
   } else {
     await expect(piPluginHost.verify!('bun', '1.4.0')).resolves.toBeUndefined()
     expect(process.env.PATH).toContain(bin)
-    await expect(piPluginHost.detect()).resolves.toMatchObject({ installed: true, installedVersion: '1.4.0', executable: `${bin}\\pi.exe`, packageManager: 'bun', managed: true })
+    await expect(piPluginHost.detect()).resolves.toMatchObject({
+      installed: true,
+      installedVersion: '1.4.0',
+      executable: `${bin}\\pi.exe`,
+      packageManager: 'bun',
+      managed: true
+    })
   }
 })

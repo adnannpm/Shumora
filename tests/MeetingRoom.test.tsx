@@ -7,9 +7,9 @@ import { MeetingRoom } from '../src/renderer/src/MeetingRoom'
 import type { MeetingSnapshot } from '../src/shared/meetings'
 afterEach(() => { cleanup(); delete window.meetings })
 const sessions = [
-  { id: 'a', name: 'Design', cwd: '/work', status: 'running' as const, generation: 1 },
-  { id: 'b', name: 'Engineering', cwd: '/work', status: 'running' as const, generation: 1 },
-  { id: 'c', name: 'Old terminal', cwd: '/work', status: 'running' as const, generation: 1 }
+  { id: 'a', name: 'Design', cwd: '/work', agent: 'pi' as const, status: 'running' as const, generation: 1 },
+  { id: 'b', name: 'Engineering', cwd: '/work', agent: 'pi' as const, status: 'running' as const, generation: 1 },
+  { id: 'c', name: 'Old terminal', cwd: '/work', agent: 'pi' as const, status: 'running' as const, generation: 1 }
 ]
 function setup() {
   let snapshot: MeetingSnapshot = { agents: { a: 'ready', b: 'ready', c: 'disconnected' }, state: { revision: 1, phase: 'setup', agenda: '', participants: [], leader: 'user', messages: [], round: 0 } }

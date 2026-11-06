@@ -22,7 +22,7 @@ import { packageStatus, configuredPackageNames } from './package-status'
 import { checkLibraryUpdates } from './library-updates'
 import { fetchPackagePage } from './package-fetch'
 import { PluginService, piDefinition, opencodeDefinition, managerDefinitions } from './plugins'
-import { pluginHost, piPluginHost, routerHost, runPiPackage, opencodePluginHost, resolveOpenCodeLaunch, detectNode, managerPluginHosts } from './plugin-host'
+import { pluginHost, piPluginHost, routerHost, runPiPackage, opencodePluginHost, resolveOpenCodeLaunch, detectNode, managerPluginHosts, isTerminalAgentAvailable } from './plugin-host'
 import { routerLogin, routerLogout, routerAuthStatus } from './router-auth'
 import { routerQuota } from './router-quota'
 import { RouterCatalog } from './router-catalog'
@@ -30,6 +30,7 @@ import { RouterService } from './router-service'
 import { routerKeys, routerCreateKey } from './router-keys'
 import { routerHealth } from './router-health'
 import type { ManagerPluginId, PackageManager, PluginAction } from '../shared/plugins'
+import { assertTerminalAgent, TERMINAL_AGENT_LABELS, type TerminalAgent } from '../shared/terminal-agent'
 import type { GitPushOptions, GitAskPassResponse } from '../shared/types'
 import { GitService } from './git'
 import { AskPassService } from './askpass-service'
@@ -57,9 +58,10 @@ function flushFolders() {
   while (pendingFolders.length) {
     const target = pendingFolders.shift()!
     try {
-      if (packages.operation().status === 'running') throw new Error('Wait for the package operation to finish before opening a folder.')
+      const agent = terminalAgent!.active()
+      assertCanStartSession(agent)
       if (sessions.list().length >= 32) throw new Error('Workspace supports up to 32 sessions.')
-      const session = sessions.create(target)
+      const session = sessions.create(target, undefined, agent)
       window?.webContents.send('sessions:event', { type: 'opened', session })
     } catch (error) { void dialog.showMessageBox({ type: 'error', title: 'Open in Shumora', message: String(error) }) }
   }
@@ -90,9 +92,9 @@ function publishMeeting() {
   if (window && !window.isDestroyed()) window.webContents.send('meetings:change', meetingSnapshot())
 }
 let terminalAgent: TerminalAgentSettings | undefined
-const sessions = new SessionManager((cwd, id, generation) => {
+const sessions = new SessionManager((cwd, id, generation, agent) => {
   if (!statSync(cwd).isDirectory()) throw new Error('Working directory is not a folder')
-  const openCode = terminalAgent?.active() === 'opencode'
+  const openCode = agent === 'opencode'
   const launch = openCode ? resolveOpenCodeLaunch() : resolveLaunch(process.platform, process.env, process.env.PATH || process.env.Path || '')
   const env = Object.fromEntries(Object.entries(process.env).filter(([key, value]) => value !== undefined && key !== 'ELECTRON_RUN_AS_NODE')) as Record<string, string>
   if (openCode) return pty.spawn(launch.file, launch.args, { name: 'xterm-256color', cols: 100, rows: 30, cwd, env: { ...env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } })
@@ -111,12 +113,44 @@ const sessions = new SessionManager((cwd, id, generation) => {
 })
 
 let updates: UpdateManager
-const packages = new PackageService(fetchPackagePage, runPiPackage, () => {}, operation => {
-  if (window && !window.isDestroyed()) window.webContents.send('packages:operation', operation)
-}, packageStatus, sessions)
+const packages = new PackageService(
+  fetchPackagePage,
+  runPiPackage,
+  () => {
+    if (piPlugin?.operation().status === 'running') {
+      throw new Error('Wait for the Pi installation operation to finish.')
+    }
+  },
+  operation => {
+    if (window && !window.isDestroyed()) window.webContents.send('packages:operation', operation)
+  },
+  packageStatus,
+  sessions
+)
 let plugins: PluginService
 let piPlugin: PluginService<'pi'>
 let opencodePlugin: PluginService<'opencode'>
+
+function assertCanStartSession(agent: TerminalAgent) {
+  assertTerminalAgent(agent)
+  if (agent === 'pi' && packages.operation().status === 'running') {
+    throw new Error('Wait for the package operation to finish before starting sessions.')
+  }
+  const runtime = agent === 'pi' ? piPlugin : opencodePlugin
+  if (runtime?.operation().status === 'running') {
+    throw new Error('Wait for the runtime installation operation to finish before starting sessions.')
+  }
+}
+
+function assertCanMutateRuntime(agent: TerminalAgent) {
+  if (agent === 'pi' && packages.operation().status === 'running') {
+    throw new Error('Wait for the Pi package operation to finish.')
+  }
+  const hasRunningSession = sessions.list().some(s => s.agent === agent && s.status === 'running')
+  if (hasRunningSession) {
+    throw new Error(`Stop running ${TERMINAL_AGENT_LABELS[agent]} sessions before changing ${TERMINAL_AGENT_LABELS[agent]}.`)
+  }
+}
 const managerPlugins = new Map<ManagerPluginId, PluginService<ManagerPluginId>>()
 function managerPlugin(id: unknown) {
   const service = managerPlugins.get(id as ManagerPluginId)
@@ -234,12 +268,13 @@ function registerIPC() {
       setImmediate(flushFolders)
       return sessions.list()
     },
-    'sessions:create': (cwd?: string) => {
-      if (packages.operation().status === 'running') throw new Error('Wait for the package operation to finish before starting sessions.')
+    'sessions:create': (cwd?: string, requestedAgent?: TerminalAgent) => {
+      const agent = requestedAgent ?? terminalAgent!.active()
+      assertCanStartSession(agent)
       if (sessions.list().length >= 32) throw new Error('MVP supports up to 32 sessions per workspace')
-      const target = cwd === undefined ? folder : cwd
+      const target = cwd ?? folder
       if (typeof target !== 'string' || !statSync(target).isDirectory()) throw new Error('Working directory is not a folder')
-      return sessions.create(target)
+      return sessions.create(target, undefined, agent)
     },
     'sessions:snapshot': (id: string) => sessions.snapshot(id),
     'sessions:input': (id: string, data: string) => sessions.input(id, data),
@@ -251,7 +286,7 @@ function registerIPC() {
     },
     'sessions:stop': (id: string) => sessions.stop(id),
     'sessions:restart': (id: string) => {
-      if (packages.operation().status === 'running') throw new Error('Wait for the package operation to finish before starting sessions.')
+      assertCanStartSession(sessions.snapshot(id).session.agent)
       return sessions.restart(id)
     },
     'git:status': (id: string) => git.status(sessionCwd(id)),
@@ -351,18 +386,28 @@ if (primaryInstance) app.whenReady().then(async () => {
   })
   await askPass.start()
   database = openDatabase(app.getPath('userData'))
-  terminalAgent = new TerminalAgentSettings(database, async agent => {
-    try { return (await (agent === 'pi' ? piPluginHost : opencodePluginHost).detect()).installed } catch { return false }
-  })
+  terminalAgent = new TerminalAgentSettings(database, async agent => isTerminalAgentAvailable(agent))
   plugins = new PluginService(database, pluginHost, operation => {
     if (window && !window.isDestroyed()) window.webContents.send('plugins:operation', operation)
   })
-  piPlugin = new PluginService(database, piPluginHost, operation => {
-    if (window && !window.isDestroyed()) window.webContents.send('pi-plugin:operation', operation)
-  }, piDefinition, () => { if (terminalAgent?.active() === 'pi' && sessions.list().some(s => s.status === 'running')) throw new Error('Stop all running Workspace sessions before changing Pi.') })
-  opencodePlugin = new PluginService(database, opencodePluginHost, operation => {
-    if (window && !window.isDestroyed()) window.webContents.send('opencode-plugin:operation', operation)
-  }, opencodeDefinition, () => { if (terminalAgent?.active() === 'opencode' && sessions.list().some(s => s.status === 'running')) throw new Error('Stop all running Workspace sessions before changing OpenCode.') })
+  piPlugin = new PluginService(
+    database,
+    piPluginHost,
+    operation => {
+      if (window && !window.isDestroyed()) window.webContents.send('pi-plugin:operation', operation)
+    },
+    piDefinition,
+    () => assertCanMutateRuntime('pi')
+  )
+  opencodePlugin = new PluginService(
+    database,
+    opencodePluginHost,
+    operation => {
+      if (window && !window.isDestroyed()) window.webContents.send('opencode-plugin:operation', operation)
+    },
+    opencodeDefinition,
+    () => assertCanMutateRuntime('opencode')
+  )
   for (const id of ['pnpm', 'bun', 'yarn'] as const) {
     managerPlugins.set(id, new PluginService<ManagerPluginId>(database, managerPluginHosts[id], operation => {
       if (window && !window.isDestroyed()) window.webContents.send(`manager-plugin:${id}:operation`, operation)
@@ -382,17 +427,36 @@ if (primaryInstance) app.whenReady().then(async () => {
   const requestedFolder = openFolderArgument(process.argv)
   folder = requestedFolder || folder
   terminalStatePath = join(app.getPath('userData'), 'workspace-terminals.json')
-  const savedTerminals = loadTerminals(terminalStatePath)
+  let savedTerminals: ReturnType<typeof loadTerminals>
+  try {
+    savedTerminals = loadTerminals(terminalStatePath)
+  } catch (error) {
+    terminalStatePath = undefined
+    dialog.showErrorBox('Could not restore workspace', `${String(error)}. The saved workspace was not changed.`)
+    app.quit()
+    return
+  }
+
+  const defaultAgent = terminalAgent.active()
   restoringTerminals = true
   try {
     if (savedTerminals !== null) {
-      for (const terminal of savedTerminals) sessions.create(terminal.cwd, terminal)
-    } else if (!requestedFolder) sessions.create(folder)
-    if (requestedFolder) {
-      if (sessions.list().length < 32) sessions.create(requestedFolder)
-      else console.warn('Workspace is full; cannot open the requested folder.')
+      for (const terminal of savedTerminals) {
+        sessions.create(terminal.cwd, terminal, terminal.agent ?? defaultAgent)
+      }
+    } else if (!requestedFolder) {
+      sessions.create(folder, undefined, defaultAgent)
     }
-  } finally { restoringTerminals = false }
+    if (requestedFolder) {
+      if (sessions.list().length < 32) {
+        sessions.create(requestedFolder, undefined, defaultAgent)
+      } else {
+        console.warn('Workspace is full; cannot open the requested folder.')
+      }
+    }
+  } finally {
+    restoringTerminals = false
+  }
   try { terminalStateWriter.save(terminalStatePath, sessions.list()) } catch (error) { console.error('Could not save workspace terminals', error) }
   createWindow()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
