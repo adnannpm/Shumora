@@ -12,18 +12,72 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 function setup(count = 1, approved = true) {
-  let sessions: Session[] = Array.from({ length: count }, (_, i) => ({ id: String(i + 1), name: `Pi ${i + 1}`, cwd: '/tmp', status: 'running', generation: 1 }))
+  let sessions: Session[] = Array.from({ length: count }, (_, i) => ({
+    id: String(i + 1),
+    name: `Pi ${i + 1}`,
+    cwd: '/tmp',
+    agent: 'pi',
+    status: 'running',
+    generation: 1
+  }))
   let counter = count
   const api: WorkspaceAPI = {
     gitStatus: vi.fn(async () => ({ isRepo: false, changes: [] })),
-    gitDiff: vi.fn(), gitStage: vi.fn(), gitUnstage: vi.fn(), gitStageAll: vi.fn(), gitUnstageAll: vi.fn(), gitDiscard: vi.fn(), gitCommit: vi.fn(), gitPush: vi.fn(), gitPushInfo: vi.fn(async () => ({ branch: 'main', hasUpstream: true, ahead: 0, behind: 0, commits: [] })), gitCommitModels: vi.fn(), gitGenerateMessage: vi.fn(), gitBranches: vi.fn(), gitSwitch: vi.fn(),
-    list: vi.fn(async () => sessions), create: vi.fn(async (cwd = '/tmp') => { const n = ++counter; const s: Session = { id: String(n), name: `Pi ${n}`, cwd, status: 'running', generation: 1 }; sessions = [...sessions, s]; return s }),
-    rename: vi.fn(async (id, name) => { const session = { ...sessions.find(s => s.id === id)!, name }; sessions = sessions.map(s => s.id === id ? session : s); return session }),
-    close: vi.fn(async () => approved), folder: async () => '/tmp', chooseFolder: vi.fn(async () => '/project'), onEvent: vi.fn(() => () => {}), snapshot: vi.fn(), input: vi.fn(), resize: vi.fn(), stop: vi.fn(), restart: vi.fn()
+    gitDiff: vi.fn(),
+    gitStage: vi.fn(),
+    gitUnstage: vi.fn(),
+    gitStageAll: vi.fn(),
+    gitUnstageAll: vi.fn(),
+    gitDiscard: vi.fn(),
+    gitCommit: vi.fn(),
+    gitPush: vi.fn(),
+    gitPushInfo: vi.fn(async () => ({ branch: 'main', hasUpstream: true, ahead: 0, behind: 0, commits: [] })),
+    gitCommitModels: vi.fn(),
+    gitGenerateMessage: vi.fn(),
+    gitBranches: vi.fn(),
+    gitSwitch: vi.fn(),
+    list: vi.fn(async () => sessions),
+    create: vi.fn(async (cwd = '/tmp', agent: Session['agent'] = 'pi') => {
+      const n = ++counter
+      const s: Session = {
+        id: String(n),
+        name: `${agent === 'pi' ? 'Pi' : 'OpenCode'} ${n}`,
+        cwd,
+        agent,
+        status: 'running',
+        generation: 1
+      }
+      sessions = [...sessions, s]
+      return s
+    }),
+    rename: vi.fn(async (id, name) => {
+      const session = { ...sessions.find(s => s.id === id)!, name }
+      sessions = sessions.map(s => (s.id === id ? session : s))
+      return session
+    }),
+    close: vi.fn(async () => approved),
+    folder: async () => '/tmp',
+    chooseFolder: vi.fn(async () => '/project'),
+    onEvent: vi.fn(() => () => {}),
+    snapshot: vi.fn(),
+    input: vi.fn(),
+    resize: vi.fn(),
+    stop: vi.fn(),
+    restart: vi.fn()
+  }
+  window.terminalAgent = {
+    status: vi.fn(async () => ({ active: 'opencode' as const, canChange: true, installed: { pi: true, opencode: true } })),
+    select: vi.fn()
   }
   window.piPlugin = { status: async () => ({ installed: true }) } as any
   window.plugins = { status: async () => ({ id: '9router', installed: true }) } as any
-  window.workspace = api; render(<Provider><App /></Provider>); return api
+  window.workspace = api
+  render(
+    <Provider>
+      <App />
+    </Provider>
+  )
+  return api
 }
 it('checks on startup and opens About & Updates from the in-app update notification without stopping sessions', async () => {
   let listener = (_: import('../src/shared/updates').UpdateState) => {}
@@ -54,15 +108,130 @@ it('creates sessions directly without a setup modal when Pi is installed', async
   fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
   await screen.findByRole('tab', { name: 'Pi 2' })
   expect(api.create).toHaveBeenCalledTimes(1)
+  expect(api.create).toHaveBeenCalledWith('/tmp', 'pi')
+  expect(window.terminalAgent!.select).not.toHaveBeenCalled()
   expect(screen.queryByRole('heading', { name: 'Set up your Terminals' })).toBeNull()
 })
 
+function flushAnimationFrames() {
+  return act(async () => {
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+  })
+}
+
+async function selectMenuItem(item: HTMLElement) {
+  fireEvent.pointerDown(item, { pointerType: 'mouse', button: 0 })
+  await waitFor(() => expect(item.hasAttribute('data-highlighted')).toBe(true))
+  fireEvent.pointerUp(item, { pointerType: 'mouse', button: 0 })
+  fireEvent.click(item)
+}
+
+it('opens only Pi and OpenCode and creates in the clicked group folder without changing Settings', async () => {
+  const api = setup()
+  await screen.findByRole('tab', { name: 'Pi 1' })
+  fireEvent.click(screen.getByRole('button', { name: 'New terminal in folder…' }))
+  await screen.findByRole('tab', { name: 'Pi 2' })
+  fireEvent.click(screen.getByRole('button', { name: 'Split right' }))
+  fireEvent.click(screen.getByRole('tab', { name: 'Pi 1' }))
+
+  const trigger = screen.getByRole('button', { name: 'New session options in group 2' })
+  fireEvent.click(trigger)
+  const code = await screen.findByRole('menuitem', { name: 'OpenCode' })
+  await waitFor(() => expect(code.hasAttribute('data-disabled')).toBe(false))
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Pi', 'OpenCode'])
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('menu')))
+
+  await selectMenuItem(code)
+  await waitFor(() => expect(api.create).toHaveBeenLastCalledWith('/project', 'opencode'))
+
+  const tab = await screen.findByRole('tab', { name: 'OpenCode 3' })
+  expect(tab.closest('[role="tablist"]')).toBe(screen.getByRole('tablist', { name: 'Session group 2' }))
+
+  // The clicked group's active tab, not global focus or Settings, decides the program.
+  fireEvent.click(screen.getByRole('tab', { name: 'Pi 1' }))
+  fireEvent.click(screen.getByRole('button', { name: 'New session in group 2' }))
+  const nextCode = await screen.findByRole('tab', { name: 'OpenCode 4' })
+  expect(api.create).toHaveBeenLastCalledWith('/project', 'opencode')
+  expect(nextCode.closest('[role="tablist"]')).toBe(screen.getByRole('tablist', { name: 'Session group 2' }))
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Pi 2' }))
+  fireEvent.click(screen.getByRole('button', { name: 'New session in group 2' }))
+  await screen.findByRole('tab', { name: 'Pi 5' })
+  expect(api.create).toHaveBeenLastCalledWith('/project', 'pi')
+  expect(window.terminalAgent!.select).not.toHaveBeenCalled()
+  expect(api.stop).not.toHaveBeenCalled()
+  expect(api.restart).not.toHaveBeenCalled()
+})
+
+it('switches directly between group launchers without a late dismissal closing the new menu', async () => {
+  setup(2)
+  await screen.findByRole('tab', { name: 'Pi 2' })
+  fireEvent.click(screen.getByRole('button', { name: 'Split right' }))
+
+  const first = screen.getByRole('button', { name: 'New session options in group 1' })
+  const second = screen.getByRole('button', { name: 'New session options in group 2' })
+
+  fireEvent.click(first)
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('menu')))
+  await flushAnimationFrames()
+
+  fireEvent.pointerDown(second, { button: 0 })
+  fireEvent.pointerUp(second, { button: 0 })
+  fireEvent.click(second)
+  await flushAnimationFrames()
+
+  await waitFor(() => expect(second.getAttribute('aria-expanded')).toBe('true'))
+  await waitFor(() => expect(first.getAttribute('aria-expanded')).toBe('false'))
+  expect(screen.getByRole('menu')).toBeTruthy()
+})
+it('refreshes installation status on opening and supports keyboard dismissal with focus return', async () => {
+  setup()
+  await screen.findByRole('tab', { name: 'Pi 1' })
+  const status = vi.mocked(window.terminalAgent!.status)
+  status.mockResolvedValue({ active: 'pi', canChange: true, installed: { pi: true, opencode: false } })
+  const trigger = screen.getByRole('button', { name: 'New session options in group 1' })
+  fireEvent.click(trigger)
+  const code = await screen.findByRole('menuitem', { name: 'OpenCode' })
+  await waitFor(() => expect(status).toHaveBeenCalledTimes(2))
+  await waitFor(() => expect(code.getAttribute('data-disabled')).not.toBeNull())
+  expect(code.getAttribute('data-disabled')).not.toBeNull()
+  expect(screen.getByTestId('1').getAttribute('data-focused')).toBe('false')
+  fireEvent.keyDown(code, { key: 'Escape' })
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+  await waitFor(() => expect(document.activeElement).toBe(trigger))
+  status.mockResolvedValue({ active: 'pi', canChange: true, installed: { pi: true, opencode: true } })
+  fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+  const enabledCode = await screen.findByRole('menuitem', { name: 'OpenCode' })
+  await waitFor(() => expect(enabledCode.hasAttribute('data-disabled')).toBe(false))
+  expect(status).toHaveBeenCalledTimes(3)
+  fireEvent.keyDown(enabledCode, { key: 'Escape' })
+})
+it('keeps the last installation result clickable during a slow menu refresh', async () => {
+  const api = setup()
+  await screen.findByRole('tab', { name: 'Pi 1' })
+  const status = vi.mocked(window.terminalAgent!.status)
+  await waitFor(() => expect(status).toHaveBeenCalledTimes(1))
+  let finish!: (value: Awaited<ReturnType<typeof status>>) => void
+  status.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  const trigger = screen.getByRole('button', { name: 'New session options in group 1' })
+  fireEvent.click(trigger)
+  const pi = await screen.findByRole('menuitem', { name: 'Pi' })
+  expect(pi.hasAttribute('data-disabled')).toBe(false)
+  expect(screen.getByRole('menuitem', { name: 'OpenCode' }).hasAttribute('data-disabled')).toBe(false)
+  await act(async () => { finish({ active: 'pi', canChange: true, installed: { pi: true, opencode: false } }) })
+  await waitFor(() => expect(screen.getByRole('menuitem', { name: 'OpenCode' }).hasAttribute('data-disabled')).toBe(true))
+  fireEvent.pointerDown(pi, { button: 0 })
+  await waitFor(() => expect(pi.hasAttribute('data-highlighted')).toBe(true))
+  fireEvent.click(pi)
+  await screen.findByRole('tab', { name: 'Pi 2' })
+  expect(api.create).toHaveBeenLastCalledWith('/tmp', 'pi')
+})
 it('focuses an Explorer-opened terminal and switches back from Settings', async () => {
   const api = setup()
   await screen.findByRole('tab', { name: 'Pi 1' })
   fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
   const listener = vi.mocked(api.onEvent).mock.calls[0][0]
-  act(() => listener({ type: 'opened', session: { id: 'explorer', name: 'Pi 2', cwd: 'C:\\Projects', status: 'running', generation: 1 } }))
+  act(() => listener({ type: 'opened', session: { id: 'explorer', name: 'Pi 2', cwd: 'C:\\Projects', agent: 'pi', status: 'running', generation: 1 } }))
   expect((await screen.findByRole('tab', { name: 'Pi 2' })).getAttribute('aria-selected')).toBe('true')
   expect(screen.getByTestId('explorer').getAttribute('data-visible')).toBe('true')
   expect(api.create).not.toHaveBeenCalled()
@@ -257,7 +426,7 @@ it('shows a text-free spinner immediately while creating a session', async () =>
   vi.mocked(api.create).mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
   fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
   await waitFor(() => expect(screen.getByLabelText('Loading terminal', { selector: '[role="progressbar"]', exact: true }).textContent).toBe(''))
-  await act(async () => complete({ id: 'new', name: 'New terminal', cwd: '/tmp', status: 'running', generation: 1 }))
+  await act(async () => complete({ id: 'new', name: 'New terminal', cwd: '/tmp', agent: 'pi', status: 'running', generation: 1 }))
   await screen.findByRole('tab', { name: 'New terminal' })
   expect(screen.queryByRole('progressbar')).toBeNull()
 })
@@ -317,7 +486,7 @@ it('cancels rename with Escape, ignores blanks and saves on blur', async () => {
 it('keeps folders per session and inherits the active session folder', async () => {
   const api = setup()
   await screen.findByRole('tab', { name: 'Pi 1' })
-  expect(screen.queryByRole('button', { name: 'New session options in group 1' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'New session options in group 1' })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'New terminal in folder…' }))
   await screen.findByRole('tab', { name: 'Pi 2' })
   expect(api.chooseFolder).toHaveBeenCalledWith('/tmp')
@@ -325,12 +494,12 @@ it('keeps folders per session and inherits the active session folder', async () 
   expect(screen.getByTitle('/project')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
   await screen.findByRole('tab', { name: 'Pi 3' })
-  expect(api.create).toHaveBeenLastCalledWith('/project')
+  expect(api.create).toHaveBeenLastCalledWith('/project', 'pi')
   fireEvent.click(screen.getByRole('tab', { name: 'Pi 1' }))
   expect(screen.getByTitle('/tmp')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'New session in group 1' }))
   await screen.findByRole('tab', { name: 'Pi 4' })
-  expect(api.create).toHaveBeenLastCalledWith('/tmp')
+  expect(api.create).toHaveBeenLastCalledWith('/tmp', 'pi')
   expect(api.restart).not.toHaveBeenCalled(); expect(api.stop).not.toHaveBeenCalled()
 })
 it('does not create a session when folder selection is cancelled', async () => {

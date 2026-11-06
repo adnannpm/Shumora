@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { SessionManager, type PtyProcess } from '../src/main/sessions'
 
 function fixture(fail = false) {
@@ -14,6 +14,23 @@ function fixture(fail = false) {
 }
 
 describe('SessionManager', () => {
+  it('retains explicit program, custom name and folder across restart without fallback', () => {
+    const spawn = vi.fn((_cwd, _id, _generation, agent) => {
+      if (agent === 'opencode') throw new Error('OpenCode missing')
+      return { onData: () => ({ dispose() {} }), onExit: () => ({ dispose() {} }), write() {}, resize() {}, kill() {} }
+    })
+    const manager = new SessionManager(spawn, () => {})
+    expect(manager.create('/pi').name).toBe('Pi 1')
+    const openCode = manager.create('/code', undefined, 'opencode')
+    expect(openCode).toMatchObject({ name: 'OpenCode 1', agent: 'opencode', status: 'error', error: 'OpenCode missing' })
+    manager.rename(openCode.id, 'Backend')
+    expect(manager.restart(openCode.id)).toMatchObject({ name: 'Backend', cwd: '/code', agent: 'opencode', status: 'error' })
+    expect(spawn.mock.calls.map(call => call[3])).toEqual(['pi', 'opencode', 'opencode'])
+    expect(manager.create('/pi').name).toBe('Pi 2')
+    expect(() => manager.create('/bad', undefined, 'bad' as any)).toThrow('Invalid terminal agent')
+    expect(() => manager.create('/bad', undefined, null as any)).toThrow('Invalid terminal agent')
+    expect(manager.list()).toHaveLength(3)
+  })
   it('creates independent sessions and routes input/output only to their owner', () => {
     const { manager: m, processes: p } = fixture()
     const a = m.create('/tmp'), b = m.create('/tmp')
