@@ -11,9 +11,30 @@ vi.mock('node:fs', () => ({
   },
   constants: { F_OK: 0, X_OK: 1 }, existsSync: (file: string) => file in exec.files || exec.shim && /npm-cli\.js$/.test(file), readFileSync: (file: string) => { if (!(file in exec.files)) throw new Error('missing'); return exec.files[file] }, realpathSync: (file: string) => file
 }))
-import { pluginHost, piPluginHost, opencodePluginHost, detectNode, installTimeout } from '../src/main/plugin-host'
+import { pluginHost, piPluginHost, opencodePluginHost, detectNode, installTimeout, isTerminalAgentAvailable } from '../src/main/plugin-host'
 import { execFile } from 'node:child_process'
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); exec.shim = false; exec.responses = {}; exec.files = {}; vi.unstubAllEnvs() })
+
+it('offers a runnable Pi installer wrapper without package-manager ownership checks', () => {
+  vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+  vi.stubEnv('PATH', '/home/alecto/.pi/agent/bin')
+  vi.stubEnv('PI_EXECUTABLE', '')
+  exec.files['/home/alecto/.pi/agent/bin/pi'] = '#!/bin/sh\n# managed release launcher'
+  expect(isTerminalAgentAvailable('pi')).toBe(true)
+  expect(isTerminalAgentAvailable('opencode')).toBe(false)
+  expect(execFile).not.toHaveBeenCalled()
+})
+
+it('checks the configured Pi executable and does not offer a missing launcher', () => {
+  vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+  vi.stubEnv('PATH', '/empty')
+  vi.stubEnv('PI_EXECUTABLE', '/custom/pi')
+  expect(isTerminalAgentAvailable('pi')).toBe(false)
+  exec.files['/custom/pi'] = ''
+  expect(isTerminalAgentAvailable('pi')).toBe(true)
+  exec.files['/empty/opencode'] = ''
+  expect(isTerminalAgentAvailable('opencode')).toBe(true)
+})
 
 it('recognizes standalone OpenCode by its version command without npm metadata', async () => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')

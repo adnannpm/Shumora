@@ -2,6 +2,7 @@ import { accessSync, constants, existsSync, readFileSync, realpathSync } from 'n
 import path from 'node:path'
 import { spawn, type ChildProcess, execFile } from 'node:child_process'
 import type { PluginHost } from './plugins'
+import type { TerminalAgent } from '../shared/terminal-agent'
 import type { ManagerPluginId, PackageManager } from '../shared/plugins'
 import { packageManagerNames, managerRootArgs } from './package-managers'
 import type { RouterHost } from './router-service'
@@ -19,6 +20,20 @@ function executable(name: string): string | undefined {
   const names = process.platform === 'win32' ? [`${name}.exe`, `${name}.cmd`, name] : [name]
   return dirs.flatMap(dir => names.map(n => paths.join(dir, n))).find(file => { try { accessSync(file, process.platform === 'win32' ? constants.F_OK : constants.X_OK); return true } catch { return false } })
 }
+// Launch availability is independent of package-manager ownership. In particular,
+// the official Pi shell wrapper can run even when npm cannot manage its release.
+export function isTerminalAgentAvailable(agent: TerminalAgent): boolean {
+  try {
+    const launch = agent === 'pi'
+      ? resolveLaunch(process.platform, process.env, process.env.PATH || process.env.Path || '', existsSync, () => '')
+      : resolveOpenCodeLaunch()
+    accessSync(launch.file, process.platform === 'win32' ? constants.F_OK : constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function installTimeout(env: NodeJS.ProcessEnv = process.env): number {
   const value = Number(env.SHUMORA_INSTALL_TIMEOUT_MS)
   return Number.isSafeInteger(value) && value >= 120_000 && value <= 3_600_000 ? value : 900_000

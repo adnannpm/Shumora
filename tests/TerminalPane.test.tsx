@@ -38,7 +38,7 @@ import { Provider } from '../src/renderer/src/Provider'
 afterEach(() => { cleanup(); terminals.length = 0; imageAddons.length = 0; fitting.run = () => {}; vi.restoreAllMocks(); vi.unstubAllGlobals() })
 it.each(['[pi-9router-ext] Press any key to continue', 'Continue? [y/n]', '\r\nPi ready'])('removes the text-free spinner on initial output: %s', async output => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
-  const session: Session = { id: 'one', name: 'Pi 1', cwd: '/tmp', status: 'running', generation: 1 }
+  const session: Session = { id: 'one', name: 'Pi 1', cwd: '/tmp', agent: 'pi', status: 'running', generation: 1 }
   let listener: (event: any) => void = () => {}
   window.workspace = { snapshot: async () => ({ session, output: '', seq: 0 }), onEvent: (callback: typeof listener) => { listener = callback; return () => {} } } as any
   render(<Provider><TerminalPane session={session} visible={true} focused={false} onFocus={() => {}} /></Provider>)
@@ -49,7 +49,7 @@ it.each(['[pi-9router-ext] Press any key to continue', 'Continue? [y/n]', '\r\nP
 })
 it('does not show loading over restored output or an exited session', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
-  const session: Session = { id: 'one', name: 'Pi 1', cwd: '/tmp', status: 'running', generation: 1 }
+  const session: Session = { id: 'one', name: 'Pi 1', cwd: '/tmp', agent: 'pi', status: 'running', generation: 1 }
   window.workspace = { snapshot: async () => ({ session, output: 'Press any key to continue', seq: 1 }), onEvent: () => () => {} } as any
   const view = render(<Provider><TerminalPane session={session} visible={false} focused={false} onFocus={() => {}} /></Provider>)
   await waitFor(() => expect(screen.queryByRole('progressbar')).toBeNull())
@@ -58,7 +58,7 @@ it('does not show loading over restored output or an exited session', async () =
 })
 it('blocks input for stopped/failed sessions without recreating the terminal, and enables it after restart', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
-  const session: Session = { id: 'one', name: 'Pi 1', cwd: '/tmp', status: 'running', generation: 1 }
+  const session: Session = { id: 'one', name: 'Pi 1', cwd: '/tmp', agent: 'pi', status: 'running', generation: 1 }
   const input = vi.fn(async () => {})
   window.workspace = { input, snapshot: async () => ({ session, output: '', seq: 0 }), onEvent: () => () => {} } as any
   const props = { visible: false, focused: false, onFocus() {} }
@@ -95,7 +95,7 @@ it.each([true, false])('preserves bottom-follow intent on split resize (at botto
   })
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
-  const session: Session = { id: 'one', name: 'Pi 1', cwd: '/tmp', status: 'running', generation: 1 }
+  const session: Session = { id: 'one', name: 'Pi 1', cwd: '/tmp', agent: 'pi', status: 'running', generation: 1 }
   const resizePty = vi.fn(async () => {})
   window.workspace = { resize: resizePty, snapshot: async () => ({ session, output: 'long chat history', seq: 1 }), onEvent: () => () => {} } as any
   render(<Provider><TerminalPane session={session} visible={false} focused={false} onFocus={() => {}} /></Provider>)

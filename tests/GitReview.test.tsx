@@ -15,7 +15,7 @@ it('pairs removed and added lines side by side with line numbers', () => {
 })
 
 it('finds other running sessions inside the same repository', () => {
-  const s = (id: string, cwd: string, status: Session['status'] = 'running'): Session => ({ id, name: id, cwd, status, generation: 1 })
+  const s = (id: string, cwd: string, status: Session['status'] = 'running'): Session => ({ id, name: id, cwd, agent: 'pi', status, generation: 1 })
   const list = [s('self', '/repo'), s('sub', '/repo/pkg'), s('other', '/repo-two'), s('stopped', '/repo', 'exited')]
   expect(sessionsInRepo(list, '/repo', 'self').map((x) => x.id)).toEqual(['sub'])
 })
@@ -168,7 +168,7 @@ it('pushes commits to the remote with branch selection and commit details', asyn
 it('switches branches and warns about running sessions and uncommitted work', async () => {
   const mock = api([{ path: 'a.ts', status: 'modified', worktreeStatus: 'modified', staged: false, unstaged: true }])
   window.workspace = mock as any
-  const sessions: Session[] = [{ id: 'one', name: 'Pi 1', cwd: '/repo', status: 'running', generation: 1 }]
+  const sessions: Session[] = [{ id: 'one', name: 'Pi 1', cwd: '/repo', agent: 'pi', status: 'running', generation: 1 }]
   mock.gitStatus.mockResolvedValue({ isRepo: true, root: '/repo', branch: 'main', changes: (await mock.gitStatus()).changes } as any)
   render(<Provider><GitReviewButton sessionId="one" visible sessions={sessions} /></Provider>)
   fireEvent.click(await screen.findByTitle('Switch branch'))

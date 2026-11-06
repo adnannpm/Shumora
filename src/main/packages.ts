@@ -102,7 +102,7 @@ export class PackageService {
       if (action === 'install' && current?.configured) throw new Error('Package is already configured. Use Update or Repair.')
       if (action !== 'install' && !current?.configured) throw new Error('Package is not configured in personal Pi settings')
       const args = action === 'uninstall' ? ['remove', current!.source!] : ['install', `npm:${name}@${version}`]
-      const active = this.sessions?.list().filter(session => session.status === 'running') || []
+      const active = this.sessions?.list().filter(session => session.agent === 'pi' && session.status === 'running') || []
       if (active.length) this.log(`[Shumora] Stopping ${active.length} Workspace session(s)…\n`)
       for (const session of active) this.sessions!.stop(session.id)
       this.log(`$ pi ${args.join(' ')}\n`)

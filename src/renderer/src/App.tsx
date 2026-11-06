@@ -1,7 +1,8 @@
 import { useLanguage } from './Language'
 import { lazy, Suspense, useEffect, useReducer, useRef, useState, type CSSProperties } from 'react'
-import { Button, Dialog, Portal } from '@chakra-ui/react'
+import { Button, Dialog, Menu, Portal } from '@chakra-ui/react'
 import type { Session } from '../../shared/types'
+import { TERMINAL_AGENTS, TERMINAL_AGENT_LABELS, type TerminalAgent, type TerminalAgentState } from '../../shared/terminal-agent'
 import { TerminalPane } from './TerminalPane'
 import { GitReviewButton } from './GitReview'
 import { Sidebar, type Page } from './Sidebar'
@@ -64,6 +65,26 @@ export default function App() {
   const [closeTarget, setCloseTarget] = useState<Session | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
   const [tabMenu, setTabMenu] = useState<{ id: string; group: number; x: number; y: number } | null>(null)
+  const [launcherGroup, setLauncherGroup] = useState<number | null>(null)
+  const [launcherStatus, setLauncherStatus] = useState<TerminalAgentState | null>(null)
+  useEffect(() => {
+    if (launcherGroup === null && launcherStatus !== null) return
+    let alive = true
+    void window.terminalAgent
+      ?.status()
+      .then(status => {
+        if (alive) setLauncherStatus(status)
+      })
+      .catch(e => {
+        if (alive) setError(String(e))
+      })
+    return () => {
+      alive = false
+    }
+  }, [launcherGroup])
+  useEffect(() => {
+    setLauncherGroup(null)
+  }, [page, layout.tree])
   const tabMenuElement = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!tabMenu) return
@@ -187,25 +208,53 @@ export default function App() {
     return () => { disposed = true; unsubscribe() }
   }, [])
   const activeSession = sessions.find(s => s.id === layout.groups[layout.focused]?.active)
+  function groupActiveSession(group: number) {
+    return sessions.find(s => s.id === layout.groups[group]?.active)
+  }
   function groupFolder(group: number) {
-    return sessions.find(s => s.id === layout.groups[group]?.active)?.cwd || folder
+    return groupActiveSession(group)?.cwd || folder
   }
   function requestSession(group = layout.focused, orientation?: Layout['orientation'], chooseFolder = false) {
-    void add(group, orientation, chooseFolder)
+    void createSession({ group, orientation, chooseFolder })
   }
-  async function add(group = layout.focused, orientation?: Layout['orientation'], chooseFolder = false, selectedFolder?: string, reportToModal = false) {
+  interface CreateSessionOptions {
+    group?: number
+    orientation?: Layout['orientation']
+    chooseFolder?: boolean
+    selectedFolder?: string
+    reportToModal?: boolean
+    agent?: TerminalAgent
+  }
+  async function createSession({
+    group = layout.focused,
+    orientation,
+    chooseFolder = false,
+    selectedFolder,
+    reportToModal = false,
+    agent
+  }: CreateSessionOptions = {}) {
     if (busy) return
-    setBusy(true); setError('')
+    setBusy(true)
+    setError('')
     try {
       const cwd = selectedFolder ?? (chooseFolder ? await window.workspace.chooseFolder(groupFolder(group)) : groupFolder(group))
       if (cwd === null) return
       setCreatingGroup(group)
-      const session = await window.workspace.create(cwd)
-      if (session.status === 'error') throw new Error(session.error || 'Could not start the Pi session')
-      setSessions(list => list.some(s => s.id === session.id) ? list.map(s => s.id === session.id ? session : s) : [...list, session])
-      if (orientation) { dispatch({ type: 'split', orientation, group, newId: session.id }) }
-      else dispatch({ type: 'add', id: session.id, group })
-    } catch (e) { if (reportToModal) throw e; setError(String(e)) } finally { setBusy(false); setCreatingGroup(null) }
+      const session = agent === undefined ? await window.workspace.create(cwd) : await window.workspace.create(cwd, agent)
+      if (session.status === 'error') throw new Error(session.error || 'Could not start the terminal session')
+      setSessions(list => (list.some(s => s.id === session.id) ? list.map(s => (s.id === session.id ? session : s)) : [...list, session]))
+      if (orientation) {
+        dispatch({ type: 'split', orientation, group, newId: session.id })
+      } else {
+        dispatch({ type: 'add', id: session.id, group })
+      }
+    } catch (e) {
+      if (reportToModal) throw e
+      setError(String(e))
+    } finally {
+      setBusy(false)
+      setCreatingGroup(null)
+    }
   }
   async function close(id: string) {
     if (closing.includes(id)) return
@@ -300,14 +349,55 @@ export default function App() {
               </div>
             })}
           </div>
-          <Button size="xs" variant="ghost" flexShrink="0" aria-label={t("New session in group {number}", { number: index + 1 })} title={t("New session")} disabled={busy} onClick={() => requestSession(index)}>＋</Button>
+          <div className="session-launcher">
+            <Button
+              size="xs"
+              variant="ghost"
+              aria-label={t("New session in group {number}", { number: index + 1 })}
+              title={t("New session")}
+              disabled={busy}
+              onClick={() => void createSession({ group: index, agent: groupActiveSession(index)?.agent })}
+            >
+              ＋
+            </Button>
+            <Menu.Root
+              open={launcherGroup === index}
+              onOpenChange={({ open }) => {
+                if (open) {
+                  setTabMenu(null)
+                  setLauncherGroup(index)
+                } else {
+                  setLauncherGroup(current => (current === index ? null : current))
+                }
+              }}
+              positioning={{ placement: 'bottom-end' }}
+              onSelect={({ value }) => void createSession({ group: index, agent: value as TerminalAgent })}
+            >
+              <Menu.Trigger asChild>
+                <Button size="xs" variant="ghost" disabled={busy} aria-label={t("New session options in group {number}", { number: index + 1 })}>
+                  ▾
+                </Button>
+              </Menu.Trigger>
+              <Portal>
+                <Menu.Positioner>
+                  <Menu.Content minW="140px">
+                    {TERMINAL_AGENTS.map(agent => (
+                      <Menu.Item key={agent} value={agent} disabled={busy || !launcherStatus?.installed[agent]}>
+                        {TERMINAL_AGENT_LABELS[agent]}
+                      </Menu.Item>
+                    ))}
+                  </Menu.Content>
+                </Menu.Positioner>
+              </Portal>
+            </Menu.Root>
+          </div>
           {split && <Button size="xs" variant="ghost" flexShrink="0" aria-label={t("Move active tab from group {number} to other group", { number: index + 1 })} title={t("Move active tab to other group")} disabled={busy} onClick={() => dispatch({ type: 'move', group: index })}>⇄</Button>}
         </div>)}
         {sessions.map(session => {
           const index = layout.groups.findIndex(g => g.ids.includes(session.id))
           const visible = index >= 0 && layout.groups[index].active === session.id
           return <div key={session.id} id={`panel-${session.id}`} role="tabpanel" aria-labelledby={`tab-${session.id}`} className="session-panel" style={{ ...position(Math.max(0, index), 2), display: visible ? 'flex' : 'none' }}>
-            <TerminalPane session={session} visible={visible && page === 'workspace'} focused={visible && page === 'workspace' && layout.focused === index} autoFocusBlocked={tabMenu !== null || renaming !== null} onFocus={() => dispatch({ type: 'focus', group: index })} />
+            <TerminalPane session={session} visible={visible && page === 'workspace'} focused={visible && page === 'workspace' && layout.focused === index} autoFocusBlocked={tabMenu !== null || launcherGroup !== null || renaming !== null} onFocus={() => dispatch({ type: 'focus', group: index })} />
           </div>
         })}
         {separators.map(separator => <div key={separator.path} className={`group-separator separator-${separator.orientation}`} role="separator" tabIndex={0} aria-label={t("Resize terminal groups")} aria-orientation={separator.orientation === 'right' ? "vertical" : "horizontal"} aria-valuemin={25} aria-valuemax={75} aria-valuenow={separator.ratio} style={{ position: 'absolute', left: separator.orientation === 'right' ? `calc(${separator.left}% - 3px)` : `${separator.left}%`, top: separator.orientation === 'down' ? `calc(${separator.top}% - 3px)` : `${separator.top}%`, width: separator.orientation === 'right' ? 6 : `${separator.width}%`, height: separator.orientation === 'down' ? 6 : `${separator.height}%` }}
@@ -362,7 +452,7 @@ export default function App() {
         setTabMenu(null)
         if (session) { renameDone.current = false; setRenaming({ id: session.id, name: session.name }) }
       }}>{t('Rename')}</button>
-      <button type="button" role="menuitem" disabled={busy} onClick={() => { const group = tabMenu.group; setTabMenu(null); void add(group) }}>{t('Duplicate')}</button>
+      <button type="button" role="menuitem" disabled={busy} onClick={() => { const group = tabMenu.group; setTabMenu(null); void createSession({ group }) }}>{t('Duplicate')}</button>
     </div></Portal>}
     <Dialog.Root role="alertdialog" open={closeTarget !== null} placement="center" size="sm" initialFocusEl={() => cancelClose.current} closeOnInteractOutside={false} onOpenChange={({ open }) => { if (!open && !closing.length) setCloseTarget(null) }}>
       <Portal>

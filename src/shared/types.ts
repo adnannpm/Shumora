@@ -1,8 +1,11 @@
+import type { TerminalAgent } from './terminal-agent'
+
 export type AgentActivity = 'working' | 'waiting' | 'done' | 'error' | 'disconnected'
 export interface Session {
   id: string
   name: string
   cwd: string
+  agent: TerminalAgent
   status: 'running' | 'exited' | 'error'
   generation: number
   activity?: AgentActivity
@@ -69,7 +72,7 @@ export interface WorkspaceAPI {
   notificationsEnabled?(): Promise<boolean>
   setNotificationsEnabled?(enabled: boolean): Promise<void>
   list(): Promise<Session[]>
-  create(cwd?: string): Promise<Session>
+  create(cwd?: string, agent?: TerminalAgent): Promise<Session>
   snapshot(id: string): Promise<Snapshot>
   input(id: string, data: string): Promise<void>
   resize(id: string, cols: number, rows: number): Promise<void>
